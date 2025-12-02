@@ -144,7 +144,12 @@ function UploadPanel({ onModelReady, hasModel }) {
     return (
       <div style={styles.miniPanel}>
         <button style={styles.newModelBtn} onClick={handleReset}>
-          📁 Load New Model
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
+          </svg>
+          Load New Model
         </button>
       </div>
     )
@@ -152,63 +157,159 @@ function UploadPanel({ onModelReady, hasModel }) {
 
   return (
     <div style={styles.overlay}>
-      <div style={styles.panel}>
-        <h1 style={styles.title}>🏗️ Digital Twin Viewer</h1>
-        <p style={styles.subtitle}>Upload an IFC file to get started</p>
+      {/* Header */}
+      <header style={styles.header}>
+        <div style={styles.logo}>
+          <span style={styles.logoIcon}>◈</span>
+          <span style={styles.logoText}>DIGITAL TWIN</span>
+        </div>
+        <nav style={styles.nav}>
+          <a href="#" style={styles.navLinkActive}>Overview</a>
+          <a href="#" style={styles.navLink}>Details</a>
+          <a href="#" style={styles.navLink}>Reports</a>
+          <a href="#" style={styles.navLink}>Contact</a>
+        </nav>
+        <div style={styles.headerRight}>
+          <a href="#" style={styles.loginLink}>Log in</a>
+          <button style={styles.signUpBtn}>Sign up</button>
+        </div>
+      </header>
 
-        {uploadState === 'idle' && (
-          <div
-            style={{
-              ...styles.dropzone,
-              ...(isDragging ? styles.dropzoneActive : {})
-            }}
-            onDrop={handleDrop}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-          >
-            <span style={styles.dropIcon}>📄</span>
-            <p style={styles.dropText}>
-              Drag & drop your <strong>.ifc</strong> file here
-            </p>
-            <p style={styles.dropOr}>or</p>
-            <label style={styles.browseBtn}>
-              Browse Files
-              <input
-                type="file"
-                accept=".ifc"
-                onChange={handleFileChange}
-                style={styles.fileInput}
-              />
-            </label>
-          </div>
-        )}
-
-        {(uploadState === 'uploading' || uploadState === 'processing') && (
-          <div style={styles.processing}>
-            <div style={styles.spinner}></div>
-            <p style={styles.progressText}>{progress}</p>
-            <p style={styles.hint}>
-              {uploadState === 'processing' && 'Converting geometry and extracting metadata...'}
-            </p>
-          </div>
-        )}
-
-        {uploadState === 'error' && (
-          <div style={styles.errorBox}>
-            <p style={styles.errorText}>❌ {error}</p>
-            <button style={styles.retryBtn} onClick={handleReset}>
-              Try Again
-            </button>
-          </div>
-        )}
-
-        <div style={styles.footer}>
-          <p style={styles.footerText}>
-            Supports IFC 2x3 and IFC 4 files
+      {/* Main Content */}
+      <div style={styles.mainContent}>
+        {/* Left side - Text */}
+        <div style={styles.leftContent}>
+          <h1 style={styles.title}>BUILDING<br/>INSIGHTS</h1>
+          <p style={styles.subtitle}>
+            Upload your IFC building model to explore<br/>
+            detailed 3D visualization and metadata.
           </p>
-          <p style={styles.footerHint}>
-            Make sure the backend server is running on port 8000
-          </p>
+          <button style={styles.learnMoreBtn}>
+            Learn more
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{marginLeft: '8px'}}>
+              <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+          </button>
+        </div>
+
+        {/* Center - 3D Building Illustration */}
+        <div style={styles.centerContent}>
+          <div style={styles.buildingIllustration}>
+            <svg viewBox="0 0 200 200" style={styles.buildingSvg}>
+              {/* Simple isometric building */}
+              <g transform="translate(100, 160)">
+                {/* Base */}
+                <polygon points="0,-120 60,-90 60,-30 0,-60 -60,-30 -60,-90" fill="#e8e8ed" stroke="#c7c7cc" strokeWidth="1"/>
+                {/* Left face */}
+                <polygon points="-60,-90 0,-60 0,0 -60,-30" fill="#f5f5f7" stroke="#c7c7cc" strokeWidth="1"/>
+                {/* Right face */}
+                <polygon points="0,-60 60,-90 60,-30 0,0" fill="#ffffff" stroke="#c7c7cc" strokeWidth="1"/>
+                {/* Windows left */}
+                <rect x="-45" y="-75" width="12" height="15" fill="#d1d1d6" transform="skewY(-30)"/>
+                <rect x="-25" y="-75" width="12" height="15" fill="#d1d1d6" transform="skewY(-30)"/>
+                <rect x="-45" y="-50" width="12" height="15" fill="#d1d1d6" transform="skewY(-30)"/>
+                <rect x="-25" y="-50" width="12" height="15" fill="#d1d1d6" transform="skewY(-30)"/>
+                {/* Windows right */}
+                <rect x="15" y="-82" width="12" height="15" fill="#d1d1d6" transform="skewY(30)"/>
+                <rect x="35" y="-82" width="12" height="15" fill="#d1d1d6" transform="skewY(30)"/>
+                <rect x="15" y="-57" width="12" height="15" fill="#d1d1d6" transform="skewY(30)"/>
+                <rect x="35" y="-57" width="12" height="15" fill="#d1d1d6" transform="skewY(30)"/>
+              </g>
+            </svg>
+          </div>
+        </div>
+
+        {/* Right side - Upload Panel */}
+        <div style={styles.rightContent}>
+          <div style={styles.uploadCard}>
+            {uploadState === 'idle' && (
+              <>
+                <div style={styles.cardHeader}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1d1d1f" strokeWidth="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="17 8 12 3 7 8" />
+                    <line x1="12" y1="3" x2="12" y2="15" />
+                  </svg>
+                  <span style={styles.cardTitle}>Upload Model</span>
+                </div>
+                
+                <div
+                  style={{
+                    ...styles.dropzone,
+                    ...(isDragging ? styles.dropzoneActive : {})
+                  }}
+                  onDrop={handleDrop}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                >
+                  <div style={styles.dropIcon}>
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#86868b" strokeWidth="1.5">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                    </svg>
+                  </div>
+                  <p style={styles.dropText}>
+                    Drag & drop your <strong>.ifc</strong> file
+                  </p>
+                  <span style={styles.dropOr}>or</span>
+                  <label style={styles.browseBtn}>
+                    Browse Files
+                    <input
+                      type="file"
+                      accept=".ifc"
+                      onChange={handleFileChange}
+                      style={styles.fileInput}
+                    />
+                  </label>
+                </div>
+
+                <div style={styles.cardFooter}>
+                  <p style={styles.supportText}>Supports IFC 2x3 and IFC 4</p>
+                </div>
+              </>
+            )}
+
+            {(uploadState === 'uploading' || uploadState === 'processing') && (
+              <div style={styles.processing}>
+                <div style={styles.spinner}></div>
+                <p style={styles.progressText}>{progress}</p>
+                <p style={styles.hint}>
+                  {uploadState === 'processing' && 'Converting geometry and extracting metadata...'}
+                </p>
+              </div>
+            )}
+
+            {uploadState === 'error' && (
+              <div style={styles.errorBox}>
+                <div style={styles.errorIcon}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ff3b30" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="15" y1="9" x2="9" y2="15" />
+                    <line x1="9" y1="9" x2="15" y2="15" />
+                  </svg>
+                </div>
+                <p style={styles.errorText}>{error}</p>
+                <button style={styles.retryBtn} onClick={handleReset}>
+                  Try Again
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Stats Card */}
+          <div style={styles.statsCard}>
+            <div style={styles.statItem}>
+              <span style={styles.statLabel}>Server Status</span>
+              <div style={styles.statValue}>
+                <span style={styles.statusDot}></span>
+                Active
+              </div>
+            </div>
+            <div style={styles.statItem}>
+              <span style={styles.statLabel}>Port</span>
+              <span style={styles.statValue}>8000</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -225,160 +326,299 @@ const styles = {
     left: 0,
     right: 0,
     bottom: 0,
-    background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+    background: '#f5f5f7',
+    display: 'flex',
+    flexDirection: 'column',
+    zIndex: 1000,
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  },
+  header: {
+    height: '60px',
+    background: '#ffffff',
+    borderBottom: '1px solid #e5e5e7',
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000,
-    fontFamily: 'system-ui, -apple-system, sans-serif',
+    justifyContent: 'space-between',
+    padding: '0 24px',
   },
-  panel: {
-    background: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: '16px',
-    padding: '40px',
-    maxWidth: '480px',
-    width: '90%',
-    textAlign: 'center',
-    backdropFilter: 'blur(10px)',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
+  logo: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  logoIcon: {
+    fontSize: '20px',
+    color: '#1d1d1f',
+  },
+  logoText: {
+    fontSize: '14px',
+    fontWeight: 600,
+    letterSpacing: '1.5px',
+    color: '#1d1d1f',
+  },
+  nav: {
+    display: 'flex',
+    gap: '32px',
+  },
+  navLink: {
+    fontSize: '14px',
+    color: '#86868b',
+    textDecoration: 'none',
+    fontWeight: 500,
+    transition: 'color 0.2s',
+  },
+  navLinkActive: {
+    fontSize: '14px',
+    color: '#1d1d1f',
+    textDecoration: 'none',
+    fontWeight: 500,
+  },
+  headerRight: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+  },
+  loginLink: {
+    fontSize: '14px',
+    color: '#1d1d1f',
+    textDecoration: 'none',
+    fontWeight: 500,
+  },
+  signUpBtn: {
+    padding: '8px 16px',
+    background: '#1d1d1f',
+    color: '#ffffff',
+    border: 'none',
+    borderRadius: '6px',
+    fontSize: '13px',
+    fontWeight: 500,
+    cursor: 'pointer',
+  },
+  mainContent: {
+    flex: 1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '40px 60px',
+    gap: '40px',
+  },
+  leftContent: {
+    flex: '0 0 auto',
+    maxWidth: '400px',
   },
   title: {
-    margin: '0 0 8px 0',
-    fontSize: '28px',
-    color: '#ffffff',
-    fontWeight: 600,
+    fontSize: '56px',
+    fontWeight: 700,
+    lineHeight: 1.1,
+    color: '#1d1d1f',
+    margin: '0 0 20px 0',
+    letterSpacing: '-1px',
   },
   subtitle: {
-    margin: '0 0 32px 0',
-    color: 'rgba(255, 255, 255, 0.6)',
     fontSize: '16px',
+    color: '#86868b',
+    lineHeight: 1.6,
+    margin: '0 0 32px 0',
+  },
+  learnMoreBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    padding: '12px 20px',
+    background: '#1d1d1f',
+    color: '#ffffff',
+    border: 'none',
+    borderRadius: '8px',
+    fontSize: '14px',
+    fontWeight: 500,
+    cursor: 'pointer',
+  },
+  centerContent: {
+    flex: '1 1 auto',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  buildingIllustration: {
+    width: '300px',
+    height: '300px',
+  },
+  buildingSvg: {
+    width: '100%',
+    height: '100%',
+  },
+  rightContent: {
+    flex: '0 0 auto',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+    width: '320px',
+  },
+  uploadCard: {
+    background: '#ffffff',
+    borderRadius: '16px',
+    padding: '24px',
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04), 0 4px 24px rgba(0, 0, 0, 0.04)',
+  },
+  cardHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    marginBottom: '20px',
+  },
+  cardTitle: {
+    fontSize: '15px',
+    fontWeight: 600,
+    color: '#1d1d1f',
   },
   dropzone: {
-    border: '2px dashed rgba(255, 255, 255, 0.3)',
+    border: '2px dashed #d1d1d6',
     borderRadius: '12px',
-    padding: '40px 20px',
-    cursor: 'pointer',
+    padding: '32px 20px',
+    textAlign: 'center',
     transition: 'all 0.2s ease',
-    background: 'rgba(255, 255, 255, 0.02)',
+    background: '#fafafa',
+    cursor: 'pointer',
   },
   dropzoneActive: {
-    borderColor: '#646cff',
-    background: 'rgba(100, 108, 255, 0.1)',
+    borderColor: '#1d1d1f',
+    background: '#f0f0f2',
   },
   dropIcon: {
-    fontSize: '48px',
-    display: 'block',
-    marginBottom: '16px',
+    marginBottom: '12px',
   },
   dropText: {
     margin: '0 0 8px 0',
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: '16px',
+    color: '#1d1d1f',
+    fontSize: '14px',
   },
   dropOr: {
-    margin: '16px 0',
-    color: 'rgba(255, 255, 255, 0.4)',
-    fontSize: '14px',
+    display: 'block',
+    margin: '12px 0',
+    color: '#86868b',
+    fontSize: '12px',
   },
   browseBtn: {
     display: 'inline-block',
-    padding: '12px 24px',
-    background: '#646cff',
+    padding: '10px 20px',
+    background: '#1d1d1f',
     color: '#ffffff',
     borderRadius: '8px',
     cursor: 'pointer',
-    fontSize: '14px',
+    fontSize: '13px',
     fontWeight: 500,
     transition: 'background 0.2s',
   },
   fileInput: {
     display: 'none',
   },
+  cardFooter: {
+    marginTop: '16px',
+    paddingTop: '16px',
+    borderTop: '1px solid #f0f0f2',
+  },
+  supportText: {
+    margin: 0,
+    fontSize: '12px',
+    color: '#86868b',
+    textAlign: 'center',
+  },
   processing: {
     padding: '40px 20px',
+    textAlign: 'center',
   },
   spinner: {
-    width: '48px',
-    height: '48px',
-    border: '4px solid rgba(255, 255, 255, 0.1)',
-    borderTopColor: '#646cff',
+    width: '40px',
+    height: '40px',
+    border: '3px solid #f0f0f2',
+    borderTopColor: '#1d1d1f',
     borderRadius: '50%',
     margin: '0 auto 20px',
     animation: 'spin 1s linear infinite',
   },
   progressText: {
     margin: '0 0 8px 0',
-    color: '#ffffff',
-    fontSize: '16px',
+    color: '#1d1d1f',
+    fontSize: '14px',
+    fontWeight: 500,
   },
   hint: {
     margin: 0,
-    color: 'rgba(255, 255, 255, 0.5)',
-    fontSize: '14px',
+    color: '#86868b',
+    fontSize: '13px',
   },
   errorBox: {
-    padding: '20px',
-    background: 'rgba(255, 107, 107, 0.1)',
-    borderRadius: '8px',
-    border: '1px solid rgba(255, 107, 107, 0.3)',
+    padding: '32px 20px',
+    textAlign: 'center',
+  },
+  errorIcon: {
+    marginBottom: '12px',
   },
   errorText: {
     margin: '0 0 16px 0',
-    color: '#ff6b6b',
+    color: '#ff3b30',
     fontSize: '14px',
   },
   retryBtn: {
     padding: '10px 20px',
-    background: 'rgba(255, 255, 255, 0.1)',
-    border: '1px solid rgba(255, 255, 255, 0.2)',
-    borderRadius: '6px',
-    color: '#ffffff',
+    background: '#f5f5f7',
+    border: '1px solid #d1d1d6',
+    borderRadius: '8px',
+    color: '#1d1d1f',
     cursor: 'pointer',
-    fontSize: '14px',
+    fontSize: '13px',
+    fontWeight: 500,
   },
-  footer: {
-    marginTop: '32px',
-    paddingTop: '20px',
-    borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+  statsCard: {
+    background: '#ffffff',
+    borderRadius: '12px',
+    padding: '16px 20px',
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
   },
-  footerText: {
-    margin: '0 0 4px 0',
-    color: 'rgba(255, 255, 255, 0.4)',
-    fontSize: '12px',
+  statItem: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '8px 0',
   },
-  footerHint: {
-    margin: 0,
-    color: 'rgba(255, 255, 255, 0.3)',
-    fontSize: '11px',
+  statLabel: {
+    fontSize: '13px',
+    color: '#86868b',
+  },
+  statValue: {
+    fontSize: '13px',
+    fontWeight: 500,
+    color: '#1d1d1f',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+  },
+  statusDot: {
+    width: '8px',
+    height: '8px',
+    borderRadius: '50%',
+    background: '#34c759',
   },
   miniPanel: {
     position: 'absolute',
-    top: 20,
+    bottom: 20,
     left: '50%',
     transform: 'translateX(-50%)',
     zIndex: 100,
   },
   newModelBtn: {
-    padding: '8px 16px',
-    background: 'rgba(26, 26, 46, 0.9)',
-    border: '1px solid rgba(255, 255, 255, 0.2)',
-    borderRadius: '6px',
-    color: '#ffffff',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '10px 16px',
+    background: '#ffffff',
+    border: '1px solid #e5e5e7',
+    borderRadius: '8px',
+    color: '#1d1d1f',
     cursor: 'pointer',
     fontSize: '13px',
-    backdropFilter: 'blur(10px)',
+    fontWeight: 500,
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
   },
-}
-
-// Add CSS animation for spinner
-if (typeof document !== 'undefined') {
-  const styleSheet = document.createElement('style')
-  styleSheet.textContent = `
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-  `
-  document.head.appendChild(styleSheet)
 }
 
 export default UploadPanel

@@ -43,29 +43,59 @@ function PropertyPanel({ selectedId, metadataUrl = '/metadata.json' }) {
 
       <div style={styles.content}>
         {loading && (
-          <div style={styles.message}>Loading metadata...</div>
+          <div style={styles.message}>
+            <div style={styles.loadingSpinner}></div>
+            <p>Loading metadata...</p>
+          </div>
         )}
 
         {error && (
           <div style={styles.errorMessage}>
-            <span style={styles.errorIcon}>⚠️</span>
-            {error}
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ff3b30" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            <p>{error}</p>
           </div>
         )}
 
         {!loading && !error && !selectedId && (
           <div style={styles.message}>
-            <span style={styles.selectIcon}>👆</span>
-            <p>Select an element</p>
+            <div style={styles.selectIconWrapper}>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#86868b" strokeWidth="1.5">
+                <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z" />
+                <path d="M13 13l6 6" />
+              </svg>
+            </div>
+            <p style={styles.messageTitle}>Select an element</p>
             <p style={styles.hint}>Click on a 3D element to view its properties</p>
           </div>
         )}
 
         {!loading && !error && selectedId && !elementData && (
           <div style={styles.message}>
-            <span style={styles.errorIcon}>❓</span>
-            <p>No data found</p>
+            <div style={styles.selectIconWrapper}>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#86868b" strokeWidth="1.5">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+            </div>
+            <p style={styles.messageTitle}>No data found</p>
             <p style={styles.hint}>ID: {selectedId}</p>
+            <p style={styles.hint}>
+              {metadata ? `${Object.keys(metadata).length} elements in metadata` : 'Metadata not loaded'}
+            </p>
+            <details style={styles.debugDetails}>
+              <summary style={styles.debugSummary}>Debug Info</summary>
+              <p style={styles.debugText}>
+                Available IDs (first 5):<br/>
+                {metadata ? Object.keys(metadata).slice(0, 5).map(id => (
+                  <code key={id} style={styles.debugCode}>{id}</code>
+                )) : 'None'}
+              </p>
+            </details>
           </div>
         )}
 
@@ -150,7 +180,17 @@ function PropertySet({ name, properties }) {
         style={styles.psetHeader}
         onClick={() => setExpanded(!expanded)}
       >
-        <span style={styles.expandIcon}>{expanded ? '▼' : '▶'}</span>
+        <svg 
+          width="12" 
+          height="12" 
+          viewBox="0 0 24 24" 
+          fill="none" 
+          stroke="currentColor" 
+          strokeWidth="2"
+          style={{ transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
+        >
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
         <span style={styles.psetName}>{name}</span>
         <span style={styles.psetCount}>{Object.keys(properties).length}</span>
       </button>
@@ -170,6 +210,46 @@ function PropertySet({ name, properties }) {
  */
 function PropertyRow({ label, value, mono = false }) {
   const displayValue = formatValue(value)
+  
+  // Check if value is a complex object (like material layers)
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    // Check if it's a special IFC quantity object
+    if (value.type && value.type.includes('IfcPhysical')) {
+      return (
+        <div style={styles.complexPropertyRow}>
+          <div style={styles.complexPropertyHeader}>
+            <span style={styles.propertyLabel}>{label}</span>
+            <span style={styles.complexTypeTag}>{value.Discrimination || 'Layer'}</span>
+          </div>
+          {value.properties && (
+            <div style={styles.nestedProperties}>
+              {Object.entries(value.properties).map(([key, val]) => (
+                <div key={key} style={styles.nestedProperty}>
+                  <span style={styles.nestedLabel}>{key}</span>
+                  <span style={styles.nestedValue}>{formatValue(val)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )
+    }
+    
+    // For other objects, show as nested properties
+    return (
+      <div style={styles.complexPropertyRow}>
+        <span style={styles.propertyLabel}>{label}</span>
+        <div style={styles.nestedProperties}>
+          {Object.entries(value).map(([key, val]) => (
+            <div key={key} style={styles.nestedProperty}>
+              <span style={styles.nestedLabel}>{key}</span>
+              <span style={styles.nestedValue}>{formatValue(val)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
   
   return (
     <div style={styles.propertyRow}>
@@ -196,7 +276,12 @@ function formatValue(value) {
     return value.toFixed(3)
   }
   if (Array.isArray(value)) return value.join(', ')
-  if (typeof value === 'object') return JSON.stringify(value)
+  if (typeof value === 'object') {
+    // For objects, just show a summary instead of raw JSON
+    const keys = Object.keys(value)
+    if (keys.length === 0) return '—'
+    return `{${keys.length} properties}`
+  }
   return String(value)
 }
 
@@ -205,30 +290,28 @@ function formatValue(value) {
  */
 const styles = {
   panel: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
     width: '320px',
     height: '100%',
-    background: 'rgba(26, 26, 46, 0.95)',
-    borderLeft: '1px solid rgba(255, 255, 255, 0.1)',
+    background: '#ffffff',
+    borderLeft: '1px solid #e5e5e7',
     display: 'flex',
     flexDirection: 'column',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
-    color: '#ffffff',
-    backdropFilter: 'blur(10px)',
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    color: '#1d1d1f',
+    flexShrink: 0,
   },
   header: {
     padding: '16px 20px',
-    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+    borderBottom: '1px solid #e5e5e7',
+    background: '#fafafa',
   },
   title: {
     margin: 0,
-    fontSize: '14px',
+    fontSize: '13px',
     fontWeight: 600,
     textTransform: 'uppercase',
     letterSpacing: '0.5px',
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: '#86868b',
   },
   content: {
     flex: 1,
@@ -241,44 +324,65 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     height: '200px',
-    color: 'rgba(255, 255, 255, 0.5)',
+    color: '#86868b',
     textAlign: 'center',
     padding: '20px',
   },
-  selectIcon: {
-    fontSize: '32px',
-    marginBottom: '12px',
+  selectIconWrapper: {
+    width: '64px',
+    height: '64px',
+    borderRadius: '50%',
+    background: '#f5f5f7',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: '16px',
   },
-  errorIcon: {
-    fontSize: '24px',
-    marginBottom: '8px',
+  messageTitle: {
+    margin: '0 0 4px 0',
+    fontSize: '15px',
+    fontWeight: 500,
+    color: '#1d1d1f',
   },
   hint: {
-    fontSize: '12px',
-    marginTop: '4px',
-    opacity: 0.6,
+    margin: 0,
+    fontSize: '13px',
+    color: '#86868b',
+  },
+  loadingSpinner: {
+    width: '32px',
+    height: '32px',
+    border: '3px solid #f0f0f2',
+    borderTopColor: '#1d1d1f',
+    borderRadius: '50%',
+    marginBottom: '16px',
+    animation: 'spin 1s linear infinite',
   },
   errorMessage: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     padding: '20px',
-    color: '#ff6b6b',
+    color: '#ff3b30',
     textAlign: 'center',
+    gap: '12px',
   },
   elementInfo: {
     padding: '0 16px',
   },
   elementHeader: {
     marginBottom: '20px',
+    padding: '16px',
+    background: '#f5f5f7',
+    borderRadius: '12px',
   },
   typeTag: {
     display: 'inline-block',
     padding: '4px 8px',
-    background: 'rgba(100, 108, 255, 0.2)',
-    color: '#a5a8ff',
+    background: '#1d1d1f',
+    color: '#ffffff',
     borderRadius: '4px',
-    fontSize: '11px',
+    fontSize: '10px',
     fontWeight: 600,
     textTransform: 'uppercase',
     letterSpacing: '0.5px',
@@ -286,29 +390,30 @@ const styles = {
   },
   elementName: {
     margin: '0 0 4px 0',
-    fontSize: '18px',
+    fontSize: '16px',
     fontWeight: 600,
-    color: '#ffffff',
+    color: '#1d1d1f',
     wordBreak: 'break-word',
   },
   description: {
     margin: 0,
     fontSize: '13px',
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: '#86868b',
   },
   section: {
     marginBottom: '20px',
   },
   sectionTitle: {
-    margin: '0 0 12px 0',
+    margin: '0 0 8px 0',
     fontSize: '11px',
     fontWeight: 600,
     textTransform: 'uppercase',
     letterSpacing: '0.5px',
-    color: 'rgba(255, 255, 255, 0.5)',
+    color: '#86868b',
+    paddingLeft: '4px',
   },
   propertyList: {
-    background: 'rgba(255, 255, 255, 0.03)',
+    background: '#f5f5f7',
     borderRadius: '8px',
     overflow: 'hidden',
   },
@@ -317,22 +422,62 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     padding: '10px 12px',
-    borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+    borderBottom: '1px solid #e5e5e7',
     gap: '12px',
+  },
+  complexPropertyRow: {
+    padding: '10px 12px',
+    borderBottom: '1px solid #e5e5e7',
+  },
+  complexPropertyHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '8px',
+  },
+  complexTypeTag: {
+    fontSize: '10px',
+    color: '#86868b',
+    background: '#e5e5e7',
+    padding: '2px 6px',
+    borderRadius: '4px',
+    textTransform: 'uppercase',
+  },
+  nestedProperties: {
+    background: '#ffffff',
+    borderRadius: '6px',
+    border: '1px solid #e5e5e7',
+    overflow: 'hidden',
+  },
+  nestedProperty: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '6px 10px',
+    borderBottom: '1px solid #f0f0f2',
+    fontSize: '12px',
+  },
+  nestedLabel: {
+    color: '#86868b',
+  },
+  nestedValue: {
+    color: '#1d1d1f',
+    fontWeight: 500,
   },
   propertyLabel: {
     fontSize: '13px',
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: '#86868b',
     flexShrink: 0,
   },
   propertyValue: {
     fontSize: '13px',
-    color: '#ffffff',
+    color: '#1d1d1f',
     textAlign: 'right',
     wordBreak: 'break-word',
+    fontWeight: 500,
   },
   monoText: {
-    fontFamily: 'ui-monospace, monospace',
+    fontFamily: "'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', monospace",
     fontSize: '11px',
   },
   materialList: {
@@ -341,15 +486,16 @@ const styles = {
     gap: '6px',
   },
   materialTag: {
-    padding: '4px 10px',
-    background: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: '12px',
+    padding: '6px 12px',
+    background: '#f5f5f7',
+    borderRadius: '16px',
     fontSize: '12px',
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: '#1d1d1f',
+    fontWeight: 500,
   },
   pset: {
     marginBottom: '8px',
-    background: 'rgba(255, 255, 255, 0.03)',
+    background: '#f5f5f7',
     borderRadius: '8px',
     overflow: 'hidden',
   },
@@ -360,14 +506,11 @@ const styles = {
     padding: '10px 12px',
     background: 'none',
     border: 'none',
-    color: '#ffffff',
+    color: '#1d1d1f',
     cursor: 'pointer',
     textAlign: 'left',
     gap: '8px',
-  },
-  expandIcon: {
-    fontSize: '10px',
-    color: 'rgba(255, 255, 255, 0.4)',
+    fontFamily: 'inherit',
   },
   psetName: {
     flex: 1,
@@ -376,13 +519,40 @@ const styles = {
   },
   psetCount: {
     fontSize: '11px',
-    color: 'rgba(255, 255, 255, 0.4)',
-    background: 'rgba(255, 255, 255, 0.1)',
-    padding: '2px 6px',
+    color: '#86868b',
+    background: '#e5e5e7',
+    padding: '2px 8px',
     borderRadius: '10px',
   },
   psetContent: {
-    borderTop: '1px solid rgba(255, 255, 255, 0.05)',
+    borderTop: '1px solid #e5e5e7',
+    background: '#ffffff',
+  },
+  debugDetails: {
+    marginTop: '12px',
+    textAlign: 'left',
+    width: '100%',
+  },
+  debugSummary: {
+    cursor: 'pointer',
+    fontSize: '11px',
+    color: '#86868b',
+  },
+  debugText: {
+    fontSize: '10px',
+    color: '#86868b',
+    marginTop: '8px',
+    lineHeight: '1.6',
+  },
+  debugCode: {
+    display: 'block',
+    fontFamily: "'SF Mono', 'Monaco', monospace",
+    fontSize: '9px',
+    background: '#f5f5f7',
+    padding: '2px 4px',
+    borderRadius: '2px',
+    marginTop: '2px',
+    wordBreak: 'break-all',
   },
 }
 

@@ -140,11 +140,21 @@ function StructureTree({
 
       <div style={styles.content}>
         {loading && (
-          <div style={styles.message}>Loading hierarchy...</div>
+          <div style={styles.message}>
+            <div style={styles.loadingSpinner}></div>
+            <p>Loading hierarchy...</p>
+          </div>
         )}
 
         {error && (
-          <div style={styles.errorMessage}>⚠️ {error}</div>
+          <div style={styles.errorMessage}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ff3b30" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            <span>{error}</span>
+          </div>
         )}
 
         {!loading && !error && hierarchy && (
@@ -165,17 +175,27 @@ function StructureTree({
         {/* Statistics */}
         {hierarchy?.statistics && (
           <div style={styles.stats}>
-            <div style={styles.statItem}>
-              <span>Buildings</span>
-              <span>{hierarchy.statistics.buildings}</span>
+            <div style={styles.statsHeader}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#86868b" strokeWidth="2">
+                <path d="M18 20V10" />
+                <path d="M12 20V4" />
+                <path d="M6 20v-6" />
+              </svg>
+              <span>Statistics</span>
             </div>
-            <div style={styles.statItem}>
-              <span>Storeys</span>
-              <span>{hierarchy.statistics.storeys}</span>
-            </div>
-            <div style={styles.statItem}>
-              <span>Elements</span>
-              <span>{hierarchy.statistics.totalElements}</span>
+            <div style={styles.statsGrid}>
+              <div style={styles.statItem}>
+                <span style={styles.statValue}>{hierarchy.statistics.buildings}</span>
+                <span style={styles.statLabel}>Buildings</span>
+              </div>
+              <div style={styles.statItem}>
+                <span style={styles.statValue}>{hierarchy.statistics.storeys}</span>
+                <span style={styles.statLabel}>Storeys</span>
+              </div>
+              <div style={styles.statItem}>
+                <span style={styles.statValue}>{hierarchy.statistics.totalElements}</span>
+                <span style={styles.statLabel}>Elements</span>
+              </div>
             </div>
           </div>
         )}
@@ -204,15 +224,12 @@ function TreeNode({
   const isIsolated = isolatedBranch === nodeId
   const isLeaf = !hasChildren && node.globalId && node.type !== 'Category'
   
-  // Get icon based on type
-  const icon = getTypeIcon(node.type)
-  
   return (
     <div style={styles.nodeContainer}>
       <div 
         style={{
           ...styles.node,
-          paddingLeft: `${depth * 16 + 8}px`,
+          paddingLeft: `${depth * 16 + 12}px`,
           ...(isSelected ? styles.nodeSelected : {}),
           ...(isIsolated ? styles.nodeIsolated : {})
         }}
@@ -223,14 +240,21 @@ function TreeNode({
             style={styles.expandBtn}
             onClick={() => toggleExpand(nodeId)}
           >
-            {isExpanded ? '▼' : '▶'}
+            <svg 
+              width="10" 
+              height="10" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2"
+              style={{ transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
+            >
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
           </button>
         ) : (
           <span style={styles.expandPlaceholder} />
         )}
-
-        {/* Icon */}
-        <span style={styles.icon}>{icon}</span>
 
         {/* Node label */}
         <span 
@@ -252,7 +276,10 @@ function TreeNode({
               onClick={() => onIsolate(node, nodeId)}
               title={isIsolated ? 'Show all' : 'Isolate this branch'}
             >
-              {isIsolated ? '👁️' : '◎'}
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
             </button>
           )}
         </div>
@@ -281,91 +308,82 @@ function TreeNode({
 }
 
 /**
- * Get icon for IFC type
- */
-function getTypeIcon(type) {
-  const icons = {
-    'IfcProject': '📋',
-    'IfcSite': '🌍',
-    'IfcBuilding': '🏢',
-    'IfcBuildingStorey': '📐',
-    'IfcSpace': '⬜',
-    'IfcWall': '🧱',
-    'IfcWallStandardCase': '🧱',
-    'IfcDoor': '🚪',
-    'IfcWindow': '🪟',
-    'IfcSlab': '⬛',
-    'IfcRoof': '🏠',
-    'IfcStair': '🪜',
-    'IfcColumn': '🔲',
-    'IfcBeam': '📏',
-    'IfcFurniture': '🪑',
-    'IfcCovering': '🎨',
-    'IfcRailing': '🚧',
-    'Category': '📁',
-  }
-  return icons[type] || '📦'
-}
-
-/**
  * Styles
  */
 const styles = {
   panel: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
     width: '280px',
     height: '100%',
-    background: 'rgba(26, 26, 46, 0.95)',
-    borderRight: '1px solid rgba(255, 255, 255, 0.1)',
+    background: '#ffffff',
+    borderRight: '1px solid #e5e5e7',
     display: 'flex',
     flexDirection: 'column',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
-    color: '#ffffff',
-    backdropFilter: 'blur(10px)',
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    color: '#1d1d1f',
+    flexShrink: 0,
   },
   header: {
     padding: '16px 16px',
-    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+    borderBottom: '1px solid #e5e5e7',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
+    background: '#fafafa',
   },
   title: {
     margin: 0,
-    fontSize: '14px',
+    fontSize: '13px',
     fontWeight: 600,
     textTransform: 'uppercase',
     letterSpacing: '0.5px',
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: '#86868b',
   },
   showAllBtn: {
-    padding: '4px 8px',
-    background: 'rgba(100, 108, 255, 0.3)',
-    border: '1px solid rgba(100, 108, 255, 0.5)',
+    padding: '4px 10px',
+    background: '#1d1d1f',
+    border: 'none',
     borderRadius: '4px',
-    color: '#a5a8ff',
+    color: '#ffffff',
     fontSize: '11px',
+    fontWeight: 500,
     cursor: 'pointer',
   },
   content: {
     flex: 1,
     overflow: 'auto',
-    padding: '8px 0',
+    display: 'flex',
+    flexDirection: 'column',
   },
   message: {
     padding: '20px',
     textAlign: 'center',
-    color: 'rgba(255, 255, 255, 0.5)',
+    color: '#86868b',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  loadingSpinner: {
+    width: '24px',
+    height: '24px',
+    border: '2px solid #f0f0f2',
+    borderTopColor: '#1d1d1f',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
   },
   errorMessage: {
     padding: '20px',
     textAlign: 'center',
-    color: '#ff6b6b',
+    color: '#ff3b30',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
   },
   tree: {
     fontSize: '13px',
+    padding: '8px 0',
+    flex: 1,
   },
   nodeContainer: {
     userSelect: 'none',
@@ -373,38 +391,34 @@ const styles = {
   node: {
     display: 'flex',
     alignItems: 'center',
-    padding: '6px 8px',
+    padding: '6px 12px',
     cursor: 'pointer',
     transition: 'background 0.15s',
     gap: '4px',
   },
   nodeSelected: {
-    background: 'rgba(255, 255, 0, 0.15)',
+    background: 'rgba(0, 122, 255, 0.1)',
   },
   nodeIsolated: {
-    background: 'rgba(100, 108, 255, 0.2)',
+    background: '#f5f5f7',
   },
   expandBtn: {
-    width: '16px',
-    height: '16px',
+    width: '18px',
+    height: '18px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     background: 'none',
     border: 'none',
-    color: 'rgba(255, 255, 255, 0.4)',
+    color: '#86868b',
     cursor: 'pointer',
     fontSize: '10px',
     padding: 0,
     flexShrink: 0,
+    borderRadius: '4px',
   },
   expandPlaceholder: {
-    width: '16px',
-    flexShrink: 0,
-  },
-  icon: {
-    fontSize: '14px',
-    marginRight: '4px',
+    width: '18px',
     flexShrink: 0,
   },
   label: {
@@ -412,49 +426,85 @@ const styles = {
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
+    color: '#1d1d1f',
   },
   actions: {
     display: 'flex',
     gap: '4px',
-    opacity: 0.6,
+    opacity: 0,
+    transition: 'opacity 0.15s',
   },
   actionBtn: {
-    width: '20px',
-    height: '20px',
+    width: '22px',
+    height: '22px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'none',
-    borderWidth: '1px',
-    borderStyle: 'solid',
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    background: '#f5f5f7',
+    border: '1px solid #e5e5e7',
     borderRadius: '4px',
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: '#86868b',
     cursor: 'pointer',
-    fontSize: '10px',
     padding: 0,
   },
   actionBtnActive: {
-    background: 'rgba(100, 108, 255, 0.3)',
-    borderColor: 'rgba(100, 108, 255, 0.5)',
-    color: '#a5a8ff',
+    background: '#1d1d1f',
+    borderColor: '#1d1d1f',
+    color: '#ffffff',
   },
   children: {
     // Children are indented via paddingLeft on node
   },
   stats: {
-    padding: '12px 16px',
-    borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+    padding: '16px',
+    borderTop: '1px solid #e5e5e7',
+    background: '#fafafa',
+    marginTop: 'auto',
+  },
+  statsHeader: {
     display: 'flex',
-    flexDirection: 'column',
-    gap: '4px',
+    alignItems: 'center',
+    gap: '8px',
+    fontSize: '11px',
+    fontWeight: 600,
+    textTransform: 'uppercase',
+    letterSpacing: '0.5px',
+    color: '#86868b',
+    marginBottom: '12px',
+  },
+  statsGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(3, 1fr)',
+    gap: '8px',
   },
   statItem: {
     display: 'flex',
-    justifyContent: 'space-between',
-    fontSize: '11px',
-    color: 'rgba(255, 255, 255, 0.5)',
+    flexDirection: 'column',
+    alignItems: 'center',
+    padding: '12px 8px',
+    background: '#ffffff',
+    borderRadius: '8px',
+    border: '1px solid #e5e5e7',
   },
+  statValue: {
+    fontSize: '18px',
+    fontWeight: 600,
+    color: '#1d1d1f',
+  },
+  statLabel: {
+    fontSize: '10px',
+    color: '#86868b',
+    marginTop: '2px',
+  },
+}
+
+// Add hover styles via CSS
+if (typeof document !== 'undefined') {
+  const styleSheet = document.createElement('style')
+  styleSheet.textContent = `
+    .tree-node:hover .actions { opacity: 1 !important; }
+  `
+  document.head.appendChild(styleSheet)
 }
 
 export default StructureTree
