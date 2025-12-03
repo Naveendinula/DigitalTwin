@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useMemo } from 'react'
 import * as THREE from 'three'
 
 /**
@@ -7,6 +7,10 @@ import * as THREE from 'three'
  * Implements X-ray/ghost effect for non-selected elements.
  * When enabled, non-selected meshes become semi-transparent wireframes
  * while selected meshes remain solid with their original materials.
+ * 
+ * Performance optimizations:
+ * - Cached X-ray material to avoid recreation
+ * - Batched material updates
  * 
  * @returns {object} X-ray mode state and controls
  */
@@ -22,21 +26,35 @@ function useXRayMode() {
   
   // Currently selected IDs when X-ray is active
   const selectedIdsRef = useRef(new Set())
+  
+  // Cached X-ray material (shared instance for performance)
+  const xRayMaterialRef = useRef(null)
 
   /**
-   * Create X-ray material for non-selected meshes
+   * Get or create cached X-ray material
    * Dark blue-gray wireframe, very translucent
    */
-  const createXRayMaterial = useCallback(() => {
-    return new THREE.MeshBasicMaterial({
-      color: 0x2a2a3e,        // Slightly lighter blue-gray
-      wireframe: true,         // Wireframe mode
-      transparent: true,
-      opacity: 0.08,           // Much more translucent
-      depthWrite: false,       // Render behind solid objects
-      side: THREE.DoubleSide,  // Visible from both sides
-    })
+  const getXRayMaterial = useCallback(() => {
+    if (!xRayMaterialRef.current) {
+      xRayMaterialRef.current = new THREE.MeshBasicMaterial({
+        color: 0x2a2a3e,        // Slightly lighter blue-gray
+        wireframe: true,         // Wireframe mode
+        transparent: true,
+        opacity: 0.08,           // Much more translucent
+        depthWrite: false,       // Render behind solid objects
+        side: THREE.DoubleSide,  // Visible from both sides
+      })
+    }
+    return xRayMaterialRef.current
   }, [])
+
+  /**
+   * Create a clone of X-ray material (for individual mesh assignment)
+   * Cloning allows per-mesh material state if needed
+   */
+  const createXRayMaterial = useCallback(() => {
+    return getXRayMaterial().clone()
+  }, [getXRayMaterial])
 
   /**
    * Check if a mesh matches any of the selected globalIds

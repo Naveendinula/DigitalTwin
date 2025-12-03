@@ -1,15 +1,16 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 
 /**
  * StructureTree Component
  * 
  * Renders a collapsible tree view of the building hierarchy.
  * Supports selection and isolation of elements by clicking on nodes.
+ * Supports bidirectional selection sync with 3D model.
  * 
  * @param {string} hierarchyUrl - URL to the hierarchy JSON file
  * @param {function} onIsolate - Callback when isolating elements, receives array of GlobalIds
  * @param {function} onSelect - Callback when selecting a single element
- * @param {string|null} selectedId - Currently selected element GlobalId
+ * @param {string|string[]|null} selectedId - Currently selected element GlobalId(s)
  */
 function StructureTree({ 
   hierarchyUrl = '/hierarchy.json', 
@@ -22,6 +23,34 @@ function StructureTree({
   const [error, setError] = useState(null)
   const [expandedNodes, setExpandedNodes] = useState(new Set())
   const [isolatedBranch, setIsolatedBranch] = useState(null)
+  
+  // Ref for scrolling to selected node
+  const treeContainerRef = useRef(null)
+  const selectedNodeRef = useRef(null)
+  
+  // Build a map of globalId -> nodeId for quick lookup
+  const globalIdToNodeMap = useMemo(() => {
+    if (!hierarchy) return new Map()
+    
+    const map = new Map()
+    const traverse = (node, depth = 0) => {
+      const nodeId = node.globalId || `${node.type}-${node.name}-${depth}`
+      if (node.globalId) {
+        map.set(node.globalId, { nodeId, node, depth })
+      }
+      if (node.children) {
+        node.children.forEach(child => traverse(child, depth + 1))
+      }
+    }
+    traverse(hierarchy)
+    return map
+  }, [hierarchy])
+  
+  // Normalize selectedId to array for easier comparison
+  const selectedIds = useMemo(() => {
+    if (!selectedId) return []
+    return Array.isArray(selectedId) ? selectedId : [selectedId]
+  }, [selectedId])
 
   // Load hierarchy JSON on mount
   useEffect(() => {
@@ -138,15 +167,77 @@ function StructureTree({
     onIsolate?.(null)
   }, [onIsolate])
 
+  /**
+   * Auto-expand and scroll to selected node when selectedId changes from 3D model click
+   */
+  useEffect(() => {
+    if (selectedIds.length === 0 || !hierarchy) return
+    
+    // Get the first selected ID to scroll to
+    const targetId = selectedIds[0]
+    const nodeInfo = globalIdToNodeMap.get(targetId)
+    
+    if (!nodeInfo) return
+    
+    // Find path to node and expand all ancestors
+    const expandPath = (node, targetGlobalId, path = []) => {
+      const nodeId = node.globalId || `${node.type}-${node.name}-${path.length}`
+      
+      if (node.globalId === targetGlobalId) {
+        return [...path, nodeId]
+      }
+      
+      if (node.children) {
+        for (const child of node.children) {
+          const result = expandPath(child, targetGlobalId, [...path, nodeId])
+          if (result) return result
+        }
+      }
+      return null
+    }
+    
+    const pathToNode = expandPath(hierarchy, targetId)
+    
+    if (pathToNode) {
+      // Expand all nodes in the path (except the target itself)
+      setExpandedNodes(prev => {
+        const next = new Set(prev)
+        pathToNode.forEach(id => next.add(id))
+        return next
+      })
+      
+      // Scroll to node after a brief delay to allow expansion
+      setTimeout(() => {
+        if (selectedNodeRef.current) {
+          selectedNodeRef.current.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center'
+          })
+        }
+      }, 100)
+    }
+  }, [selectedIds, globalIdToNodeMap, hierarchy])
+
   return (
     <div style={styles.panel}>
       <div style={styles.header}>
         <h2 style={styles.title}>Structure</h2>
-        {isolatedBranch && (
-          <button style={styles.showAllBtn} onClick={handleShowAll}>
-            Show All
-          </button>
-        )}
+        <div style={styles.headerActions}>
+          {isolatedBranch && (
+            <>
+              <span style={styles.xrayBadge}>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+                X-Ray
+              </span>
+              <button style={styles.showAllBtn} onClick={handleShowAll}>
+                Show All
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       <div style={styles.content}>
@@ -169,7 +260,7 @@ function StructureTree({
         )}
 
         {!loading && !error && hierarchy && (
-          <div style={styles.tree}>
+          <div style={styles.tree} ref={treeContainerRef}>
             <TreeNode
               node={hierarchy}
               depth={0}
@@ -177,8 +268,9 @@ function StructureTree({
               toggleExpand={toggleExpand}
               onIsolate={handleIsolate}
               onSelect={handleSelectElement}
-              selectedId={selectedId}
+              selectedIds={selectedIds}
               isolatedBranch={isolatedBranch}
+              selectedNodeRef={selectedNodeRef}
             />
           </div>
         )}
@@ -225,18 +317,22 @@ function TreeNode({
   toggleExpand, 
   onIsolate,
   onSelect,
-  selectedId,
-  isolatedBranch
+  selectedIds = [],
+  isolatedBranch,
+  selectedNodeRef
 }) {
   const nodeId = node.globalId || `${node.type}-${node.name}-${depth}`
   const hasChildren = node.children && node.children.length > 0
   const isExpanded = expandedNodes.has(nodeId)
-  const isSelected = node.globalId === selectedId
+  const isSelected = node.globalId && selectedIds.includes(node.globalId)
   const isIsolated = isolatedBranch === nodeId
   const isLeaf = !hasChildren && node.globalId && node.type !== 'Category'
   
+  // Use ref for selected node scrolling
+  const nodeRef = isSelected ? selectedNodeRef : null
+  
   return (
-    <div style={styles.nodeContainer} className="tree-node">
+    <div style={styles.nodeContainer} className="tree-node" ref={nodeRef}>
       <div 
         style={{
           ...styles.node,
@@ -291,12 +387,21 @@ function TreeNode({
                 e.stopPropagation()
                 onIsolate(node, nodeId)
               }}
-              title={isIsolated ? 'Show all' : 'Isolate this branch'}
+              title={isIsolated ? 'Show all (Exit X-Ray)' : 'Isolate with X-Ray effect'}
             >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                <circle cx="12" cy="12" r="3" />
-              </svg>
+              {isIsolated ? (
+                // Filled eye icon when isolated/X-Ray active
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" fill="white" />
+                </svg>
+              ) : (
+                // Outline eye icon when not isolated
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              )}
             </button>
           )}
         </div>
@@ -314,8 +419,9 @@ function TreeNode({
               toggleExpand={toggleExpand}
               onIsolate={onIsolate}
               onSelect={onSelect}
-              selectedId={selectedId}
+              selectedIds={selectedIds}
               isolatedBranch={isolatedBranch}
+              selectedNodeRef={selectedNodeRef}
             />
           ))}
         </div>
@@ -340,12 +446,13 @@ const styles = {
     flexShrink: 0,
   },
   header: {
-    padding: '16px 16px',
+    padding: '12px 16px',
     borderBottom: '1px solid #e5e5e7',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
     background: '#fafafa',
+    gap: '8px',
   },
   title: {
     margin: 0,
@@ -354,6 +461,24 @@ const styles = {
     textTransform: 'uppercase',
     letterSpacing: '0.5px',
     color: '#86868b',
+  },
+  headerActions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  xrayBadge: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+    padding: '3px 8px',
+    background: 'rgba(0, 122, 255, 0.1)',
+    borderRadius: '4px',
+    fontSize: '10px',
+    fontWeight: 600,
+    color: '#007AFF',
+    textTransform: 'uppercase',
+    letterSpacing: '0.5px',
   },
   showAllBtn: {
     padding: '4px 10px',
@@ -410,17 +535,24 @@ const styles = {
   node: {
     display: 'flex',
     alignItems: 'center',
-    padding: '5px 8px',
+    paddingTop: '5px',
+    paddingBottom: '5px',
+    paddingLeft: '8px',
+    paddingRight: '8px',
     cursor: 'pointer',
     transition: 'background 0.15s',
     gap: '0',
     minHeight: '28px',
   },
   nodeSelected: {
-    background: 'rgba(0, 122, 255, 0.1)',
+    background: 'linear-gradient(90deg, rgba(0, 212, 255, 0.15) 0%, rgba(0, 212, 255, 0.08) 100%)',
+    borderLeft: '3px solid #00D4FF',
+    paddingLeft: '5px',
   },
   nodeIsolated: {
-    background: 'rgba(0, 122, 255, 0.08)',
+    background: 'linear-gradient(90deg, rgba(0, 122, 255, 0.12) 0%, rgba(0, 122, 255, 0.05) 100%)',
+    borderLeft: '3px solid #007AFF',
+    paddingLeft: '5px',
   },
   nodeLeft: {
     display: 'flex',

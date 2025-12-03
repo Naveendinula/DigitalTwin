@@ -1,0 +1,1576 @@
+{
+  "globalId": "35dyTrKLDA6wq0o933TuW1",
+  "type": "IfcProject",
+  "name": "0001",
+  "children": [
+    {
+      "globalId": "35dyTrKLDA6wq0o933TuW3",
+      "type": "IfcSite",
+      "name": "Topography : Surface",
+      "children": [
+        {
+          "globalId": "35dyTrKLDA6wq0o933TuW0",
+          "type": "IfcBuilding",
+          "name": null,
+          "children": [
+            {
+              "globalId": "2L1aZE$XjEIOtolM95UNBK",
+              "type": "IfcBuildingStorey",
+              "name": "Level 3",
+              "children": [
+                {
+                  "type": "Category",
+                  "name": "Grid",
+                  "category": "IfcGrid",
+                  "children": [
+                    {
+                      "globalId": "0lOAy$lY0jG$dgyqycLvcp",
+                      "type": "IfcGrid",
+                      "name": "Default Grid"
+                    }
+                  ]
+                },
+                {
+                  "type": "Category",
+                  "name": "Roof",
+                  "category": "IfcRoof",
+                  "children": [
+                    {
+                      "globalId": "2tNPqdG8D3JuH1l_boeNLe",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 125mm"
+                    },
+                    {
+                      "globalId": "3ECNUuIP10$99YYF83tRkb",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Genteng Metal w Sunsulate"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "globalId": "15Z0v90RiHrPC20026FoKR",
+              "type": "IfcBuildingStorey",
+              "name": "Level 2",
+              "children": [
+                {
+                  "globalId": "275uc_d0D37ggfbUf7EVe5",
+                  "type": "IfcSpace",
+                  "name": "7"
+                },
+                {
+                  "globalId": "275uc_d0D37ggfbUf7EVe1",
+                  "type": "IfcSpace",
+                  "name": "8"
+                },
+                {
+                  "globalId": "275uc_d0D37ggfbUf7EVey",
+                  "type": "IfcSpace",
+                  "name": "9"
+                },
+                {
+                  "globalId": "275uc_d0D37ggfbUf7EVe$",
+                  "type": "IfcSpace",
+                  "name": "10"
+                },
+                {
+                  "type": "Category",
+                  "name": "Covering",
+                  "category": "IfcCovering",
+                  "children": [
+                    {
+                      "globalId": "3uEB_QLH96COxbJRmw6aoY",
+                      "type": "IfcCovering",
+                      "name": "Ceilings : Compound Ceiling : Plain With Insolation"
+                    }
+                  ]
+                },
+                {
+                  "type": "Category",
+                  "name": "CurtainWall",
+                  "category": "IfcCurtainWall",
+                  "children": [
+                    {
+                      "globalId": "3ECNUuIP10$99YYF83tRjP",
+                      "type": "IfcCurtainWall",
+                      "name": "Walls : Curtain Wall : Storefront",
+                      "children": [
+                        {
+                          "globalId": "3ECNUuIP10$99YYF83tRjQ",
+                          "type": "IfcPlate",
+                          "name": "Curtain Panels : System Panel : Glazed"
+                        },
+                        {
+                          "globalId": "3ECNUuIP10$99YYF83tRjV",
+                          "type": "IfcPlate",
+                          "name": "Curtain Panels : System Panel : Glazed"
+                        },
+                        {
+                          "globalId": "3ECNUuIP10$99YYF83tRjH",
+                          "type": "IfcPlate",
+                          "name": "Curtain Panels : System Panel : Glazed"
+                        },
+                        {
+                          "globalId": "3ECNUuIP10$99YYF83tRjR",
+                          "type": "IfcMember",
+                          "name": "Curtain Wall Mullions : Rectangular Mullion : 50 x 150mm"
+                        },
+                        {
+                          "globalId": "3ECNUuIP10$99YYF83tRjS",
+                          "type": "IfcMember",
+                          "name": "Curtain Wall Mullions : Rectangular Mullion : 50 x 150mm"
+                        },
+                        {
+                          "globalId": "3ECNUuIP10$99YYF83tRjT",
+                          "type": "IfcMember",
+                          "name": "Curtain Wall Mullions : Rectangular Mullion : 50 x 150mm"
+                        },
+                        {
+                          "globalId": "3ECNUuIP10$99YYF83tRjM",
+                          "type": "IfcMember",
+                          "name": "Curtain Wall Mullions : Rectangular Mullion : 50 x 150mm"
+                        },
+                        {
+                          "globalId": "3ECNUuIP10$99YYF83tRjN",
+                          "type": "IfcMember",
+                          "name": "Curtain Wall Mullions : Rectangular Mullion : 50 x 150mm"
+                        },
+                        {
+                          "globalId": "3ECNUuIP10$99YYF83tRke",
+                          "type": "IfcMember",
+                          "name": "Curtain Wall Mullions : Rectangular Mullion : 50 x 150mm"
+                        },
+                        {
+                          "globalId": "3ECNUuIP10$99YYF83tRkh",
+                          "type": "IfcMember",
+                          "name": "Curtain Wall Mullions : Rectangular Mullion : 50 x 150mm"
+                        },
+                        {
+                          "globalId": "3ECNUuIP10$99YYF83tRki",
+                          "type": "IfcMember",
+                          "name": "Curtain Wall Mullions : Rectangular Mullion : 50 x 150mm"
+                        },
+                        {
+                          "globalId": "3ECNUuIP10$99YYF83tRkl",
+                          "type": "IfcMember",
+                          "name": "Curtain Wall Mullions : Rectangular Mullion : 50 x 150mm"
+                        },
+                        {
+                          "globalId": "3ECNUuIP10$99YYF83tRkW",
+                          "type": "IfcMember",
+                          "name": "Curtain Wall Mullions : Rectangular Mullion : 50 x 150mm"
+                        }
+                      ]
+                    },
+                    {
+                      "globalId": "3ECNUuIP10$99YYF83tRkC",
+                      "type": "IfcCurtainWall",
+                      "name": "Walls : Curtain Wall : Storefront",
+                      "children": [
+                        {
+                          "globalId": "3ECNUuIP10$99YYF83tRkD",
+                          "type": "IfcPlate",
+                          "name": "Curtain Panels : System Panel : Glazed"
+                        },
+                        {
+                          "globalId": "3ECNUuIP10$99YYF83tRk3",
+                          "type": "IfcPlate",
+                          "name": "Curtain Panels : System Panel : Glazed"
+                        },
+                        {
+                          "globalId": "3ECNUuIP10$99YYF83tRkE",
+                          "type": "IfcMember",
+                          "name": "Curtain Wall Mullions : Rectangular Mullion : 50 x 150mm"
+                        },
+                        {
+                          "globalId": "3ECNUuIP10$99YYF83tRkF",
+                          "type": "IfcMember",
+                          "name": "Curtain Wall Mullions : Rectangular Mullion : 50 x 150mm"
+                        },
+                        {
+                          "globalId": "3ECNUuIP10$99YYF83tRk0",
+                          "type": "IfcMember",
+                          "name": "Curtain Wall Mullions : Rectangular Mullion : 50 x 150mm"
+                        },
+                        {
+                          "globalId": "3ECNUuIP10$99YYF83tRk1",
+                          "type": "IfcMember",
+                          "name": "Curtain Wall Mullions : Rectangular Mullion : 50 x 150mm"
+                        },
+                        {
+                          "globalId": "3ECNUuIP10$99YYF83tRkO",
+                          "type": "IfcMember",
+                          "name": "Curtain Wall Mullions : Rectangular Mullion : 50 x 150mm"
+                        },
+                        {
+                          "globalId": "3ECNUuIP10$99YYF83tRkR",
+                          "type": "IfcMember",
+                          "name": "Curtain Wall Mullions : Rectangular Mullion : 50 x 150mm"
+                        },
+                        {
+                          "globalId": "3ECNUuIP10$99YYF83tRkU",
+                          "type": "IfcMember",
+                          "name": "Curtain Wall Mullions : Rectangular Mullion : 50 x 150mm"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "Category",
+                  "name": "Door",
+                  "category": "IfcDoor",
+                  "children": [
+                    {
+                      "globalId": "001_mXHwH9vg8VtyVQOyxX",
+                      "type": "IfcDoor",
+                      "name": "Doors : M_Single-Flush : 0915 x 2134mm"
+                    },
+                    {
+                      "globalId": "001_mXHwH9vg8VtyVQOyxS",
+                      "type": "IfcDoor",
+                      "name": "Doors : M_Single-Flush : 0915 x 2134mm"
+                    },
+                    {
+                      "globalId": "001_mXHwH9vg8VtyVQOydp",
+                      "type": "IfcDoor",
+                      "name": "Doors : M_Single-Flush : 0915 x 2134mm"
+                    },
+                    {
+                      "globalId": "001_mXHwH9vg8VtyVQOycV",
+                      "type": "IfcDoor",
+                      "name": "Doors : M_Single-Flush : 0915 x 2134mm"
+                    },
+                    {
+                      "globalId": "3ECNUuIP10$99YYF83tV0M",
+                      "type": "IfcDoor",
+                      "name": "Doors : M_Single-Flush : 0915 x 2134mm"
+                    }
+                  ]
+                },
+                {
+                  "type": "Category",
+                  "name": "Furniture",
+                  "category": "IfcFurniture",
+                  "children": [
+                    {
+                      "globalId": "3ECNUuIP10$99YYF83tRgR",
+                      "type": "IfcFurniture",
+                      "name": "Furniture : Bed - Small Sizes (AUS) : 1200x2100"
+                    }
+                  ]
+                },
+                {
+                  "type": "Category",
+                  "name": "Grid",
+                  "category": "IfcGrid",
+                  "children": [
+                    {
+                      "globalId": "00e$R$m$S5q$5tacZfq0HP",
+                      "type": "IfcGrid",
+                      "name": "Default Grid"
+                    }
+                  ]
+                },
+                {
+                  "type": "Category",
+                  "name": "Railing",
+                  "category": "IfcRailing",
+                  "children": [
+                    {
+                      "globalId": "3ECNUuIP10$99YYF83tRi5",
+                      "type": "IfcRailing",
+                      "name": "Railings : Railing : 900mm Rectangular"
+                    },
+                    {
+                      "globalId": "3ECNUuIP10$99YYF83tRjk",
+                      "type": "IfcRailing",
+                      "name": "Railings : Railing : 900mm Rectangular"
+                    }
+                  ]
+                },
+                {
+                  "type": "Category",
+                  "name": "Roof",
+                  "category": "IfcRoof",
+                  "children": [
+                    {
+                      "globalId": "2tNPqdG8D3JuH1l_boeNLH",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 125mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qzC",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qz2",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qzK",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qyg",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qyW",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qys",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qyC",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qy2",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qyO",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9q$k",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9q$a",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9q$w",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9q$m",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9q$6",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9q$S",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9q$I",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9q_e",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9q__",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9q_q",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9q_A",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9q_0",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9q_M",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qvi",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qvY",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qvu",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qvE",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qv4",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qvQ",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qvG",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9quc",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9quy",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9quo",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qu8",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9quU",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9quK",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qxg",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qxW",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qxs",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qxC",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qx2",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qxO",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qwk",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qwa",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qww",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qwm",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qw6",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qwS",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qwI",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qre",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qr_",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qrq",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qrA",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qr0",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qrM",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qqi",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qqY",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qqu",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qqE",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qq4",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qqQ",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qqG",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qtc",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qty",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qto",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qt8",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qtU",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qtK",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qsg",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qsW",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qss",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qsC",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qs2",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qsO",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qnk",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qna",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qnw",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qnm",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qn6",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qnS",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qnI",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qme",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qm_",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qmq",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qmA",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qm0",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qmM",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qpi",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qpY",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qpu",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qpE",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qp4",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qpQ",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qpG",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qoc",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qoy",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qoo",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qo8",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qoU",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qoK",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qjg",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qjW",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qjs",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qjC",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qj2",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qjO",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qik",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qia",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qiw",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qim",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qi6",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qiS",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qiI",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qle",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9ql_",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qlq",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qlA",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9ql0",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qlM",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qki",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qkY",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qku",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qkE",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qk4",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qkQ",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qkG",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qfc",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qfy",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qfo",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qf8",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qfU",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qfK",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qeg",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qeW",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qes",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qeC",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    },
+                    {
+                      "globalId": "0MsqXD1o9AF8ehBKYX9qe2",
+                      "type": "IfcRoof",
+                      "name": "Roofs : Basic Roof : Generic - 400mm"
+                    }
+                  ]
+                },
+                {
+                  "type": "Category",
+                  "name": "Slab",
+                  "category": "IfcSlab",
+                  "children": [
+                    {
+                      "globalId": "2L1aZE$XjEIOtolM95UNTk",
+                      "type": "IfcSlab",
+                      "name": "Floors : Floor : Generic 150mm"
+                    },
+                    {
+                      "globalId": "3ECNUuIP10$99YYF83tRgL",
+                      "type": "IfcSlab",
+                      "name": "Floors : Floor : GK Concrete Floor"
+                    },
+                    {
+                      "globalId": "3ECNUuIP10$99YYF83tRhl",
+                      "type": "IfcSlab",
+                      "name": "Floors : Floor : Steel Balcony"
+                    }
+                  ]
+                },
+                {
+                  "type": "Category",
+                  "name": "Wall",
+                  "category": "IfcWall",
+                  "children": [
+                    {
+                      "globalId": "001_mXHwH9vg8VtyVQOysn",
+                      "type": "IfcWall",
+                      "name": "Walls : Basic Wall : Generic - 175mm Interior"
+                    },
+                    {
+                      "globalId": "001_mXHwH9vg8VtyVQOyrE",
+                      "type": "IfcWall",
+                      "name": "Walls : Basic Wall : Generic - 175mm Interior"
+                    },
+                    {
+                      "globalId": "001_mXHwH9vg8VtyVQOyo7",
+                      "type": "IfcWall",
+                      "name": "Walls : Basic Wall : Generic - 175mm Interior"
+                    },
+                    {
+                      "globalId": "001_mXHwH9vg8VtyVQOynC",
+                      "type": "IfcWall",
+                      "name": "Walls : Basic Wall : Generic - 175mm Interior"
+                    },
+                    {
+                      "globalId": "001_mXHwH9vg8VtyVQOy$8",
+                      "type": "IfcWall",
+                      "name": "Walls : Basic Wall : Generic - 175mm Interior"
+                    },
+                    {
+                      "globalId": "001_mXHwH9vg8VtyVQOyu$",
+                      "type": "IfcWall",
+                      "name": "Walls : Basic Wall : Generic - 175mm Interior"
+                    },
+                    {
+                      "globalId": "001_mXHwH9vg8VtyVQOyls",
+                      "type": "IfcWall",
+                      "name": "Walls : Basic Wall : Generic - 175mm Interior"
+                    },
+                    {
+                      "globalId": "001_mXHwH9vg8VtyVQOykn",
+                      "type": "IfcWall",
+                      "name": "Walls : Basic Wall : Generic - 175mm Interior"
+                    },
+                    {
+                      "globalId": "3ECNUuIP10$99YYF83tV0b",
+                      "type": "IfcWall",
+                      "name": "Walls : Basic Wall : Dinding Hebel w Cellulose"
+                    }
+                  ]
+                },
+                {
+                  "type": "Category",
+                  "name": "Window",
+                  "category": "IfcWindow",
+                  "children": [
+                    {
+                      "globalId": "001_mXHwH9vg8VtyVQOyBS",
+                      "type": "IfcWindow",
+                      "name": "Windows : M_Fixed : 750 X 2200"
+                    },
+                    {
+                      "globalId": "001_mXHwH9vg8VtyVQOyBV",
+                      "type": "IfcWindow",
+                      "name": "Windows : M_Fixed : 750 X 2200"
+                    },
+                    {
+                      "globalId": "001_mXHwH9vg8VtyVQOyBU",
+                      "type": "IfcWindow",
+                      "name": "Windows : M_Fixed : 750 X 2200"
+                    },
+                    {
+                      "globalId": "001_mXHwH9vg8VtyVQOyAl",
+                      "type": "IfcWindow",
+                      "name": "Windows : M_Fixed : 750 X 2200"
+                    },
+                    {
+                      "globalId": "001_mXHwH9vg8VtyVQOyAw",
+                      "type": "IfcWindow",
+                      "name": "Windows : M_Fixed : 3000 X 2200"
+                    },
+                    {
+                      "globalId": "001_mXHwH9vg8VtyVQOyA5",
+                      "type": "IfcWindow",
+                      "name": "Windows : M_Fixed : 4000 X 2200"
+                    },
+                    {
+                      "globalId": "001_mXHwH9vg8VtyVQOyA4",
+                      "type": "IfcWindow",
+                      "name": "Windows : M_Fixed : 4000 X 2200"
+                    },
+                    {
+                      "globalId": "001_mXHwH9vg8VtyVQOyA7",
+                      "type": "IfcWindow",
+                      "name": "Windows : M_Fixed : 4000 X 2200"
+                    },
+                    {
+                      "globalId": "001_mXHwH9vg8VtyVQOyA6",
+                      "type": "IfcWindow",
+                      "name": "Windows : M_Fixed : 3000 X 2200"
+                    },
+                    {
+                      "globalId": "001_mXHwH9vg8VtyVQOyAN",
+                      "type": "IfcWindow",
+                      "name": "Windows : M_Fixed : 3000 X 2200"
+                    },
+                    {
+                      "globalId": "001_mXHwH9vg8VtyVQOy9g",
+                      "type": "IfcWindow",
+                      "name": "Windows : M_Fixed : 3000 X 2200"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "globalId": "3Zu5Bv0LOHrPC10026FoQQ",
+              "type": "IfcBuildingStorey",
+              "name": "Level 1",
+              "children": [
+                {
+                  "globalId": "275uc_d0D37ggfbUf7EVeO",
+                  "type": "IfcSpace",
+                  "name": "1"
+                },
+                {
+                  "globalId": "275uc_d0D37ggfbUf7EVeR",
+                  "type": "IfcSpace",
+                  "name": "2"
+                },
+                {
+                  "globalId": "275uc_d0D37ggfbUf7EVeM",
+                  "type": "IfcSpace",
+                  "name": "3"
+                },
+                {
+                  "globalId": "275uc_d0D37ggfbUf7EVeH",
+                  "type": "IfcSpace",
+                  "name": "4"
+                },
+                {
+                  "globalId": "275uc_d0D37ggfbUf7EVeC",
+                  "type": "IfcSpace",
+                  "name": "5"
+                },
+                {
+                  "globalId": "275uc_d0D37ggfbUf7EVeF",
+                  "type": "IfcSpace",
+                  "name": "6"
+                },
+                {
+                  "type": "Category",
+                  "name": "BuildingElementProxy",
+                  "category": "IfcBuildingElementProxy",
+                  "children": [
+                    {
+                      "globalId": "3ECNUuIP10$99YYF83tRg6",
+                      "type": "IfcBuildingElementProxy",
+                      "name": "<Lines> : Model Lines"
+                    },
+                    {
+                      "globalId": "3ECNUuIP10$99YYF83tRg7",
+                      "type": "IfcBuildingElementProxy",
+                      "name": "<Lines> : Model Lines"
+                    },
+                    {
+                      "globalId": "3ECNUuIP10$99YYF83tRgO",
+                      "type": "IfcBuildingElementProxy",
+                      "name": "<Lines> : Model Lines"
+                    },
+                    {
+                      "globalId": "3ECNUuIP10$99YYF83tRgP",
+                      "type": "IfcBuildingElementProxy",
+                      "name": "<Lines> : Model Lines"
+                    },
+                    {
+                      "globalId": "3ECNUuIP10$99YYF83tRjo",
+                      "type": "IfcBuildingElementProxy",
+                      "name": "Generic Models : Small_Kitchen_-_Revit_2011 : Small_Kitchen_-_Revit_2011"
+                    },
+                    {
+                      "globalId": "3ECNUuIP10$99YYF83tRjp",
+                      "type": "IfcBuildingElementProxy",
+                      "name": "Specialty Equipment : Refrigerator_built-in_SideBySide_stainlessrfa_5540 : 36\" x 70\""
+                    }
+                  ]
+                },
+                {
+                  "type": "Category",
+                  "name": "Column",
+                  "category": "IfcColumn",
+                  "children": [
+                    {
+                      "globalId": "3ECNUuIP10$99YYF83tRgA",
+                      "type": "IfcColumn",
+                      "name": "Columns : M_Rectangular Column1 : 457 x 475mm 2"
+                    },
+                    {
+                      "globalId": "3ECNUuIP10$99YYF83tRgB",
+                      "type": "IfcColumn",
+                      "name": "Columns : M_Rectangular Column1 : 457 x 475mm 2"
+                    },
+                    {
+                      "globalId": "3ECNUuIP10$99YYF83tRgC",
+                      "type": "IfcColumn",
+                      "name": "Columns : M_Rectangular Column1 : 457 x 475mm 2"
+                    },
+                    {
+                      "globalId": "3ECNUuIP10$99YYF83tRgD",
+                      "type": "IfcColumn",
+                      "name": "Columns : M_Rectangular Column1 : 457 x 475mm 2"
+                    }
+                  ]
+                },
+                {
+                  "type": "Category",
+                  "name": "Door",
+                  "category": "IfcDoor",
+                  "children": [
+                    {
+                      "globalId": "37GyPYgvr4gO9HuNyLnDIz",
+                      "type": "IfcDoor",
+                      "name": "Doors : M_Single-Flush : 0915 x 2134mm"
+                    },
+                    {
+                      "globalId": "37GyPYgvr4gO9HuNyLnDTU",
+                      "type": "IfcDoor",
+                      "name": "Doors : M_Single-Flush : 0915 x 2134mm"
+                    },
+                    {
+                      "globalId": "37GyPYgvr4gO9HuNyLnDVd",
+                      "type": "IfcDoor",
+                      "name": "Doors : M_Single-Flush : 0915 x 2134mm"
+                    },
+                    {
+                      "globalId": "37GyPYgvr4gO9HuNyLnDOJ",
+                      "type": "IfcDoor",
+                      "name": "Doors : M_Single-Flush : 0915 x 2134mm"
+                    },
+                    {
+                      "globalId": "37GyPYgvr4gO9HuNyLnDQw",
+                      "type": "IfcDoor",
+                      "name": "Doors : M_Single-Flush : 0915 x 2134mm"
+                    },
+                    {
+                      "globalId": "37GyPYgvr4gO9HuNyLnElS",
+                      "type": "IfcDoor",
+                      "name": "Doors : M_Single-Flush : 0915 x 2134mm EXT"
+                    }
+                  ]
+                },
+                {
+                  "type": "Category",
+                  "name": "Grid",
+                  "category": "IfcGrid",
+                  "children": [
+                    {
+                      "globalId": "2hWgmIwEFOBhkAU6jjwJBI",
+                      "type": "IfcGrid",
+                      "name": "Default Grid"
+                    }
+                  ]
+                },
+                {
+                  "type": "Category",
+                  "name": "Slab",
+                  "category": "IfcSlab",
+                  "children": [
+                    {
+                      "globalId": "2L1aZE$XjEIOtolM95UNSl",
+                      "type": "IfcSlab",
+                      "name": "Floors : Floor : Generic 150mm"
+                    },
+                    {
+                      "globalId": "3ECNUuIP10$99YYF83tRgU",
+                      "type": "IfcSlab",
+                      "name": "Floors : Floor : GK Concrete Floor"
+                    }
+                  ]
+                },
+                {
+                  "type": "Category",
+                  "name": "Stair",
+                  "category": "IfcStair",
+                  "children": [
+                    {
+                      "globalId": "0FVq2unYfCbP$BLwmcJQAE",
+                      "type": "IfcStair",
+                      "name": "Stairs : Assembled Stair : Stair",
+                      "children": [
+                        {
+                          "globalId": "0FVq2unYfCbP$BLwmcJQ9R",
+                          "type": "IfcStairFlight",
+                          "name": "Stairs : Assembled Stair : Stair Run 1"
+                        },
+                        {
+                          "globalId": "0FVq2unYfCbP$BLwmcJQFf",
+                          "type": "IfcStairFlight",
+                          "name": "Stairs : Assembled Stair : Stair Run 2"
+                        },
+                        {
+                          "globalId": "0FVq2unYfCbP$BLwmcJQFd",
+                          "type": "IfcSlab",
+                          "name": "Stairs : Assembled Stair : Stair Landing 1"
+                        },
+                        {
+                          "globalId": "0FVq2unYfCbP$BLwmcJQ9P",
+                          "type": "IfcMember",
+                          "name": "Stairs : Assembled Stair : Stair Stringer 1"
+                        },
+                        {
+                          "globalId": "0FVq2unYfCbP$BLwmcJQ9O",
+                          "type": "IfcMember",
+                          "name": "Stairs : Assembled Stair : Stair Stringer 2"
+                        },
+                        {
+                          "globalId": "0FVq2unYfCbP$BLwmcJQFb",
+                          "type": "IfcMember",
+                          "name": "Stairs : Assembled Stair : Stair Stringer 3"
+                        },
+                        {
+                          "globalId": "0FVq2unYfCbP$BLwmcJQFa",
+                          "type": "IfcMember",
+                          "name": "Stairs : Assembled Stair : Stair Stringer 4"
+                        },
+                        {
+                          "globalId": "0FVq2unYfCbP$BLwmcJQFY",
+                          "type": "IfcMember",
+                          "name": "Stairs : Assembled Stair : Stair Stringer 6"
+                        },
+                        {
+                          "globalId": "0FVq2unYfCbP$BLwmcJQFX",
+                          "type": "IfcMember",
+                          "name": "Stairs : Assembled Stair : Stair Stringer 7"
+                        },
+                        {
+                          "globalId": "0FVq2unYfCbP$BLwmcJQFW",
+                          "type": "IfcMember",
+                          "name": "Stairs : Assembled Stair : Stair Stringer 8"
+                        },
+                        {
+                          "globalId": "0FVq2unYfCbP$BLwmcJRmu",
+                          "type": "IfcRailing",
+                          "name": "Railings : Railing : 1100mm"
+                        },
+                        {
+                          "globalId": "0FVq2unYfCbP$BLwmcJRmq",
+                          "type": "IfcRailing",
+                          "name": "Railings : Railing : 1100mm"
+                        }
+                      ]
+                    },
+                    {
+                      "globalId": "3ECNUuIP10$99YYF83tRhb",
+                      "type": "IfcStair",
+                      "name": "Stairs : Assembled Stair : Stair",
+                      "children": [
+                        {
+                          "globalId": "3ECNUuIP10$99YYF83tRhc",
+                          "type": "IfcStairFlight",
+                          "name": "Stairs : Assembled Stair : Stair Run 1"
+                        },
+                        {
+                          "globalId": "3ECNUuIP10$99YYF83tRhE",
+                          "type": "IfcSlab",
+                          "name": "Stairs : Assembled Stair : Stair Landing 1"
+                        },
+                        {
+                          "globalId": "3ECNUuIP10$99YYF83tRh4",
+                          "type": "IfcMember",
+                          "name": "Stairs : Assembled Stair : Stair Stringer 1"
+                        },
+                        {
+                          "globalId": "3ECNUuIP10$99YYF83tRhw",
+                          "type": "IfcRailing",
+                          "name": "Railings : Railing : 900mm Rectangular"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "Category",
+                  "name": "Wall",
+                  "category": "IfcWall",
+                  "children": [
+                    {
+                      "globalId": "37GyPYgvr4gO9HuNyLnDLy",
+                      "type": "IfcWall",
+                      "name": "Walls : Basic Wall : Generic - 175mm Interior"
+                    },
+                    {
+                      "globalId": "37GyPYgvr4gO9HuNyLnDKw",
+                      "type": "IfcWall",
+                      "name": "Walls : Basic Wall : Generic - 175mm Interior"
+                    },
+                    {
+                      "globalId": "37GyPYgvr4gO9HuNyLnDNA",
+                      "type": "IfcWall",
+                      "name": "Walls : Basic Wall : Generic - 175mm Interior"
+                    },
+                    {
+                      "globalId": "37GyPYgvr4gO9HuNyLnDHF",
+                      "type": "IfcWall",
+                      "name": "Walls : Basic Wall : Generic - 175mm Interior"
+                    },
+                    {
+                      "globalId": "37GyPYgvr4gO9HuNyLnDJi",
+                      "type": "IfcWall",
+                      "name": "Walls : Basic Wall : Generic - 175mm Interior"
+                    },
+                    {
+                      "globalId": "37GyPYgvr4gO9HuNyLnDPA",
+                      "type": "IfcWall",
+                      "name": "Walls : Basic Wall : Generic - 175mm Interior"
+                    },
+                    {
+                      "globalId": "3ECNUuIP10$99YYF83tRgE",
+                      "type": "IfcWall",
+                      "name": "Walls : Basic Wall : Dinding Hebel w Cellulose"
+                    },
+                    {
+                      "globalId": "3ECNUuIP10$99YYF83tRj1",
+                      "type": "IfcWall",
+                      "name": "Walls : Basic Wall : Dinding Hebel w Cellulose"
+                    },
+                    {
+                      "globalId": "3ECNUuIP10$99YYF83tVP_",
+                      "type": "IfcWall",
+                      "name": "Walls : Basic Wall : Dinding Hebel w Cellulose"
+                    },
+                    {
+                      "globalId": "3ECNUuIP10$99YYF83tVSP",
+                      "type": "IfcWall",
+                      "name": "Walls : Basic Wall : Dinding Hebel w Cellulose"
+                    }
+                  ]
+                },
+                {
+                  "type": "Category",
+                  "name": "Window",
+                  "category": "IfcWindow",
+                  "children": [
+                    {
+                      "globalId": "37GyPYgvr4gO9HuNyLnEbh",
+                      "type": "IfcWindow",
+                      "name": "Windows : M_Fixed : 750 X 2200"
+                    },
+                    {
+                      "globalId": "37GyPYgvr4gO9HuNyLnEcD",
+                      "type": "IfcWindow",
+                      "name": "Windows : M_Fixed : 750 X 2200"
+                    },
+                    {
+                      "globalId": "37GyPYgvr4gO9HuNyLnEX_",
+                      "type": "IfcWindow",
+                      "name": "Windows : M_Fixed : 750 X 2200"
+                    },
+                    {
+                      "globalId": "37GyPYgvr4gO9HuNyLnEXi",
+                      "type": "IfcWindow",
+                      "name": "Windows : M_Fixed : 3000 X 2200"
+                    },
+                    {
+                      "globalId": "37GyPYgvr4gO9HuNyLnEZn",
+                      "type": "IfcWindow",
+                      "name": "Windows : M_Fixed : 3000 X 2200"
+                    },
+                    {
+                      "globalId": "37GyPYgvr4gO9HuNyLnEZK",
+                      "type": "IfcWindow",
+                      "name": "Windows : M_Fixed : 4000 X 2200"
+                    },
+                    {
+                      "globalId": "37GyPYgvr4gO9HuNyLnEi1",
+                      "type": "IfcWindow",
+                      "name": "Windows : M_Fixed : 4000 X 2200"
+                    },
+                    {
+                      "globalId": "37GyPYgvr4gO9HuNyLnElw",
+                      "type": "IfcWindow",
+                      "name": "Windows : M_Fixed : 4000 X 2200"
+                    },
+                    {
+                      "globalId": "37GyPYgvr4gO9HuNyLnElM",
+                      "type": "IfcWindow",
+                      "name": "Windows : M_Fixed : 3000 X 2200"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "globalId": "2L1aZE$XjEIOtolM95UN09",
+              "type": "IfcBuildingStorey",
+              "name": "Level 0",
+              "children": [
+                {
+                  "type": "Category",
+                  "name": "Grid",
+                  "category": "IfcGrid",
+                  "children": [
+                    {
+                      "globalId": "0EgjP0gdV0AS8$Nb_Khhq1",
+                      "type": "IfcGrid",
+                      "name": "Default Grid"
+                    }
+                  ]
+                },
+                {
+                  "type": "Category",
+                  "name": "Wall",
+                  "category": "IfcWall",
+                  "children": [
+                    {
+                      "globalId": "37GyPYgvr4gO9HuNyLnD47",
+                      "type": "IfcWall",
+                      "name": "Walls : Basic Wall : Generic - 200mm"
+                    },
+                    {
+                      "globalId": "37GyPYgvr4gO9HuNyLnD7h",
+                      "type": "IfcWall",
+                      "name": "Walls : Basic Wall : Generic - 200mm"
+                    },
+                    {
+                      "globalId": "37GyPYgvr4gO9HuNyLnD6x",
+                      "type": "IfcWall",
+                      "name": "Walls : Basic Wall : Generic - 200mm"
+                    },
+                    {
+                      "globalId": "37GyPYgvr4gO9HuNyLnD6E",
+                      "type": "IfcWall",
+                      "name": "Walls : Basic Wall : Generic - 200mm"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "statistics": {
+    "totalElements": 258,
+    "sites": 1,
+    "buildings": 1,
+    "storeys": 4,
+    "spaces": 10,
+    "elementsByType": {
+      "IfcGrid": 4,
+      "IfcRoof": 139,
+      "IfcCovering": 1,
+      "IfcCurtainWall": 2,
+      "IfcPlate": 5,
+      "IfcMember": 25,
+      "IfcDoor": 11,
+      "IfcFurniture": 1,
+      "IfcRailing": 5,
+      "IfcSlab": 7,
+      "IfcWall": 23,
+      "IfcWindow": 20,
+      "IfcBuildingElementProxy": 6,
+      "IfcColumn": 4,
+      "IfcStair": 2,
+      "IfcStairFlight": 3
+    }
+  }
+}

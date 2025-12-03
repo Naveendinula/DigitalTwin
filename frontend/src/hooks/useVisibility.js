@@ -5,7 +5,7 @@ import * as THREE from 'three'
  * useVisibility Hook
  * 
  * Manages visibility/isolation of objects in the Three.js scene.
- * Allows hiding/showing objects by their GlobalId (mesh name).
+ * Allows hiding/showing objects by their GlobalId (mesh name or ancestor name).
  * 
  * @param {THREE.Scene} scene - The Three.js scene reference
  * @returns {object} Visibility control functions
@@ -23,13 +23,41 @@ function useVisibility() {
   }, [])
 
   /**
+   * Check if a mesh matches any of the selected globalIds
+   * Checks mesh name, userData, and ancestor chain (up to 10 levels)
+   */
+  const isMeshMatchingIds = useCallback((mesh, idsSet) => {
+    if (!mesh || idsSet.size === 0) return false
+    
+    // Check direct match on mesh name
+    if (mesh.name && idsSet.has(mesh.name)) return true
+    
+    // Check userData.GlobalId
+    if (mesh.userData?.GlobalId && idsSet.has(mesh.userData.GlobalId)) return true
+    
+    // Check ancestor chain (for nested elements like windows, stairs, etc.)
+    let ancestor = mesh.parent
+    let depth = 0
+    const maxDepth = 10
+    
+    while (ancestor && depth < maxDepth) {
+      if (ancestor.name && idsSet.has(ancestor.name)) return true
+      if (ancestor.userData?.GlobalId && idsSet.has(ancestor.userData.GlobalId)) return true
+      ancestor = ancestor.parent
+      depth++
+    }
+    
+    return false
+  }, [])
+
+  /**
    * Store original visibility states
    */
   const storeOriginalState = useCallback(() => {
     if (!sceneRef.current) return
     
     sceneRef.current.traverse((object) => {
-      if (object.isMesh && object.name) {
+      if (object.isMesh) {
         if (!originalVisibility.current.has(object.uuid)) {
           originalVisibility.current.set(object.uuid, object.visible)
         }
@@ -56,6 +84,7 @@ function useVisibility() {
 
   /**
    * Isolate specific objects by GlobalId (show only these, hide others)
+   * Checks mesh name, userData.GlobalId, and ancestor chain
    * 
    * @param {string[]} globalIds - Array of GlobalIds to show
    */
@@ -75,8 +104,9 @@ function useVisibility() {
     let shownCount = 0
 
     sceneRef.current.traverse((object) => {
-      if (object.isMesh && object.name) {
-        if (idsToShow.has(object.name)) {
+      if (object.isMesh) {
+        // Check if mesh matches any of the IDs (including ancestor chain)
+        if (isMeshMatchingIds(object, idsToShow)) {
           object.visible = true
           shownCount++
         } else {
@@ -87,10 +117,11 @@ function useVisibility() {
     })
 
     console.log(`Isolated ${shownCount} objects, hidden ${hiddenCount} objects`)
-  }, [showAll, storeOriginalState])
+  }, [showAll, storeOriginalState, isMeshMatchingIds])
 
   /**
    * Hide specific objects by GlobalId
+   * Checks mesh name, userData.GlobalId, and ancestor chain
    * 
    * @param {string[]} globalIds - Array of GlobalIds to hide
    */
@@ -102,14 +133,15 @@ function useVisibility() {
     const idsToHide = new Set(globalIds)
 
     sceneRef.current.traverse((object) => {
-      if (object.isMesh && object.name && idsToHide.has(object.name)) {
+      if (object.isMesh && isMeshMatchingIds(object, idsToHide)) {
         object.visible = false
       }
     })
-  }, [storeOriginalState])
+  }, [storeOriginalState, isMeshMatchingIds])
 
   /**
    * Show specific objects by GlobalId
+   * Checks mesh name, userData.GlobalId, and ancestor chain
    * 
    * @param {string[]} globalIds - Array of GlobalIds to show
    */
@@ -120,11 +152,11 @@ function useVisibility() {
     const idsToShow = new Set(globalIds)
 
     sceneRef.current.traverse((object) => {
-      if (object.isMesh && object.name && idsToShow.has(object.name)) {
+      if (object.isMesh && isMeshMatchingIds(object, idsToShow)) {
         object.visible = true
       }
     })
-  }, [])
+  }, [isMeshMatchingIds])
 
   /**
    * Set transparency for specific objects
@@ -139,7 +171,7 @@ function useVisibility() {
     const idsToTransparent = new Set(globalIds)
 
     sceneRef.current.traverse((object) => {
-      if (object.isMesh && object.name && idsToTransparent.has(object.name)) {
+      if (object.isMesh && isMeshMatchingIds(object, idsToTransparent)) {
         if (object.material) {
           object.material = object.material.clone()
           object.material.transparent = true
@@ -147,7 +179,7 @@ function useVisibility() {
         }
       }
     })
-  }, [])
+  }, [isMeshMatchingIds])
 
   /**
    * Get all GlobalIds in the scene

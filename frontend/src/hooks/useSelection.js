@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useRef } from 'react'
+import * as THREE from 'three'
 
 /**
  * useSelection Hook
@@ -16,8 +17,9 @@ function useSelection() {
   // Reference to the scene for traversal
   const sceneRef = useRef(null)
 
-  // Highlight color for selected objects
-  const HIGHLIGHT_COLOR = 0x007AFF // Blue highlight
+  // Highlight color for selected objects - bright cyan for contrast with X-ray
+  const HIGHLIGHT_COLOR = 0x00D4FF // Bright cyan
+  const HIGHLIGHT_EMISSIVE = 0x0088AA // Emissive cyan
 
   /**
    * Check if a string looks like an IFC GlobalId
@@ -101,13 +103,15 @@ function useSelection() {
     }
     setSelectedObject(mesh)
 
-    // Apply highlight
+    // Apply highlight with better contrast
     if (mesh.material) {
       mesh.material = mesh.material.clone()
       mesh.material.color.setHex(HIGHLIGHT_COLOR)
+      mesh.material.transparent = true
+      mesh.material.opacity = 1
       if (mesh.material.emissive) {
-        mesh.material.emissive.setHex(HIGHLIGHT_COLOR)
-        mesh.material.emissiveIntensity = 0.3
+        mesh.material.emissive.setHex(HIGHLIGHT_EMISSIVE)
+        mesh.material.emissiveIntensity = 0.5
       }
     }
   }, [])

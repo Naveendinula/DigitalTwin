@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useRef, useMemo } from 'react'
+import React, { useCallback, useState, useRef, useMemo, useEffect } from 'react'
 import * as THREE from 'three'
 import Viewer from './components/Viewer'
 import SelectableModel from './components/SelectableModelWithVisibility'
@@ -8,10 +8,13 @@ import UploadPanel from './components/UploadPanel'
 import ViewerToolbar from './components/ViewerToolbar'
 import SectionModeHint from './components/SectionModeHint'
 import SectionPlanePanel from './components/SectionPlanePanel'
+import KeyboardHints from './components/KeyboardHints'
+import { useToast } from './components/Toast'
 import useSelection from './hooks/useSelection'
 import useVisibility from './hooks/useVisibility'
 import useSectionMode from './hooks/useSectionMode'
 import useXRayMode from './hooks/useXRayMode'
+import useCameraFocus from './hooks/useCameraFocus'
 
 /**
  * Main Application Component
@@ -58,8 +61,22 @@ function App() {
     updateXRaySelection
   } = useXRayMode()
   
+  // Camera focus for pan/zoom to selected elements
+  const {
+    setScene: setFocusScene,
+    setCamera: setFocusCamera,
+    setControls: setFocusControls,
+    focusOnElements
+  } = useCameraFocus()
+  
+  // Toast notifications
+  const { toasts, showToast, removeToast, ToastContainer } = useToast()
+  
   // Track isolated IDs for X-ray
   const [isolatedIds, setIsolatedIds] = useState(null)
+  
+  // Track last selected IDs for 'F' key focus
+  const lastSelectedIdsRef = useRef(null)
   
   // Store references
   const cameraRef = useRef(null)
@@ -77,23 +94,25 @@ function App() {
   }, [setSectionMode])
 
   /**
-   * Handle scene ready - register with visibility controller, section mode, selection, and X-ray
+   * Handle scene ready - register with visibility controller, section mode, selection, X-ray, and camera focus
    */
   const handleSceneReady = useCallback((scene, camera, gl) => {
     setScene(scene)
     setSectionScene(scene)
     setSelectionScene(scene) // Register scene with selection hook for selectById
     setXRayScene(scene) // Register scene with X-ray mode
+    setFocusScene(scene) // Register scene with camera focus
     if (camera) {
       setSectionCamera(camera)
+      setFocusCamera(camera)
       cameraRef.current = camera
     }
     if (gl) {
       setSectionRenderer(gl)
       glRef.current = gl
     }
-    console.log('Scene registered with visibility, section, selection, and X-ray controllers')
-  }, [setScene, setSectionScene, setSelectionScene, setXRayScene, setSectionCamera, setSectionRenderer])
+    console.log('Scene registered with visibility, section, selection, X-ray, and focus controllers')
+  }, [setScene, setSectionScene, setSelectionScene, setXRayScene, setFocusScene, setSectionCamera, setFocusCamera, setSectionRenderer])
 
   /**
    * Handle renderer ready from Viewer
@@ -115,9 +134,71 @@ function App() {
    */
   const handleControlsReady = useCallback((controls) => {
     setSectionControls(controls)
+    setFocusControls(controls)
     controlsRef.current = controls
     console.log('Orbit controls ready')
-  }, [setSectionControls])
+  }, [setSectionControls, setFocusControls])
+
+  /**
+   * Clear all selection and X-ray mode
+   */
+  const clearAll = useCallback(() => {
+    deselect()
+    showAll()
+    disableXRay()
+    setIsolatedIds(null)
+    lastSelectedIdsRef.current = null
+  }, [deselect, showAll, disableXRay])
+
+  /**
+   * Focus on current selection (for 'F' key shortcut)
+   */
+  const focusOnCurrentSelection = useCallback(() => {
+    if (lastSelectedIdsRef.current && lastSelectedIdsRef.current.length > 0) {
+      const result = focusOnElements(lastSelectedIdsRef.current)
+      if (!result.found) {
+        showToast('No geometry found for selected element(s)', 'warning')
+      }
+    } else if (selectedId) {
+      const ids = Array.isArray(selectedId) ? selectedId : [selectedId]
+      const result = focusOnElements(ids)
+      if (!result.found) {
+        showToast('No geometry found for selected element(s)', 'warning')
+      }
+    } else {
+      showToast('No element selected. Select an element first.', 'info')
+    }
+  }, [focusOnElements, selectedId, showToast])
+
+  /**
+   * Keyboard shortcuts handler
+   */
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      // Don't trigger shortcuts when typing in input fields
+      if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
+        return
+      }
+      
+      switch (event.key) {
+        case 'Escape':
+          // Clear selection and X-ray
+          clearAll()
+          showToast('Selection cleared', 'info', 2000)
+          break
+        case 'f':
+        case 'F':
+          // Focus on selected element(s)
+          focusOnCurrentSelection()
+          break
+        default:
+          break
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [clearAll, focusOnCurrentSelection, showToast])
 
   /**
    * Handle isolation from tree view - also enables X-ray effect
@@ -137,12 +218,25 @@ function App() {
   }, [isolate, showAll, enableXRay, disableXRay])
 
   /**
-   * Handle selection from tree view - selects element(s) in the 3D model
+   * Handle selection from tree view - selects element(s) in the 3D model and focuses camera
    */
   const handleTreeSelect = useCallback((globalIdOrIds) => {
     console.log('Selected from tree:', globalIdOrIds)
     selectById(globalIdOrIds)
-  }, [selectById])
+    
+    // Track selected IDs for 'F' key focus
+    const ids = Array.isArray(globalIdOrIds) ? globalIdOrIds : [globalIdOrIds]
+    lastSelectedIdsRef.current = ids
+    
+    // Focus camera on selected element(s) with feedback
+    const result = focusOnElements(ids)
+    
+    if (!result.found) {
+      showToast(`No geometry found for "${ids.length === 1 ? 'element' : ids.length + ' elements'}"`, 'warning')
+    } else if (result.count > 1) {
+      showToast(`Focused on ${result.count} elements`, 'info', 2000)
+    }
+  }, [selectById, focusOnElements, showToast])
 
   /**
    * Handle section pick from model click
@@ -263,6 +357,9 @@ function App() {
           
           {/* Upload new model button */}
           <UploadPanel onModelReady={handleModelReady} hasModel={true} />
+          
+          {/* Keyboard shortcuts hints */}
+          <KeyboardHints />
         </div>
         
         {/* Property Panel - Right Panel */}
@@ -271,6 +368,9 @@ function App() {
           metadataUrl={modelUrls.metadataUrl}
         />
       </div>
+      
+      {/* Toast notifications */}
+      <ToastContainer />
     </div>
   )
 }
