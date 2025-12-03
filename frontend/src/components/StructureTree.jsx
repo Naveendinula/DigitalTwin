@@ -111,13 +111,24 @@ function StructureTree({
   }, [collectGlobalIds, onIsolate, isolatedBranch])
 
   /**
-   * Handle click on a leaf element
+   * Handle click on a tree element - selects element(s) in the 3D model
+   * For leaf nodes: select single element
+   * For parent nodes: select all children elements
    */
   const handleSelectElement = useCallback((node) => {
-    if (node.globalId) {
+    // If it's a leaf with globalId, select just that element
+    if (node.globalId && (!node.children || node.children.length === 0)) {
       onSelect?.(node.globalId)
+      return
     }
-  }, [onSelect])
+    
+    // For parent nodes, collect all globalIds from children
+    const ids = collectGlobalIds(node)
+    if (ids.length > 0) {
+      // Pass the first ID for single selection, or all IDs for future multi-select
+      onSelect?.(ids.length === 1 ? ids[0] : ids)
+    }
+  }, [onSelect, collectGlobalIds])
 
   /**
    * Reset isolation
@@ -225,55 +236,61 @@ function TreeNode({
   const isLeaf = !hasChildren && node.globalId && node.type !== 'Category'
   
   return (
-    <div style={styles.nodeContainer}>
+    <div style={styles.nodeContainer} className="tree-node">
       <div 
         style={{
           ...styles.node,
-          paddingLeft: `${depth * 16 + 12}px`,
           ...(isSelected ? styles.nodeSelected : {}),
           ...(isIsolated ? styles.nodeIsolated : {})
         }}
       >
-        {/* Expand/Collapse button */}
-        {hasChildren ? (
-          <button 
-            style={styles.expandBtn}
-            onClick={() => toggleExpand(nodeId)}
-          >
-            <svg 
-              width="10" 
-              height="10" 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="2"
-              style={{ transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
+        {/* Fixed left section: indent + expand button */}
+        <div style={{ ...styles.nodeLeft, paddingLeft: `${depth * 14}px` }}>
+          {hasChildren ? (
+            <button 
+              style={styles.expandBtn}
+              onClick={() => toggleExpand(nodeId)}
             >
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
-          </button>
-        ) : (
-          <span style={styles.expandPlaceholder} />
-        )}
+              <svg 
+                width="10" 
+                height="10" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2"
+                style={{ transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
+              >
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </button>
+          ) : (
+            <span style={styles.expandPlaceholder} />
+          )}
+        </div>
 
-        {/* Node label */}
-        <span 
-          style={styles.label}
-          onClick={() => isLeaf && onSelect?.(node)}
-        >
-          {node.name || node.type?.replace('Ifc', '') || 'Unnamed'}
-        </span>
+        {/* Scrollable label section */}
+        <div style={styles.labelContainer}>
+          <span 
+            style={styles.label}
+            onClick={() => onSelect?.(node)}
+            title={node.name || node.type?.replace('Ifc', '') || 'Unnamed'}
+          >
+            {node.name || node.type?.replace('Ifc', '') || 'Unnamed'}
+          </span>
+        </div>
 
-        {/* Action buttons */}
-        <div style={styles.actions}>
-          {/* Isolate button for branches with children */}
+        {/* Fixed right section: action buttons - always visible */}
+        <div style={styles.actions} className="actions">
           {hasChildren && (
             <button
               style={{
                 ...styles.actionBtn,
                 ...(isIsolated ? styles.actionBtnActive : {})
               }}
-              onClick={() => onIsolate(node, nodeId)}
+              onClick={(e) => {
+                e.stopPropagation()
+                onIsolate(node, nodeId)
+              }}
               title={isIsolated ? 'Show all' : 'Isolate this branch'}
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -384,6 +401,8 @@ const styles = {
     fontSize: '13px',
     padding: '8px 0',
     flex: 1,
+    overflowY: 'auto',
+    overflowX: 'hidden',
   },
   nodeContainer: {
     userSelect: 'none',
@@ -391,16 +410,22 @@ const styles = {
   node: {
     display: 'flex',
     alignItems: 'center',
-    padding: '6px 12px',
+    padding: '5px 8px',
     cursor: 'pointer',
     transition: 'background 0.15s',
-    gap: '4px',
+    gap: '0',
+    minHeight: '28px',
   },
   nodeSelected: {
     background: 'rgba(0, 122, 255, 0.1)',
   },
   nodeIsolated: {
-    background: '#f5f5f7',
+    background: 'rgba(0, 122, 255, 0.08)',
+  },
+  nodeLeft: {
+    display: 'flex',
+    alignItems: 'center',
+    flexShrink: 0,
   },
   expandBtn: {
     width: '18px',
@@ -421,35 +446,48 @@ const styles = {
     width: '18px',
     flexShrink: 0,
   },
-  label: {
+  labelContainer: {
     flex: 1,
     overflow: 'hidden',
-    textOverflow: 'ellipsis',
+    overflowX: 'auto',
+    marginRight: '8px',
+    scrollbarWidth: 'thin',
+    scrollbarColor: '#d1d1d6 transparent',
+  },
+  label: {
+    display: 'inline-block',
     whiteSpace: 'nowrap',
     color: '#1d1d1f',
+    cursor: 'pointer',
+    padding: '2px 4px',
+    borderRadius: '4px',
+    transition: 'background 0.15s',
   },
   actions: {
     display: 'flex',
     gap: '4px',
-    opacity: 0,
-    transition: 'opacity 0.15s',
+    flexShrink: 0,
+    marginLeft: 'auto',
   },
   actionBtn: {
-    width: '22px',
-    height: '22px',
+    width: '24px',
+    height: '24px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: '#f5f5f7',
-    border: '1px solid #e5e5e7',
-    borderRadius: '4px',
-    color: '#86868b',
+    background: '#f0f0f2',
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: '#d1d1d6',
+    borderRadius: '6px',
+    color: '#636366',
     cursor: 'pointer',
     padding: 0,
+    transition: 'all 0.15s',
   },
   actionBtnActive: {
-    background: '#1d1d1f',
-    borderColor: '#1d1d1f',
+    background: '#007AFF',
+    borderColor: '#007AFF',
     color: '#ffffff',
   },
   children: {
@@ -502,7 +540,35 @@ const styles = {
 if (typeof document !== 'undefined') {
   const styleSheet = document.createElement('style')
   styleSheet.textContent = `
+    .tree-node:hover > div:first-child { background: rgba(0, 0, 0, 0.03); }
     .tree-node:hover .actions { opacity: 1 !important; }
+    .tree-node .actions { opacity: 0.6; transition: opacity 0.15s; }
+    .tree-node .actions button:hover { 
+      background: #e5e5e7 !important; 
+      border-color: #c7c7cc !important;
+      color: #1d1d1f !important;
+    }
+    .tree-node .actions button:active { 
+      transform: scale(0.95); 
+    }
+    /* Custom scrollbar for label container */
+    .tree-node div[style*="overflowX"]::-webkit-scrollbar {
+      height: 4px;
+    }
+    .tree-node div[style*="overflowX"]::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .tree-node div[style*="overflowX"]::-webkit-scrollbar-thumb {
+      background: #d1d1d6;
+      border-radius: 4px;
+    }
+    .tree-node div[style*="overflowX"]::-webkit-scrollbar-thumb:hover {
+      background: #aeaeb2;
+    }
+    /* Label hover effect */
+    .tree-node span[style*="cursor"]:hover {
+      background: rgba(0, 122, 255, 0.08);
+    }
   `
   document.head.appendChild(styleSheet)
 }

@@ -11,6 +11,7 @@ import SectionPlanePanel from './components/SectionPlanePanel'
 import useSelection from './hooks/useSelection'
 import useVisibility from './hooks/useVisibility'
 import useSectionMode from './hooks/useSectionMode'
+import useXRayMode from './hooks/useXRayMode'
 
 /**
  * Main Application Component
@@ -23,7 +24,7 @@ function App() {
   const [modelUrls, setModelUrls] = useState(null)
 
   // Selection state management
-  const { selectedId, handleSelect, deselect } = useSelection()
+  const { selectedId, handleSelect, deselect, setScene: setSelectionScene, selectById } = useSelection()
   
   // Visibility control
   const { setScene, isolate, showAll } = useVisibility()
@@ -48,6 +49,18 @@ function App() {
     alignCameraToSection
   } = useSectionMode()
   
+  // X-Ray mode for isolation effect
+  const {
+    xRayEnabled,
+    setScene: setXRayScene,
+    enableXRay,
+    disableXRay,
+    updateXRaySelection
+  } = useXRayMode()
+  
+  // Track isolated IDs for X-ray
+  const [isolatedIds, setIsolatedIds] = useState(null)
+  
   // Store references
   const cameraRef = useRef(null)
   const glRef = useRef(null)
@@ -64,11 +77,13 @@ function App() {
   }, [setSectionMode])
 
   /**
-   * Handle scene ready - register with visibility controller and section mode
+   * Handle scene ready - register with visibility controller, section mode, selection, and X-ray
    */
   const handleSceneReady = useCallback((scene, camera, gl) => {
     setScene(scene)
     setSectionScene(scene)
+    setSelectionScene(scene) // Register scene with selection hook for selectById
+    setXRayScene(scene) // Register scene with X-ray mode
     if (camera) {
       setSectionCamera(camera)
       cameraRef.current = camera
@@ -77,8 +92,8 @@ function App() {
       setSectionRenderer(gl)
       glRef.current = gl
     }
-    console.log('Scene registered with visibility and section controllers')
-  }, [setScene, setSectionScene, setSectionCamera, setSectionRenderer])
+    console.log('Scene registered with visibility, section, selection, and X-ray controllers')
+  }, [setScene, setSectionScene, setSelectionScene, setXRayScene, setSectionCamera, setSectionRenderer])
 
   /**
    * Handle renderer ready from Viewer
@@ -105,22 +120,29 @@ function App() {
   }, [setSectionControls])
 
   /**
-   * Handle isolation from tree view
+   * Handle isolation from tree view - also enables X-ray effect
    */
   const handleIsolate = useCallback((globalIds) => {
     if (globalIds === null) {
+      // Show all - disable X-ray and show all elements
       showAll()
+      disableXRay()
+      setIsolatedIds(null)
     } else {
+      // Isolate - enable X-ray with selected IDs visible
       isolate(globalIds)
+      enableXRay(globalIds)
+      setIsolatedIds(globalIds)
     }
-  }, [isolate, showAll])
+  }, [isolate, showAll, enableXRay, disableXRay])
 
   /**
-   * Handle selection from tree view
+   * Handle selection from tree view - selects element(s) in the 3D model
    */
-  const handleTreeSelect = useCallback((globalId) => {
-    console.log('Selected from tree:', globalId)
-  }, [])
+  const handleTreeSelect = useCallback((globalIdOrIds) => {
+    console.log('Selected from tree:', globalIdOrIds)
+    selectById(globalIdOrIds)
+  }, [selectById])
 
   /**
    * Handle section pick from model click

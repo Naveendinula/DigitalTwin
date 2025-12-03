@@ -132,6 +132,7 @@ def categorize_elements(elements: list) -> dict[str, list]:
 def build_element_node(element, include_category: bool = False) -> dict[str, Any]:
     """
     Build a tree node for a building element.
+    Includes decomposed children for composite elements (IfcStair, IfcCurtainWall, etc.)
     
     Args:
         element: An IFC element
@@ -141,8 +142,18 @@ def build_element_node(element, include_category: bool = False) -> dict[str, Any
         Tree node dictionary
     """
     node = get_element_info(element)
-    # Elements typically don't have children in the spatial hierarchy
-    del node['children']
+    
+    # Check for decomposed children (e.g., IfcStair → IfcStairFlight, IfcSlab, IfcMember)
+    decomposed_children = get_decomposition_children(element)
+    if decomposed_children:
+        for child in decomposed_children:
+            child_node = build_element_node(child)  # Recursive call for nested decomposition
+            node['children'].append(child_node)
+    
+    # Remove empty children array
+    if not node['children']:
+        del node['children']
+    
     return node
 
 

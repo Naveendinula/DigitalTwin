@@ -1,16 +1,20 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useRef } from 'react'
 
 /**
  * useSelection Hook
  * 
  * Manages selection state for 3D objects in the scene.
  * Tracks the selected mesh and its original material for restoration.
+ * Supports both click selection and programmatic selection by globalId.
  * 
  * @returns {object} Selection state and handlers
  */
 function useSelection() {
   const [selectedObject, setSelectedObject] = useState(null)
   const [originalMaterial, setOriginalMaterial] = useState(null)
+  
+  // Reference to the scene for traversal
+  const sceneRef = useRef(null)
 
   // Highlight color for selected objects
   const HIGHLIGHT_COLOR = 0x007AFF // Blue highlight
@@ -121,6 +125,150 @@ function useSelection() {
   }, [selectedObject, originalMaterial])
 
   /**
+   * Set the scene reference for mesh traversal
+   */
+  const setScene = useCallback((scene) => {
+    sceneRef.current = scene
+    console.log('Selection hook: Scene reference set')
+  }, [])
+
+  /**
+   * Find mesh by globalId in the scene
+   * Traverses the scene graph looking for matching object names, ancestor names, or userData.GlobalId
+   * Handles nested hierarchies (e.g., stairs with stair flights)
+   */
+  const findMeshByGlobalId = useCallback((globalId) => {
+    if (!sceneRef.current || !globalId) return null
+    
+    let foundMesh = null
+    let foundByAncestor = null
+    let foundByContains = null
+    
+    console.log('Searching for globalId:', globalId)
+    
+    sceneRef.current.traverse((object) => {
+      if (foundMesh) return
+      
+      // Check if this object's name matches the globalId exactly
+      if (object.name === globalId) {
+        console.log('✓ Exact name match:', object.name, 'type:', object.type)
+        if (object.isMesh) {
+          foundMesh = object
+        } else {
+          object.traverse((child) => {
+            if (!foundMesh && child.isMesh) {
+              foundMesh = child
+            }
+          })
+        }
+        return
+      }
+      
+      // Check userData.GlobalId
+      if (object.userData?.GlobalId === globalId) {
+        console.log('✓ userData.GlobalId match:', object.name)
+        if (object.isMesh) {
+          foundMesh = object
+        } else {
+          object.traverse((child) => {
+            if (!foundMesh && child.isMesh) {
+              foundMesh = child
+            }
+          })
+        }
+        return
+      }
+      
+      // Check if object name contains the globalId
+      if (!foundByContains && object.name && object.name.includes(globalId)) {
+        if (object.isMesh) {
+          foundByContains = object
+        } else {
+          object.traverse((child) => {
+            if (!foundByContains && child.isMesh) {
+              foundByContains = child
+            }
+          })
+        }
+      }
+      
+      // For meshes, check the ENTIRE ancestor chain
+      if (!foundMesh && !foundByAncestor && object.isMesh) {
+        let ancestor = object.parent
+        let depth = 0
+        const maxDepth = 10
+        
+        while (ancestor && depth < maxDepth) {
+          if (ancestor.name === globalId) {
+            console.log('✓ Ancestor name match at depth', depth, ':', ancestor.name)
+            foundByAncestor = object
+            break
+          }
+          if (ancestor.userData?.GlobalId === globalId) {
+            foundByAncestor = object
+            break
+          }
+          ancestor = ancestor.parent
+          depth++
+        }
+      }
+    })
+    
+    const result = foundMesh || foundByAncestor || foundByContains
+    if (result) {
+      console.log('Found mesh:', result.name, 'parent:', result.parent?.name)
+    } else {
+      console.warn('No mesh found for globalId:', globalId)
+    }
+    
+    return result
+  }, [])
+
+  /**
+   * Select element(s) by globalId - used for programmatic selection from tree
+   * @param {string | string[]} globalIds - Single globalId or array of globalIds
+   */
+  const selectById = useCallback((globalIds) => {
+    if (!globalIds) {
+      deselect()
+      return
+    }
+    
+    // Normalize to array
+    const ids = Array.isArray(globalIds) ? globalIds : [globalIds]
+    
+    if (ids.length === 0) {
+      deselect()
+      return
+    }
+    
+    console.log('Selecting by ID:', ids)
+    
+    // Try to find a mesh for any of the IDs (useful when parent doesn't exist but children do)
+    let mesh = null
+    let matchedId = null
+    
+    for (const id of ids) {
+      mesh = findMeshByGlobalId(id)
+      if (mesh) {
+        matchedId = id
+        break
+      }
+    }
+    
+    if (mesh) {
+      console.log('Found mesh for globalId:', matchedId, mesh.name)
+      // Deselect previous before selecting new
+      if (selectedObject && originalMaterial) {
+        selectedObject.material = originalMaterial
+      }
+      select(mesh)
+    } else {
+      console.warn('No mesh found for any of the globalIds:', ids.slice(0, 3).join(', '), ids.length > 3 ? `... and ${ids.length - 3} more` : '')
+    }
+  }, [findMeshByGlobalId, selectedObject, originalMaterial, select, deselect])
+
+  /**
    * Handle click - select new object or deselect if same/empty
    */
   const handleSelect = useCallback((mesh) => {
@@ -156,7 +304,9 @@ function useSelection() {
     selectedObject,
     selectedId,
     handleSelect,
-    deselect
+    deselect,
+    setScene,
+    selectById
   }
 }
 
