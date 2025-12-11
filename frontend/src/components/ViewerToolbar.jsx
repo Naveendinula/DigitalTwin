@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 
 /**
  * ViewerToolbar Component
@@ -11,16 +11,110 @@ import React from 'react'
  * @param {boolean} hasSectionPlane - Whether a section plane is currently active
  * @param {function} onClearSectionPlane - Callback to clear the section plane
  * @param {function} onAlignCamera - Callback to align camera to section plane
+ * @param {string} viewMode - Current view mode ('free', 'top', 'front', etc.)
+ * @param {function} onSetViewMode - Callback to set view mode
+ * @param {Array} availableViews - Array of { mode, label } for available views
+ * @param {function} onResetView - Callback to reset view to default perspective
+ * @param {function} onFitToModel - Callback to fit camera to model bounds
  */
 function ViewerToolbar({ 
   sectionModeEnabled, 
   onToggleSectionMode,
   hasSectionPlane,
   onClearSectionPlane,
-  onAlignCamera
+  onAlignCamera,
+  viewMode = 'free',
+  onSetViewMode,
+  availableViews = [],
+  onResetView,
+  onFitToModel,
+  onOpenEcPanel,
+  hasModel
 }) {
+  const [viewMenuOpen, setViewMenuOpen] = useState(false)
+  const viewMenuRef = useRef(null)
+  
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (viewMenuRef.current && !viewMenuRef.current.contains(event.target)) {
+        setViewMenuOpen(false)
+      }
+    }
+    
+    if (viewMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [viewMenuOpen])
   return (
     <div style={styles.toolbar}>
+      {/* View Mode Dropdown */}
+      <div style={styles.viewModeContainer} ref={viewMenuRef}>
+        <button
+          style={{
+            ...styles.toolButton,
+            ...(viewMenuOpen ? styles.toolButtonActive : {})
+          }}
+          onClick={() => setViewMenuOpen(!viewMenuOpen)}
+          title="View Presets"
+        >
+          <ViewCubeIcon />
+          <span style={{
+            ...styles.toolLabel,
+            ...(viewMenuOpen ? styles.toolLabelActive : {})
+          }}>
+            {viewMode === 'free' ? 'View' : viewMode.charAt(0).toUpperCase() + viewMode.slice(1)}
+          </span>
+        </button>
+        
+        {/* Dropdown Menu */}
+        {viewMenuOpen && (
+          <div style={styles.viewMenu}>
+            {availableViews.map(({ mode, label }) => (
+              <button
+                key={mode}
+                style={{
+                  ...styles.viewMenuItem,
+                  ...(viewMode === mode ? styles.viewMenuItemActive : {})
+                }}
+                onClick={() => {
+                  onSetViewMode?.(mode)
+                  setViewMenuOpen(false)
+                }}
+              >
+                {label}
+                {viewMode === mode && <CheckIcon />}
+              </button>
+            ))}
+            <div style={styles.viewMenuDivider} />
+            <button
+              style={styles.viewMenuItem}
+              onClick={() => {
+                onFitToModel?.()
+                setViewMenuOpen(false)
+              }}
+            >
+              <FitIcon />
+              <span style={{ marginLeft: '8px' }}>Fit All</span>
+            </button>
+            <button
+              style={styles.viewMenuItem}
+              onClick={() => {
+                onResetView?.()
+                setViewMenuOpen(false)
+              }}
+            >
+              <ResetIcon />
+              <span style={{ marginLeft: '8px' }}>Reset View</span>
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Section Mode Button */}
       <button
         style={{
@@ -36,6 +130,18 @@ function ViewerToolbar({
           ...(sectionModeEnabled ? styles.toolLabelActive : {})
         }}>Section</span>
       </button>
+
+      {/* Embodied Carbon Button */}
+      {hasModel && (
+        <button
+          style={styles.toolButton}
+          onClick={onOpenEcPanel}
+          title="Calculate Embodied Carbon"
+        >
+          <LeafIcon />
+          <span style={styles.toolLabel}>Carbon</span>
+        </button>
+      )}
 
       {/* Align View Button - only show when there's an active plane */}
       {hasSectionPlane && (
@@ -61,6 +167,94 @@ function ViewerToolbar({
         </button>
       )}
     </div>
+  )
+}
+
+/**
+ * View Cube Icon - 3D cube for view presets
+ */
+function ViewCubeIcon() {
+  return (
+    <svg 
+      width="20" 
+      height="20" 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="#1d1d1f"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {/* 3D Cube */}
+      <path d="M12 2L2 7l10 5 10-5-10-5z" />
+      <path d="M2 17l10 5 10-5" />
+      <path d="M2 12l10 5 10-5" />
+      <path d="M12 22V12" />
+      <path d="M2 7v10" />
+      <path d="M22 7v10" />
+    </svg>
+  )
+}
+
+/**
+ * Check Icon - Checkmark for selected item
+ */
+function CheckIcon() {
+  return (
+    <svg 
+      width="14" 
+      height="14" 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  )
+}
+
+/**
+ * Leaf Icon - For Embodied Carbon
+ */
+function LeafIcon() {
+  return (
+    <svg 
+      width="20" 
+      height="20" 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="#1d1d1f"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z" />
+      <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" />
+    </svg>
+  )
+}
+
+/**
+ * Reset Icon - Return/reset arrow
+ */
+function ResetIcon() {
+  return (
+    <svg 
+      width="14" 
+      height="14" 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+    </svg>
   )
 }
 
@@ -147,6 +341,50 @@ const styles = {
     gap: '8px',
     zIndex: 10,
   },
+  viewModeContainer: {
+    position: 'relative',
+  },
+  viewMenu: {
+    position: 'absolute',
+    top: 'calc(100% + 8px)',
+    left: '0',
+    background: '#ffffff',
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: '#e5e5e7',
+    borderRadius: '8px',
+    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.12)',
+    padding: '4px',
+    minWidth: '120px',
+    zIndex: 20,
+  },
+  viewMenuItem: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    padding: '8px 12px',
+    background: 'transparent',
+    borderWidth: '0',
+    borderStyle: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontSize: '13px',
+    fontWeight: 500,
+    color: '#1d1d1f',
+    textAlign: 'left',
+    transition: 'background 0.15s ease',
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  },
+  viewMenuItemActive: {
+    background: '#f0f0f2',
+    color: '#1d1d1f',
+  },
+  viewMenuDivider: {
+    height: '1px',
+    background: '#e5e5e7',
+    margin: '4px 0',
+  },
   toolButton: {
     display: 'flex',
     flexDirection: 'column',
@@ -155,7 +393,9 @@ const styles = {
     gap: '4px',
     padding: '10px 14px',
     background: '#ffffff',
-    border: '1px solid #e5e5e7',
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: '#e5e5e7',
     borderRadius: '8px',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
@@ -186,6 +426,10 @@ styleSheet.textContent = `
   .viewer-tool-button.active:hover {
     background: #333333 !important;
     border-color: #333333 !important;
+  }
+  /* View menu item hover */
+  [data-view-menu-item]:hover {
+    background: #f5f5f7 !important;
   }
 `
 if (typeof document !== 'undefined' && !document.querySelector('#viewer-toolbar-styles')) {

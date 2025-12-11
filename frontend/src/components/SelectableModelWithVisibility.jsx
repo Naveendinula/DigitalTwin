@@ -8,6 +8,9 @@ import { useThree } from '@react-three/fiber'
  * Loads a GLB model, makes it selectable, and supports visibility control.
  * Registers the scene with the visibility controller.
  * 
+ * NOTE: GLB/GLTF files typically use Y-up coordinate system.
+ * We rotate the model -90° around X to convert to Z-up (BIM convention).
+ * 
  * @param {string} url - Path to the GLB file
  * @param {function} onSelect - Callback when a mesh is clicked (normal selection mode)
  * @param {function} onSceneReady - Callback when scene is loaded, receives scene object
@@ -151,12 +154,15 @@ function SelectableModel({
   }
 
   return (
-    <primitive
-      ref={groupRef}
-      object={scene}
-      onPointerDown={handlePointerDown}
-      {...props}
-    />
+    <group rotation={[Math.PI / 2, 0, 0]}>
+      {/* Rotate +90° around X axis to convert Y-up (GLB) to Z-up (BIM) */}
+      <primitive
+        ref={groupRef}
+        object={scene}
+        onPointerDown={handlePointerDown}
+        {...props}
+      />
+    </group>
   )
 }
 

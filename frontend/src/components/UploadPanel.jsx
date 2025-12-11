@@ -1,10 +1,10 @@
 import React, { useState, useCallback } from 'react'
 
 /**
- * UploadPanel Component
+ * UploadPanel Component - Arctic Zen Minimalist Design
  * 
  * Handles IFC file upload and displays processing status.
- * Shows upload dropzone when no model is loaded.
+ * Features a clean, minimal hero with the arctic pavilion image.
  * 
  * @param {function} onModelReady - Callback when model is processed, receives URLs object
  * @param {boolean} hasModel - Whether a model is currently loaded
@@ -34,7 +34,8 @@ function UploadPanel({ onModelReady, hasModel }) {
           onModelReady?.({
             glbUrl: `${API_URL}${job.glb_url}`,
             metadataUrl: `${API_URL}${job.metadata_url}`,
-            hierarchyUrl: `${API_URL}${job.hierarchy_url}`
+            hierarchyUrl: `${API_URL}${job.hierarchy_url}`,
+            jobId: jobId
           })
           return
         } else if (job.status === 'failed') {
@@ -139,7 +140,7 @@ function UploadPanel({ onModelReady, hasModel }) {
     setProgress('')
   }
 
-  // If model is loaded, show minimal UI
+  // If model is loaded, show minimal floating button
   if (hasModel) {
     return (
       <div style={styles.miniPanel}>
@@ -156,398 +157,406 @@ function UploadPanel({ onModelReady, hasModel }) {
   }
 
   return (
-    <div style={styles.overlay}>
-      {/* Header */}
-      <header style={styles.header}>
-        <div style={styles.logo}>
-          <span style={styles.logoIcon}>◈</span>
-          <span style={styles.logoText}>DIGITAL TWIN</span>
-        </div>
-        <nav style={styles.nav}>
-          <a href="#" style={styles.navLinkActive}>Overview</a>
-          <a href="#" style={styles.navLink}>Details</a>
-          <a href="#" style={styles.navLink}>Reports</a>
-          <a href="#" style={styles.navLink}>Contact</a>
-        </nav>
-        <div style={styles.headerRight}>
-          <a href="#" style={styles.loginLink}>Log in</a>
-          <button style={styles.signUpBtn}>Sign up</button>
+    <div style={styles.page}>
+      {/* Minimal Navbar */}
+      <header style={styles.navbar}>
+        <div style={styles.navContent}>
+          {/* Logo */}
+          <div style={styles.logo}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#111827" strokeWidth="2">
+              <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2" />
+              <line x1="12" y1="22" x2="12" y2="15.5" />
+              <polyline points="22 8.5 12 15.5 2 8.5" />
+            </svg>
+            <span style={styles.logoText}>Digital Twin</span>
+          </div>
+
+          {/* Nav Links */}
+          <nav style={styles.navLinks}>
+            <a href="#" style={styles.navLink}>Overview</a>
+            <span style={styles.navDot}>·</span>
+            <a href="#" style={styles.navLink}>Details</a>
+            <span style={styles.navDot}>·</span>
+            <a href="#" style={styles.navLink}>Reports</a>
+            <span style={styles.navDot}>·</span>
+            <a href="#" style={styles.navLink}>Contact</a>
+          </nav>
         </div>
       </header>
 
-      {/* Main Content */}
-      <div style={styles.mainContent}>
-        {/* Left side - Text */}
-        <div style={styles.leftContent}>
-          <h1 style={styles.title}>BUILDING<br/>INSIGHTS</h1>
-          <p style={styles.subtitle}>
-            Upload your IFC building model to explore<br/>
-            detailed 3D visualization and metadata.
-          </p>
-          <button style={styles.learnMoreBtn}>
-            Learn more
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{marginLeft: '8px'}}>
-              <path d="M5 12h14M12 5l7 7-7 7"/>
-            </svg>
-          </button>
-        </div>
-
-        {/* Center - 3D Building Illustration */}
-        <div style={styles.centerContent}>
-          <div style={styles.buildingIllustration}>
-            <svg viewBox="0 0 200 200" style={styles.buildingSvg}>
-              {/* Simple isometric building */}
-              <g transform="translate(100, 160)">
-                {/* Base */}
-                <polygon points="0,-120 60,-90 60,-30 0,-60 -60,-30 -60,-90" fill="#e8e8ed" stroke="#c7c7cc" strokeWidth="1"/>
-                {/* Left face */}
-                <polygon points="-60,-90 0,-60 0,0 -60,-30" fill="#f5f5f7" stroke="#c7c7cc" strokeWidth="1"/>
-                {/* Right face */}
-                <polygon points="0,-60 60,-90 60,-30 0,0" fill="#ffffff" stroke="#c7c7cc" strokeWidth="1"/>
-                {/* Windows left */}
-                <rect x="-45" y="-75" width="12" height="15" fill="#d1d1d6" transform="skewY(-30)"/>
-                <rect x="-25" y="-75" width="12" height="15" fill="#d1d1d6" transform="skewY(-30)"/>
-                <rect x="-45" y="-50" width="12" height="15" fill="#d1d1d6" transform="skewY(-30)"/>
-                <rect x="-25" y="-50" width="12" height="15" fill="#d1d1d6" transform="skewY(-30)"/>
-                {/* Windows right */}
-                <rect x="15" y="-82" width="12" height="15" fill="#d1d1d6" transform="skewY(30)"/>
-                <rect x="35" y="-82" width="12" height="15" fill="#d1d1d6" transform="skewY(30)"/>
-                <rect x="15" y="-57" width="12" height="15" fill="#d1d1d6" transform="skewY(30)"/>
-                <rect x="35" y="-57" width="12" height="15" fill="#d1d1d6" transform="skewY(30)"/>
-              </g>
-            </svg>
+      {/* Hero Section */}
+      <main style={styles.hero}>
+        <div style={styles.heroContainer}>
+          {/* Left Column - Text */}
+          <div style={styles.textColumn}>
+            <span style={styles.eyebrow}>IFC Viewer</span>
+            <h1 style={styles.heading}>Building Insights</h1>
+            <p style={styles.subheading}>
+              Upload your IFC model to explore detailed 3D visualization, 
+              metadata inspection, and spatial hierarchy navigation.
+            </p>
+            <a href="#how" style={styles.howItWorks}>How it works →</a>
           </div>
-        </div>
 
-        {/* Right side - Upload Panel */}
-        <div style={styles.rightContent}>
-          <div style={styles.uploadCard}>
-            {uploadState === 'idle' && (
-              <>
-                <div style={styles.cardHeader}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1d1d1f" strokeWidth="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="17 8 12 3 7 8" />
-                    <line x1="12" y1="3" x2="12" y2="15" />
-                  </svg>
-                  <span style={styles.cardTitle}>Upload Model</span>
-                </div>
-                
-                <div
-                  style={{
-                    ...styles.dropzone,
-                    ...(isDragging ? styles.dropzoneActive : {})
-                  }}
-                  onDrop={handleDrop}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                >
-                  <div style={styles.dropIcon}>
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#86868b" strokeWidth="1.5">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                      <polyline points="14 2 14 8 20 8" />
+          {/* Right Column - Image + Upload Card */}
+          <div style={styles.visualColumn}>
+            {/* Hero Image with glow effect */}
+            <div style={styles.imageWrapper}>
+              <div style={styles.imageGlow}></div>
+              <img 
+                src="/src/assets/images/landing_page.png" 
+                alt="Minimal arctic pavilion visualization"
+                style={styles.heroImage}
+              />
+            </div>
+
+            {/* Upload Card - Floating over image */}
+            <div style={styles.uploadCard}>
+              {uploadState === 'idle' && (
+                <>
+                  <h3 style={styles.cardTitle}>Upload IFC Model</h3>
+                  
+                  <div
+                    style={{
+                      ...styles.dropzone,
+                      ...(isDragging ? styles.dropzoneActive : {})
+                    }}
+                    onDrop={handleDrop}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                  >
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="1.5" style={styles.dropIcon}>
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="17 8 12 3 7 8" />
+                      <line x1="12" y1="3" x2="12" y2="15" />
                     </svg>
+                    <p style={styles.dropText}>
+                      Drag & drop your <strong>.ifc</strong> file or
+                    </p>
+                    <label style={styles.browseBtn}>
+                      Browse Files
+                      <input
+                        type="file"
+                        accept=".ifc"
+                        onChange={handleFileChange}
+                        style={styles.fileInput}
+                      />
+                    </label>
                   </div>
-                  <p style={styles.dropText}>
-                    Drag & drop your <strong>.ifc</strong> file
+
+                  <div style={styles.cardFooter}>
+                    <span style={styles.supportText}>Supports IFC 2x3 and IFC 4</span>
+                    <div style={styles.statusPill}>
+                      <span style={styles.statusDot}></span>
+                      Active
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {(uploadState === 'uploading' || uploadState === 'processing') && (
+                <div style={styles.processing}>
+                  <div style={styles.spinner}></div>
+                  <p style={styles.progressText}>{progress}</p>
+                  <p style={styles.hint}>
+                    {uploadState === 'processing' && 'Converting geometry and extracting metadata...'}
                   </p>
-                  <span style={styles.dropOr}>or</span>
-                  <label style={styles.browseBtn}>
-                    Browse Files
-                    <input
-                      type="file"
-                      accept=".ifc"
-                      onChange={handleFileChange}
-                      style={styles.fileInput}
-                    />
-                  </label>
                 </div>
+              )}
 
-                <div style={styles.cardFooter}>
-                  <p style={styles.supportText}>Supports IFC 2x3 and IFC 4</p>
-                </div>
-              </>
-            )}
-
-            {(uploadState === 'uploading' || uploadState === 'processing') && (
-              <div style={styles.processing}>
-                <div style={styles.spinner}></div>
-                <p style={styles.progressText}>{progress}</p>
-                <p style={styles.hint}>
-                  {uploadState === 'processing' && 'Converting geometry and extracting metadata...'}
-                </p>
-              </div>
-            )}
-
-            {uploadState === 'error' && (
-              <div style={styles.errorBox}>
-                <div style={styles.errorIcon}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ff3b30" strokeWidth="2">
+              {uploadState === 'error' && (
+                <div style={styles.errorBox}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2" style={styles.errorIcon}>
                     <circle cx="12" cy="12" r="10" />
                     <line x1="15" y1="9" x2="9" y2="15" />
                     <line x1="9" y1="9" x2="15" y2="15" />
                   </svg>
+                  <p style={styles.errorText}>{error}</p>
+                  <button style={styles.retryBtn} onClick={handleReset}>
+                    Try Again
+                  </button>
                 </div>
-                <p style={styles.errorText}>{error}</p>
-                <button style={styles.retryBtn} onClick={handleReset}>
-                  Try Again
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Stats Card */}
-          <div style={styles.statsCard}>
-            <div style={styles.statItem}>
-              <span style={styles.statLabel}>Server Status</span>
-              <div style={styles.statValue}>
-                <span style={styles.statusDot}></span>
-                Active
-              </div>
-            </div>
-            <div style={styles.statItem}>
-              <span style={styles.statLabel}>Port</span>
-              <span style={styles.statValue}>8000</span>
+              )}
             </div>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   )
 }
 
 /**
- * Styles
+ * Arctic Zen Minimalist Styles
  */
 const styles = {
-  overlay: {
+  // Page Container
+  page: {
     position: 'fixed',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    background: '#f5f5f7',
+    background: '#F7F8FB',
     display: 'flex',
     flexDirection: 'column',
     zIndex: 1000,
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+    overflowY: 'auto',
   },
-  header: {
-    height: '60px',
-    background: '#ffffff',
-    borderBottom: '1px solid #e5e5e7',
+
+  // Navbar
+  navbar: {
+    position: 'sticky',
+    top: 0,
+    background: '#FFFFFF',
+    borderBottom: '1px solid #E5E7EB',
+    zIndex: 100,
+  },
+  navContent: {
+    maxWidth: '1280px',
+    margin: '0 auto',
+    padding: '0 32px',
+    height: '64px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '0 24px',
   },
   logo: {
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
-  },
-  logoIcon: {
-    fontSize: '20px',
-    color: '#1d1d1f',
+    gap: '10px',
   },
   logoText: {
-    fontSize: '14px',
-    fontWeight: 600,
-    letterSpacing: '1.5px',
-    color: '#1d1d1f',
+    fontSize: '16px',
+    fontWeight: 400,
+    color: '#111827',
+    letterSpacing: '-0.01em',
   },
-  nav: {
+  navLinks: {
     display: 'flex',
-    gap: '32px',
+    alignItems: 'center',
+    gap: '8px',
   },
   navLink: {
     fontSize: '14px',
-    color: '#86868b',
+    color: '#6B7280',
     textDecoration: 'none',
-    fontWeight: 500,
-    transition: 'color 0.2s',
-  },
-  navLinkActive: {
-    fontSize: '14px',
-    color: '#1d1d1f',
-    textDecoration: 'none',
-    fontWeight: 500,
-  },
-  headerRight: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '16px',
-  },
-  loginLink: {
-    fontSize: '14px',
-    color: '#1d1d1f',
-    textDecoration: 'none',
-    fontWeight: 500,
-  },
-  signUpBtn: {
-    padding: '8px 16px',
-    background: '#1d1d1f',
-    color: '#ffffff',
-    border: 'none',
+    fontWeight: 400,
+    padding: '8px 12px',
     borderRadius: '6px',
-    fontSize: '13px',
-    fontWeight: 500,
-    cursor: 'pointer',
+    transition: 'color 0.15s ease',
   },
-  mainContent: {
+  navDot: {
+    color: '#D1D5DB',
+    fontSize: '14px',
+  },
+
+  // Hero Section
+  hero: {
     flex: 1,
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '40px 60px',
-    gap: '40px',
-  },
-  leftContent: {
-    flex: '0 0 auto',
-    maxWidth: '400px',
-  },
-  title: {
-    fontSize: '56px',
-    fontWeight: 700,
-    lineHeight: 1.1,
-    color: '#1d1d1f',
-    margin: '0 0 20px 0',
-    letterSpacing: '-1px',
-  },
-  subtitle: {
-    fontSize: '16px',
-    color: '#86868b',
-    lineHeight: 1.6,
-    margin: '0 0 32px 0',
-  },
-  learnMoreBtn: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    padding: '12px 20px',
-    background: '#1d1d1f',
-    color: '#ffffff',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '14px',
-    fontWeight: 500,
-    cursor: 'pointer',
-  },
-  centerContent: {
-    flex: '1 1 auto',
-    display: 'flex',
     justifyContent: 'center',
+    padding: '60px 32px',
+  },
+  heroContainer: {
+    maxWidth: '1200px',
+    width: '100%',
+    display: 'grid',
+    gridTemplateColumns: '45% 55%',
+    gap: '60px',
     alignItems: 'center',
   },
-  buildingIllustration: {
-    width: '300px',
-    height: '300px',
-  },
-  buildingSvg: {
-    width: '100%',
-    height: '100%',
-  },
-  rightContent: {
-    flex: '0 0 auto',
+
+  // Text Column
+  textColumn: {
     display: 'flex',
     flexDirection: 'column',
     gap: '16px',
-    width: '320px',
   },
+  eyebrow: {
+    fontSize: '13px',
+    fontWeight: 500,
+    color: '#9CA3AF',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+  },
+  heading: {
+    fontSize: '48px',
+    fontWeight: 600,
+    color: '#111827',
+    margin: 0,
+    lineHeight: 1.1,
+    letterSpacing: '-0.02em',
+  },
+  subheading: {
+    fontSize: '17px',
+    color: '#6B7280',
+    margin: '8px 0 0 0',
+    lineHeight: 1.6,
+    maxWidth: '400px',
+  },
+  howItWorks: {
+    fontSize: '14px',
+    color: '#9CA3AF',
+    textDecoration: 'none',
+    marginTop: '8px',
+    transition: 'color 0.15s ease',
+  },
+
+  // Visual Column
+  visualColumn: {
+    position: 'relative',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+  },
+
+  // Hero Image
+  imageWrapper: {
+    position: 'relative',
+    width: '100%',
+    maxWidth: '560px',
+  },
+  imageGlow: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    width: '80%',
+    height: '80%',
+    background: 'radial-gradient(ellipse at center, rgba(200, 210, 230, 0.4) 0%, transparent 70%)',
+    filter: 'blur(40px)',
+    zIndex: 0,
+  },
+  heroImage: {
+    position: 'relative',
+    width: '100%',
+    height: 'auto',
+    borderRadius: '16px',
+    boxShadow: '0 25px 80px -20px rgba(0, 0, 0, 0.12), 0 10px 40px -15px rgba(0, 0, 0, 0.08)',
+    zIndex: 1,
+  },
+
+  // Upload Card
   uploadCard: {
-    background: '#ffffff',
+    position: 'relative',
+    marginTop: '-40px',
+    marginRight: '-20px',
+    alignSelf: 'flex-end',
+    width: '320px',
+    background: '#FFFFFF',
     borderRadius: '16px',
     padding: '24px',
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04), 0 4px 24px rgba(0, 0, 0, 0.04)',
-  },
-  cardHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    marginBottom: '20px',
+    border: '1px solid #E5E7EB',
+    boxShadow: '0 10px 40px -10px rgba(0, 0, 0, 0.1), 0 4px 20px -5px rgba(0, 0, 0, 0.05)',
+    zIndex: 2,
   },
   cardTitle: {
-    fontSize: '15px',
+    fontSize: '16px',
     fontWeight: 600,
-    color: '#1d1d1f',
+    color: '#111827',
+    margin: '0 0 16px 0',
   },
+
+  // Dropzone
   dropzone: {
-    border: '2px dashed #d1d1d6',
+    border: '2px dashed #E5E7EB',
     borderRadius: '12px',
-    padding: '32px 20px',
+    padding: '24px 16px',
     textAlign: 'center',
     transition: 'all 0.2s ease',
-    background: '#fafafa',
+    background: '#FAFAFA',
     cursor: 'pointer',
   },
   dropzoneActive: {
-    borderColor: '#1d1d1f',
-    background: '#f0f0f2',
+    borderColor: '#111827',
+    background: '#F3F4F6',
   },
   dropIcon: {
-    marginBottom: '12px',
+    marginBottom: '8px',
   },
   dropText: {
-    margin: '0 0 8px 0',
-    color: '#1d1d1f',
+    margin: '0 0 12px 0',
+    color: '#6B7280',
     fontSize: '14px',
-  },
-  dropOr: {
-    display: 'block',
-    margin: '12px 0',
-    color: '#86868b',
-    fontSize: '12px',
   },
   browseBtn: {
     display: 'inline-block',
     padding: '10px 20px',
-    background: '#1d1d1f',
-    color: '#ffffff',
+    background: '#111827',
+    color: '#FFFFFF',
     borderRadius: '8px',
     cursor: 'pointer',
-    fontSize: '13px',
+    fontSize: '14px',
     fontWeight: 500,
-    transition: 'background 0.2s',
+    boxShadow: '0 2px 8px rgba(17, 24, 39, 0.15)',
+    transition: 'all 0.15s ease',
   },
   fileInput: {
     display: 'none',
   },
+
+  // Card Footer
   cardFooter: {
     marginTop: '16px',
     paddingTop: '16px',
-    borderTop: '1px solid #f0f0f2',
+    borderTop: '1px solid #F3F4F6',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   supportText: {
-    margin: 0,
     fontSize: '12px',
-    color: '#86868b',
-    textAlign: 'center',
+    color: '#9CA3AF',
   },
+  statusPill: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '4px 10px',
+    background: '#F0FDF4',
+    borderRadius: '100px',
+    fontSize: '12px',
+    fontWeight: 500,
+    color: '#166534',
+  },
+  statusDot: {
+    width: '6px',
+    height: '6px',
+    borderRadius: '50%',
+    background: '#22C55E',
+  },
+
+  // Processing State
   processing: {
-    padding: '40px 20px',
+    padding: '40px 16px',
     textAlign: 'center',
   },
   spinner: {
-    width: '40px',
-    height: '40px',
-    border: '3px solid #f0f0f2',
-    borderTopColor: '#1d1d1f',
+    width: '32px',
+    height: '32px',
+    border: '3px solid #F3F4F6',
+    borderTopColor: '#111827',
     borderRadius: '50%',
-    margin: '0 auto 20px',
+    margin: '0 auto 16px',
     animation: 'spin 1s linear infinite',
   },
   progressText: {
-    margin: '0 0 8px 0',
-    color: '#1d1d1f',
+    margin: '0 0 4px 0',
+    color: '#111827',
     fontSize: '14px',
     fontWeight: 500,
   },
   hint: {
     margin: 0,
-    color: '#86868b',
+    color: '#9CA3AF',
     fontSize: '13px',
   },
+
+  // Error State
   errorBox: {
-    padding: '32px 20px',
+    padding: '32px 16px',
     textAlign: 'center',
   },
   errorIcon: {
@@ -555,49 +564,22 @@ const styles = {
   },
   errorText: {
     margin: '0 0 16px 0',
-    color: '#ff3b30',
+    color: '#EF4444',
     fontSize: '14px',
   },
   retryBtn: {
     padding: '10px 20px',
-    background: '#f5f5f7',
-    border: '1px solid #d1d1d6',
+    background: '#FFFFFF',
+    border: '1px solid #E5E7EB',
     borderRadius: '8px',
-    color: '#1d1d1f',
+    color: '#111827',
     cursor: 'pointer',
     fontSize: '13px',
     fontWeight: 500,
+    transition: 'all 0.15s ease',
   },
-  statsCard: {
-    background: '#ffffff',
-    borderRadius: '12px',
-    padding: '16px 20px',
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
-  },
-  statItem: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '8px 0',
-  },
-  statLabel: {
-    fontSize: '13px',
-    color: '#86868b',
-  },
-  statValue: {
-    fontSize: '13px',
-    fontWeight: 500,
-    color: '#1d1d1f',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-  },
-  statusDot: {
-    width: '8px',
-    height: '8px',
-    borderRadius: '50%',
-    background: '#34c759',
-  },
+
+  // Mini Panel (when model is loaded)
   miniPanel: {
     position: 'absolute',
     bottom: 20,
@@ -610,15 +592,53 @@ const styles = {
     alignItems: 'center',
     gap: '8px',
     padding: '10px 16px',
-    background: '#ffffff',
-    border: '1px solid #e5e5e7',
+    background: '#FFFFFF',
+    border: '1px solid #E5E7EB',
     borderRadius: '8px',
-    color: '#1d1d1f',
+    color: '#111827',
     cursor: 'pointer',
     fontSize: '13px',
     fontWeight: 500,
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
+    transition: 'all 0.15s ease',
   },
+}
+
+// Add CSS animations and hover effects
+if (typeof document !== 'undefined') {
+  const styleSheet = document.createElement('style')
+  styleSheet.textContent = `
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    /* Hover effects for nav links */
+    nav a:hover {
+      color: #111827 !important;
+    }
+    
+    /* Hover for "How it works" link */
+    a[href="#how"]:hover {
+      color: #6B7280 !important;
+    }
+    
+    /* Browse button hover */
+    label[style*="Browse"]:hover {
+      background: #1F2937 !important;
+    }
+    
+    /* Retry button hover */
+    button:hover {
+      background: #F9FAFB !important;
+    }
+    
+    /* New model button hover */
+    button[style*="Load New"]:hover {
+      background: #F9FAFB !important;
+      border-color: #D1D5DB !important;
+    }
+  `
+  document.head.appendChild(styleSheet)
 }
 
 export default UploadPanel

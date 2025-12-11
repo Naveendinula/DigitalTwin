@@ -109,11 +109,16 @@ function useSectionMode() {
           : [object.material]
         
         materials.forEach((material) => {
-          // Store original clipping planes if not already stored
+          // Store original clipping planes and polygon offset if not already stored
           if (!originalClippingPlanesRef.current.has(material.uuid)) {
             originalClippingPlanesRef.current.set(
               material.uuid, 
-              material.clippingPlanes ? [...material.clippingPlanes] : null
+              {
+                clippingPlanes: material.clippingPlanes ? [...material.clippingPlanes] : null,
+                polygonOffset: material.polygonOffset,
+                polygonOffsetFactor: material.polygonOffsetFactor,
+                polygonOffsetUnits: material.polygonOffsetUnits
+              }
             )
           }
 
@@ -121,11 +126,23 @@ function useSectionMode() {
             // Apply the clipping plane
             material.clippingPlanes = [plane]
             material.clipShadows = true
+            // Enable polygon offset to prevent Z-fighting at cut edges
+            material.polygonOffset = true
+            material.polygonOffsetFactor = 1
+            material.polygonOffsetUnits = 1
             material.needsUpdate = true
           } else {
             // Restore original or clear
             const original = originalClippingPlanesRef.current.get(material.uuid)
-            material.clippingPlanes = original || null
+            if (original) {
+              material.clippingPlanes = original.clippingPlanes
+              material.polygonOffset = original.polygonOffset || false
+              material.polygonOffsetFactor = original.polygonOffsetFactor || 0
+              material.polygonOffsetUnits = original.polygonOffsetUnits || 0
+            } else {
+              material.clippingPlanes = null
+              material.polygonOffset = false
+            }
             material.clipShadows = false
             material.needsUpdate = true
           }
@@ -383,9 +400,14 @@ function useSectionMode() {
       console.log('Flipped normal to face camera')
     }
     
-    // Create THREE.Plane
+    // Add a small offset to prevent Z-fighting when the plane is exactly on a surface
+    // This moves the clipping plane slightly inward (along the normal direction)
+    const zFightingOffset = 0.001
+    const offsetOrigin = origin.clone().addScaledVector(normal, zFightingOffset)
+    
+    // Create THREE.Plane with the offset origin
     const plane = new THREE.Plane()
-    plane.setFromNormalAndCoplanarPoint(normal, origin)
+    plane.setFromNormalAndCoplanarPoint(normal, offsetOrigin)
     
     // Get source label from mesh info
     const { globalId, sourceLabel } = findMeshInfo(mesh)

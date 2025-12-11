@@ -6,15 +6,18 @@ import PropertyPanel from './components/PropertyPanel'
 import StructureTree from './components/StructureTree'
 import UploadPanel from './components/UploadPanel'
 import ViewerToolbar from './components/ViewerToolbar'
+import AxisViewWidget from './components/AxisViewWidget'
 import SectionModeHint from './components/SectionModeHint'
 import SectionPlanePanel from './components/SectionPlanePanel'
 import KeyboardHints from './components/KeyboardHints'
+import EcPanel from './components/EcPanel'
 import { useToast } from './components/Toast'
 import useSelection from './hooks/useSelection'
 import useVisibility from './hooks/useVisibility'
 import useSectionMode from './hooks/useSectionMode'
 import useXRayMode from './hooks/useXRayMode'
 import useCameraFocus from './hooks/useCameraFocus'
+import useViewMode from './hooks/useViewMode'
 
 /**
  * Main Application Component
@@ -25,6 +28,8 @@ import useCameraFocus from './hooks/useCameraFocus'
 function App() {
   // Model URLs - null until uploaded
   const [modelUrls, setModelUrls] = useState(null)
+  const [jobId, setJobId] = useState(null)
+  const [ecPanelOpen, setEcPanelOpen] = useState(false)
 
   // Selection state management
   const { selectedId, handleSelect, deselect, setScene: setSelectionScene, selectById } = useSelection()
@@ -69,6 +74,20 @@ function App() {
     focusOnElements
   } = useCameraFocus()
   
+  // View mode for preset camera positions (Top/Front/Side/Free)
+  const {
+    viewMode,
+    setScene: setViewModeScene,
+    setCamera: setViewModeCamera,
+    setControls: setViewModeControls,
+    setViewMode,
+    getViewMode,
+    resetView,
+    fitToModel,
+    getAvailableViews,
+    invalidateBoundsCache
+  } = useViewMode()
+  
   // Toast notifications
   const { toasts, showToast, removeToast, ToastContainer } = useToast()
   
@@ -89,12 +108,15 @@ function App() {
   const handleModelReady = useCallback((urls) => {
     console.log('Model ready:', urls)
     setModelUrls(urls)
+    setJobId(urls.jobId)
     // Reset section mode when loading a new model
     setSectionMode(false)
-  }, [setSectionMode])
+    // Invalidate bounds cache for new model
+    invalidateBoundsCache()
+  }, [setSectionMode, invalidateBoundsCache])
 
   /**
-   * Handle scene ready - register with visibility controller, section mode, selection, X-ray, and camera focus
+   * Handle scene ready - register with visibility controller, section mode, selection, X-ray, camera focus, and view mode
    */
   const handleSceneReady = useCallback((scene, camera, gl) => {
     setScene(scene)
@@ -102,17 +124,19 @@ function App() {
     setSelectionScene(scene) // Register scene with selection hook for selectById
     setXRayScene(scene) // Register scene with X-ray mode
     setFocusScene(scene) // Register scene with camera focus
+    setViewModeScene(scene) // Register scene with view mode
     if (camera) {
       setSectionCamera(camera)
       setFocusCamera(camera)
+      setViewModeCamera(camera)
       cameraRef.current = camera
     }
     if (gl) {
       setSectionRenderer(gl)
       glRef.current = gl
     }
-    console.log('Scene registered with visibility, section, selection, X-ray, and focus controllers')
-  }, [setScene, setSectionScene, setSelectionScene, setXRayScene, setFocusScene, setSectionCamera, setFocusCamera, setSectionRenderer])
+    console.log('Scene registered with visibility, section, selection, X-ray, focus, and view mode controllers')
+  }, [setScene, setSectionScene, setSelectionScene, setXRayScene, setFocusScene, setViewModeScene, setSectionCamera, setFocusCamera, setViewModeCamera, setSectionRenderer])
 
   /**
    * Handle renderer ready from Viewer
@@ -135,9 +159,10 @@ function App() {
   const handleControlsReady = useCallback((controls) => {
     setSectionControls(controls)
     setFocusControls(controls)
+    setViewModeControls(controls)
     controlsRef.current = controls
     console.log('Orbit controls ready')
-  }, [setSectionControls, setFocusControls])
+  }, [setSectionControls, setFocusControls, setViewModeControls])
 
   /**
    * Clear all selection and X-ray mode
@@ -171,12 +196,43 @@ function App() {
   }, [focusOnElements, selectedId, showToast])
 
   /**
+   * View mode keyboard shortcut mapping
+   * Uses number keys 1-7 for quick view access
+   */
+  const viewModeShortcuts = useMemo(() => ({
+    '1': 'free',
+    '2': 'top',
+    '3': 'front',
+    '4': 'right',
+    '5': 'left',
+    '6': 'back',
+    '7': 'bottom'
+  }), [])
+
+  /**
    * Keyboard shortcuts handler
    */
   useEffect(() => {
     const handleKeyDown = (event) => {
       // Don't trigger shortcuts when typing in input fields
       if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
+        return
+      }
+      
+      // Check for view mode shortcuts (1-7)
+      const viewMode = viewModeShortcuts[event.key]
+      if (viewMode) {
+        setViewMode(viewMode)
+        const viewLabels = {
+          'free': 'Free Orbit',
+          'top': 'Top',
+          'front': 'Front',
+          'right': 'Right',
+          'left': 'Left',
+          'back': 'Back',
+          'bottom': 'Bottom'
+        }
+        showToast(`${viewLabels[viewMode]} view`, 'info', 1500)
         return
       }
       
@@ -191,6 +247,22 @@ function App() {
           // Focus on selected element(s)
           focusOnCurrentSelection()
           break
+        case 'c':
+        case 'C':
+          // DEBUG: Capture current camera state
+          if (cameraRef.current && controlsRef.current) {
+            const cam = cameraRef.current
+            const ctrl = controlsRef.current
+            console.log('=== CAMERA STATE ===')
+            console.log(`Position: (${cam.position.x.toFixed(3)}, ${cam.position.y.toFixed(3)}, ${cam.position.z.toFixed(3)})`)
+            console.log(`Target: (${ctrl.target.x.toFixed(3)}, ${ctrl.target.y.toFixed(3)}, ${ctrl.target.z.toFixed(3)})`)
+            console.log(`Up: (${cam.up.x.toFixed(3)}, ${cam.up.y.toFixed(3)}, ${cam.up.z.toFixed(3)})`)
+            // Calculate direction from target to camera
+            const dir = cam.position.clone().sub(ctrl.target).normalize()
+            console.log(`Direction (normalized): (${dir.x.toFixed(3)}, ${dir.y.toFixed(3)}, ${dir.z.toFixed(3)})`)
+            showToast('Camera state logged to console (press F12)', 'info', 3000)
+          }
+          break
         default:
           break
       }
@@ -198,7 +270,7 @@ function App() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [clearAll, focusOnCurrentSelection, showToast])
+  }, [clearAll, focusOnCurrentSelection, showToast, viewModeShortcuts, setViewMode])
 
   /**
    * Handle isolation from tree view - also enables X-ray effect
@@ -309,20 +381,19 @@ function App() {
         {/* 3D Viewer - Center */}
         <div style={styles.viewerContainer}>
           {/* Viewer Toolbar */}
-          <ViewerToolbar
+          <ViewerToolbar 
             sectionModeEnabled={sectionModeEnabled}
             onToggleSectionMode={toggleSectionMode}
-            hasSectionPlane={!!sectionPlane}
+            hasSectionPlane={!!activeSectionPlane}
             onClearSectionPlane={clearSectionPlane}
             onAlignCamera={alignCameraToSection}
-          />
-          
-          {/* Section Mode Hint */}
-          <SectionModeHint
-            sectionModeEnabled={sectionModeEnabled}
-            hasSectionPlane={!!sectionPlane}
-            pickingEnabled={sectionPlanePickingEnabled}
-            sourceLabel={activeSectionPlane?.sourceLabel}
+            viewMode={viewMode}
+            onSetViewMode={setViewMode}
+            availableViews={getAvailableViews()}
+            onResetView={resetView}
+            onFitToModel={fitToModel}
+            onOpenEcPanel={() => setEcPanelOpen(true)}
+            hasModel={!!modelUrls}
           />
           
           {/* Section Plane Controls Panel */}
@@ -358,8 +429,20 @@ function App() {
           {/* Upload new model button */}
           <UploadPanel onModelReady={handleModelReady} hasModel={true} />
           
+          <EcPanel 
+            isOpen={ecPanelOpen} 
+            onClose={() => setEcPanelOpen(false)} 
+            jobId={jobId} 
+          />
+
           {/* Keyboard shortcuts hints */}
           <KeyboardHints />
+          
+          {/* Axis View Widget - Bottom right corner */}
+          <AxisViewWidget
+            viewMode={viewMode}
+            onSetViewMode={setViewMode}
+          />
         </div>
         
         {/* Property Panel - Right Panel */}

@@ -63,7 +63,8 @@ function Viewer({ children, onMissed, onRendererReady, onControlsReady }) {
         position: [10, 10, 10], 
         fov: 50,
         near: 0.1,
-        far: 1000
+        far: 1000,
+        up: [0, 0, 1]  // Z-up for BIM/architectural models
       }}
       style={{ 
         width: '100%', 

@@ -50,6 +50,22 @@ function KeyboardHints() {
           <kbd style={styles.key}>F</kbd>
           <span style={styles.desc}>Focus on selected</span>
         </div>
+        <div style={styles.divider} />
+        <div style={styles.shortcut}>
+          <kbd style={styles.key}>1</kbd>
+          <span style={styles.desc}>Free Orbit view</span>
+        </div>
+        <div style={styles.shortcut}>
+          <div style={styles.keyGroup}>
+            <kbd style={styles.keySmall}>2</kbd>
+            <kbd style={styles.keySmall}>3</kbd>
+            <kbd style={styles.keySmall}>4</kbd>
+            <kbd style={styles.keySmall}>5</kbd>
+            <kbd style={styles.keySmall}>6</kbd>
+            <kbd style={styles.keySmall}>7</kbd>
+          </div>
+          <span style={styles.desc}>View presets (Top/Front/Right/Left/Back/Bottom)</span>
+        </div>
       </div>
     </div>
   )
@@ -105,6 +121,29 @@ const styles = {
     fontSize: '11px',
     fontWeight: 600,
     color: '#ffffff',
+  },
+  keySmall: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: '20px',
+    padding: '2px 5px',
+    background: 'rgba(255, 255, 255, 0.1)',
+    border: '1px solid rgba(255, 255, 255, 0.2)',
+    borderRadius: '3px',
+    fontFamily: 'inherit',
+    fontSize: '10px',
+    fontWeight: 600,
+    color: '#ffffff',
+  },
+  keyGroup: {
+    display: 'flex',
+    gap: '3px',
+  },
+  divider: {
+    height: '1px',
+    background: 'rgba(255, 255, 255, 0.1)',
+    margin: '4px 0',
   },
   desc: {
     color: '#d1d1d6',

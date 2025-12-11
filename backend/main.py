@@ -22,6 +22,7 @@ from enum import Enum
 from ifc_converter import convert_ifc_to_glb
 from ifc_metadata_extractor import extract_metadata, save_metadata
 from ifc_spatial_hierarchy import extract_spatial_hierarchy, save_hierarchy
+from ec_api import router as ec_router
 
 
 # Configuration
@@ -40,6 +41,9 @@ app = FastAPI(
     description="API for converting IFC files to GLB and extracting BIM metadata",
     version="1.0.0"
 )
+
+# Include EC router
+app.include_router(ec_router)
 
 # Enable CORS for frontend
 app.add_middleware(
