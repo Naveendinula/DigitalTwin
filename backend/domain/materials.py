@@ -171,6 +171,12 @@ def get_element_material_names(element) -> list[str]:
     return sorted(material_names)
 
 
+def is_leaf_element(el) -> bool:
+    """True if the element has no children in IfcRelAggregates / IfcRelNests."""
+    rels = getattr(el, "IsDecomposedBy", None) or []
+    return len(rels) == 0
+
+
 def has_material(el) -> bool:
     """True if the element (or its type) has any material association."""
     mats = ifc_element.get_materials(el, should_inherit=True)

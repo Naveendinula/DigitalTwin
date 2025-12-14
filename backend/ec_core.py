@@ -20,7 +20,9 @@ from domain.materials import (
     classify_material, 
     get_element_material_names, 
     get_material_layers_with_shares,
-    has_material
+    has_material,
+    is_leaf_element,
+    is_void_layer
 )
 from domain.geometry import compute_volume_from_geom
 

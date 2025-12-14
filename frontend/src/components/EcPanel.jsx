@@ -196,6 +196,35 @@ function EcPanel({ isOpen, onClose, jobId }) {
               <span style={styles.subValue}>({result.summary.total.avg_tCO2e.toFixed(2)} tCO2e)</span>
             </div>
 
+            {result.quality && (
+              <div style={styles.qualityContainer}>
+                <h4 style={styles.subtitle}>Data Coverage</h4>
+                <div style={styles.qualityBarContainer}>
+                  <div 
+                    style={{
+                      ...styles.qualityFill, 
+                      width: `${(result.quality.rows_with_factors / result.quality.rows_total) * 100}%`,
+                      backgroundColor: (result.quality.rows_with_factors / result.quality.rows_total) > 0.8 ? '#34c759' : '#ff9500'
+                    }} 
+                  />
+                </div>
+                <p style={styles.qualityText}>
+                  {result.quality.rows_with_factors} / {result.quality.rows_total} elements mapped
+                </p>
+                
+                {result.quality.rows_missing_factors > 0 && (
+                  <div style={styles.missingInfo}>
+                    <p style={styles.missingLabel}>Missing impacts for:</p>
+                    <ul style={styles.missingList}>
+                      {result.quality.missing_material_names_top.map((item, i) => (
+                        <li key={i}>{item.name} ({item.count})</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+
             <button 
               onClick={() => setShowDetails(!showDetails)}
               style={styles.secondaryButton}
@@ -205,35 +234,6 @@ function EcPanel({ isOpen, onClose, jobId }) {
 
             {showDetails && (
               <div style={styles.detailsContainer}>
-                {result.quality && (
-                  <div style={styles.qualityContainer}>
-                    <h4 style={styles.subtitle}>Data Coverage</h4>
-                    <div style={styles.qualityBarContainer}>
-                      <div 
-                        style={{
-                          ...styles.qualityFill, 
-                          width: `${(result.quality.rows_with_factors / result.quality.rows_total) * 100}%`,
-                          backgroundColor: (result.quality.rows_with_factors / result.quality.rows_total) > 0.8 ? '#34c759' : '#ff9500'
-                        }} 
-                      />
-                    </div>
-                    <p style={styles.qualityText}>
-                      {result.quality.rows_with_factors} / {result.quality.rows_total} elements mapped
-                    </p>
-                    
-                    {result.quality.rows_missing_factors > 0 && (
-                      <div style={styles.missingInfo}>
-                        <p style={styles.missingLabel}>Missing impacts for:</p>
-                        <ul style={styles.missingList}>
-                          {result.quality.missing_material_names_top.map((item, i) => (
-                            <li key={i}>{item.name} ({item.count})</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                )}
-
                 <h4 style={styles.subtitle}>By Material Class</h4>
                 <div style={styles.tableContainer}>
                   <table style={styles.table}>
