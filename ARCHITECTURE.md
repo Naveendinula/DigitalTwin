@@ -52,32 +52,32 @@ The system bridges the gap between complex BIM files and accessible web visualiz
 ### Context Diagram
 ```mermaid
 graph TD
-    User[User] -->|Browser| FE[Frontend (React)]
-    FE -->|HTTP/JSON| API[Backend API (FastAPI)]
-    API -->|Reads/Writes| FS[File System]
-    API -->|Executes| Tool[IfcConvert.exe]
-    API -->|Reads| DB[(CSV Database)]
+    User[User] -->|Browser| FE["Frontend (React)"]
+    FE -->|HTTP/JSON| API["Backend API (FastAPI)"]
+    API -->|Reads/Writes| FS["File System"]
+    API -->|Executes| Tool["IfcConvert.exe"]
+    API -->|Reads| DB[("CSV Database")]
 ```
 
 ### Container Diagram
 ```mermaid
 graph TB
     subgraph Frontend
-        UI[React UI]
-        Viewer[Three.js Viewer]
+        UI["React UI"]
+        Viewer["Three.js Viewer"]
     end
 
     subgraph Backend
-        Server[FastAPI Server]
-        Converter[IFC Converter]
-        Extractor[Metadata Extractor]
-        ECCore[EC Calculator]
+        Server["FastAPI Server"]
+        Converter["IFC Converter"]
+        Extractor["Metadata Extractor"]
+        ECCore["EC Calculator"]
     end
 
     subgraph Storage
-        Uploads[./uploads]
-        Outputs[./output]
-        ECDB[prac-database.csv]
+        Uploads["./uploads"]
+        Outputs["./output"]
+        ECDB["prac-database.csv"]
     end
 
     UI -->|Uploads IFC| Server

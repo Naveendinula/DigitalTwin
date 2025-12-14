@@ -29,7 +29,7 @@ graph TD
     end
 
     subgraph "Processing Layer"
-        IFCConv[IfcConvert (Geometry)]
+        IFCConv["IfcConvert (Geometry)"]
         MetaExt[Metadata Extractor]
         ECCalc[EC Calculator]
         
@@ -42,7 +42,7 @@ graph TD
         IFCFiles[Raw IFC Files]
         GLBFiles[Processed GLB]
         JSONMeta[JSON Metadata]
-        ECDB[EC Database (CSV)]
+        ECDB["EC Database (CSV)"]
         
         IFCConv -- Reads --> IFCFiles
         IFCConv -- Writes --> GLBFiles
