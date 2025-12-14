@@ -93,6 +93,21 @@ function App() {
   
   // Track isolated IDs for X-ray
   const [isolatedIds, setIsolatedIds] = useState(null)
+  // Lock focus to prevent accidental changes to isolation set
+  const [focusLock, setFocusLock] = useState(true)
+
+  // Viewer Mode: NORMAL | FOCUS | ISOLATE
+  // Derived from state to ensure consistency and avoid duplication
+  const mode = useMemo(() => {
+    if (isolatedIds) return 'ISOLATE'
+    if (selectedId) return 'FOCUS'
+    return 'NORMAL'
+  }, [isolatedIds, selectedId])
+
+  // Log mode changes for debugging
+  useEffect(() => {
+    console.log('Viewer Mode:', mode)
+  }, [mode])
   
   // Track last selected IDs for 'F' key focus
   const lastSelectedIdsRef = useRef(null)
@@ -169,8 +184,8 @@ function App() {
    */
   const clearAll = useCallback(() => {
     deselect()
-    showAll()
     disableXRay()
+    showAll()
     setIsolatedIds(null)
     lastSelectedIdsRef.current = null
   }, [deselect, showAll, disableXRay])
@@ -274,17 +289,26 @@ function App() {
 
   /**
    * Handle isolation from tree view - also enables X-ray effect
+   * Supports 'FOCUS' (Ghost/X-Ray) and 'ISOLATE' (Hide others) modes
    */
-  const handleIsolate = useCallback((globalIds) => {
+  const handleIsolate = useCallback((globalIds, options = {}) => {
+    const { behavior = 'FOCUS' } = options
+
     if (globalIds === null) {
       // Show all - disable X-ray and show all elements
-      showAll()
       disableXRay()
+      showAll()
       setIsolatedIds(null)
     } else {
-      // Isolate - enable X-ray with selected IDs visible
-      isolate(globalIds)
-      enableXRay(globalIds)
+      if (behavior === 'ISOLATE') {
+        // Hide others
+        disableXRay()
+        isolate(globalIds)
+      } else {
+        // FOCUS: Ghost others (X-Ray)
+        showAll() // Ensure everything is visible first
+        enableXRay(globalIds)
+      }
       setIsolatedIds(globalIds)
     }
   }, [isolate, showAll, enableXRay, disableXRay])
@@ -343,6 +367,40 @@ function App() {
     })
   }, [createSectionPlane])
 
+  // Sync X-Ray "solid set" with selection
+  // If X-Ray is enabled, ensure selected elements are also solid
+  useEffect(() => {
+    if (!xRayEnabled) return
+
+    // Combine isolated IDs and selected ID
+    const solidIds = [...(isolatedIds || [])]
+    if (selectedId) {
+      if (Array.isArray(selectedId)) {
+        solidIds.push(...selectedId)
+      } else {
+        solidIds.push(selectedId)
+      }
+    }
+
+    // Update X-Ray selection
+    updateXRaySelection(solidIds)
+  }, [xRayEnabled, isolatedIds, selectedId, updateXRaySelection])
+
+  // Auto-Focus behavior: If unlocked, selection replaces the focus set
+  useEffect(() => {
+    if (mode === 'FOCUS' && !focusLock && selectedId) {
+      const newIds = Array.isArray(selectedId) ? selectedId : [selectedId]
+      // Only update if different to avoid loops
+      const currentIds = isolatedIds || []
+      const isDifferent = newIds.length !== currentIds.length || 
+                         !newIds.every(id => currentIds.includes(id))
+      
+      if (isDifferent) {
+        setIsolatedIds(newIds)
+      }
+    }
+  }, [mode, focusLock, selectedId, isolatedIds])
+
   // Show upload panel if no model loaded
   if (!modelUrls) {
     return <UploadPanel onModelReady={handleModelReady} hasModel={false} />
@@ -376,6 +434,8 @@ function App() {
           onIsolate={handleIsolate}
           onSelect={handleTreeSelect}
           selectedId={selectedId}
+          focusLock={focusLock}
+          onToggleFocusLock={() => setFocusLock(prev => !prev)}
         />
 
         {/* 3D Viewer - Center */}

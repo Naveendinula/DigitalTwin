@@ -11,18 +11,25 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
  * @param {function} onIsolate - Callback when isolating elements, receives array of GlobalIds
  * @param {function} onSelect - Callback when selecting a single element
  * @param {string|string[]|null} selectedId - Currently selected element GlobalId(s)
+ * @param {boolean} focusLock - Whether focus is locked
+ * @param {function} onToggleFocusLock - Callback to toggle focus lock
  */
 function StructureTree({ 
   hierarchyUrl = '/hierarchy.json', 
   onIsolate,
   onSelect,
-  selectedId 
+  selectedId,
+  focusLock = true,
+  onToggleFocusLock
 }) {
   const [hierarchy, setHierarchy] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [expandedNodes, setExpandedNodes] = useState(new Set())
   const [isolatedBranch, setIsolatedBranch] = useState(null)
+  // Track current isolation mode and IDs
+  const [contextMode, setContextMode] = useState('GHOST') // 'GHOST' | 'HIDE'
+  const [currentIsolatedIds, setCurrentIsolatedIds] = useState([])
   
   // Ref for scrolling to selected node
   const treeContainerRef = useRef(null)
@@ -132,12 +139,30 @@ function StructureTree({
     // Toggle isolation
     if (isolatedBranch === nodeId) {
       setIsolatedBranch(null)
+      setCurrentIsolatedIds([])
       onIsolate?.(null) // null means show all
     } else {
       setIsolatedBranch(nodeId)
-      onIsolate?.(ids)
+      setCurrentIsolatedIds(ids)
+      // Use current contextMode
+      const behavior = contextMode === 'GHOST' ? 'FOCUS' : 'ISOLATE'
+      onIsolate?.(ids, { behavior })
     }
-  }, [collectGlobalIds, onIsolate, isolatedBranch])
+  }, [collectGlobalIds, onIsolate, isolatedBranch, contextMode])
+
+  /**
+   * Toggle context mode (Ghosted vs Hidden)
+   */
+  const toggleContextMode = useCallback(() => {
+    const newMode = contextMode === 'GHOST' ? 'HIDE' : 'GHOST'
+    setContextMode(newMode)
+    
+    // Re-apply isolation with new mode if active
+    if (isolatedBranch && currentIsolatedIds.length > 0) {
+      const behavior = newMode === 'GHOST' ? 'FOCUS' : 'ISOLATE'
+      onIsolate?.(currentIsolatedIds, { behavior })
+    }
+  }, [contextMode, isolatedBranch, currentIsolatedIds, onIsolate])
 
   /**
    * Handle click on a tree element - selects element(s) in the 3D model
@@ -164,6 +189,7 @@ function StructureTree({
    */
   const handleShowAll = useCallback(() => {
     setIsolatedBranch(null)
+    setCurrentIsolatedIds([])
     onIsolate?.(null)
   }, [onIsolate])
 
@@ -226,14 +252,85 @@ function StructureTree({
           {isolatedBranch && (
             <>
               <span style={styles.xrayBadge}>
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                  <circle cx="12" cy="12" r="3" />
-                </svg>
-                X-Ray
+                {contextMode === 'GHOST' ? 'Focus' : 'Isolate'}
               </span>
-              <button style={styles.showAllBtn} onClick={handleShowAll}>
-                Show All
+              <div style={styles.divider} />
+              
+              {/* Context Toggle: Ghost vs Hide */}
+              <button 
+                style={styles.iconBtn} 
+                onClick={toggleContextMode}
+                title={contextMode === 'GHOST' ? "Context: Ghosted (Click to Hide)" : "Context: Hidden (Click to Ghost)"}
+              >
+                {contextMode === 'GHOST' ? (
+                  // Ghost Icon
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M9 22h6c5 0 7-2 7-7V9c0-5-2-7-7-7H9C4 2 2 4 2 9v6c0 5 2 7 7 7z" />
+                    <path d="M9 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" opacity="0.5" />
+                    <path d="M15 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" opacity="0.5" />
+                  </svg>
+                ) : (
+                  // Eye Slash Icon
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M14.5 9.5L9.5 14.5M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                    <line x1="1" y1="1" x2="23" y2="23" />
+                  </svg>
+                )}
+              </button>
+
+              {/* Lock Toggle */}
+              <button 
+                style={{...styles.iconBtn, color: focusLock ? '#007AFF' : '#636366', background: focusLock ? 'rgba(0,122,255,0.1)' : 'transparent'}}
+                onClick={onToggleFocusLock}
+                title={focusLock ? "Focus Locked (Click to Unlock)" : "Focus Unlocked (Click to Lock)"}
+              >
+                {focusLock ? (
+                  // Lock Closed
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                ) : (
+                  // Lock Open
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+                  </svg>
+                )}
+              </button>
+
+              {/* Focus Selected (only if locked & selection exists) */}
+              {focusLock && selectedIds.length > 0 && (
+                <button 
+                  style={styles.iconBtn}
+                  onClick={() => {
+                    const behavior = contextMode === 'GHOST' ? 'FOCUS' : 'ISOLATE'
+                    onIsolate?.(selectedIds, { behavior })
+                  }}
+                  title="Set focus to current selection"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="22" y1="12" x2="18" y2="12" />
+                    <line x1="6" y1="12" x2="2" y2="12" />
+                    <line x1="12" y1="6" x2="12" y2="2" />
+                    <line x1="12" y1="22" x2="12" y2="18" />
+                  </svg>
+                </button>
+              )}
+
+              <div style={styles.divider} />
+
+              {/* Show All / Exit */}
+              <button 
+                style={styles.iconBtn} 
+                onClick={handleShowAll}
+                title="Show All (Exit Isolation)"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
               </button>
             </>
           )}
@@ -465,30 +562,36 @@ const styles = {
   headerActions: {
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
+    gap: '4px',
+    marginLeft: 'auto',
   },
   xrayBadge: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '4px',
-    padding: '3px 8px',
-    background: 'rgba(0, 122, 255, 0.1)',
-    borderRadius: '4px',
     fontSize: '10px',
-    fontWeight: 600,
+    fontWeight: 700,
     color: '#007AFF',
     textTransform: 'uppercase',
     letterSpacing: '0.5px',
+    marginRight: '4px',
   },
-  showAllBtn: {
-    padding: '4px 10px',
-    background: '#1d1d1f',
+  iconBtn: {
+    width: '24px',
+    height: '24px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'transparent',
     border: 'none',
     borderRadius: '4px',
-    color: '#ffffff',
-    fontSize: '11px',
-    fontWeight: 500,
+    color: '#636366',
     cursor: 'pointer',
+    padding: 0,
+    transition: 'all 0.15s',
+  },
+  divider: {
+    width: '1px',
+    height: '16px',
+    background: '#e5e5e7',
+    margin: '0 4px',
   },
   content: {
     flex: 1,

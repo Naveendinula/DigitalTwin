@@ -100,8 +100,7 @@ function useXRayMode() {
     if (!originalMaterialsRef.current.has(mesh.uuid)) {
       originalMaterialsRef.current.set(mesh.uuid, {
         mesh,
-        material: mesh.material,
-        visible: mesh.visible
+        material: mesh.material
       })
     }
     
@@ -110,12 +109,10 @@ function useXRayMode() {
       const stored = originalMaterialsRef.current.get(mesh.uuid)
       if (stored) {
         mesh.material = stored.material
-        mesh.visible = true
       }
     } else {
       // Apply X-ray material for non-selected meshes
       mesh.material = createXRayMaterial()
-      mesh.visible = true
     }
   }, [createXRayMaterial])
 
@@ -159,14 +156,13 @@ function useXRayMode() {
     console.log('Disabling X-ray mode, restoring', originalMaterialsRef.current.size, 'materials')
     
     // Restore all original materials
-    originalMaterialsRef.current.forEach(({ mesh, material, visible }) => {
+    originalMaterialsRef.current.forEach(({ mesh, material }) => {
       if (mesh && mesh.material) {
         // Dispose X-ray material if it's different
         if (mesh.material !== material && mesh.material.dispose) {
           mesh.material.dispose()
         }
         mesh.material = material
-        mesh.visible = visible
       }
     })
     
