@@ -2,7 +2,7 @@
 
 > **Status**: Living Document  
 > **Last Updated**: December 14, 2025  
-> **Owner**: Development Team
+> **Owner**: Naveen Panditharatne
 
 ## 1. Purpose & Scope
 
