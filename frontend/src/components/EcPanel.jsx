@@ -10,12 +10,18 @@ function EcPanel({ isOpen, onClose, jobId }) {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
+  const [showDetails, setShowDetails] = useState(false)
   
   // Draggable state
   const [position, setPosition] = useState({ x: 20, y: 80 })
+  const [size, setSize] = useState({ width: 360, height: 500 })
   const [isDragging, setIsDragging] = useState(false)
+  const [isResizing, setIsResizing] = useState(false)
+  
   const dragStart = useRef({ x: 0, y: 0 })
   const startPos = useRef({ x: 0, y: 0 })
+  const resizeStart = useRef({ x: 0, y: 0 })
+  const startSize = useRef({ width: 0, height: 0 })
   const panelRef = useRef(null)
 
   // Reset position if window resizes (optional safety)
@@ -65,20 +71,48 @@ function EcPanel({ isOpen, onClose, jobId }) {
     setIsDragging(false)
   }
 
-  // Global mouse listeners for drag
+  // Resize handlers
+  const handleResizeMouseDown = (e) => {
+    e.stopPropagation()
+    setIsResizing(true)
+    resizeStart.current = { x: e.clientX, y: e.clientY }
+    startSize.current = { width: size.width, height: size.height }
+  }
+
+  const handleResizeMouseMove = (e) => {
+    if (isResizing) {
+      e.preventDefault()
+      const dx = e.clientX - resizeStart.current.x
+      const dy = e.clientY - resizeStart.current.y
+      
+      setSize({
+        width: Math.max(300, startSize.current.width + dx),
+        height: Math.max(300, startSize.current.height + dy)
+      })
+    }
+  }
+
+  const handleResizeMouseUp = () => {
+    setIsResizing(false)
+  }
+
+  // Global mouse listeners for drag and resize
   useEffect(() => {
     if (isDragging) {
       window.addEventListener('mousemove', handleMouseMove)
       window.addEventListener('mouseup', handleMouseUp)
-    } else {
-      window.removeEventListener('mousemove', handleMouseMove)
-      window.removeEventListener('mouseup', handleMouseUp)
+    } else if (isResizing) {
+      window.addEventListener('mousemove', handleResizeMouseMove)
+      window.addEventListener('mouseup', handleResizeMouseUp)
     }
+    
     return () => {
       window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('mouseup', handleMouseUp)
+      window.removeEventListener('mousemove', handleResizeMouseMove)
+      window.removeEventListener('mouseup', handleResizeMouseUp)
     }
-  }, [isDragging])
+  }, [isDragging, isResizing])
 
   if (!isOpen) return null
 
@@ -109,6 +143,8 @@ function EcPanel({ isOpen, onClose, jobId }) {
         ...styles.panel,
         left: `${position.x}px`,
         top: `${position.y}px`,
+        width: `${size.width}px`,
+        height: `${size.height}px`,
         cursor: isDragging ? 'grabbing' : 'default'
       }}
       onMouseDown={handleMouseDown}
@@ -157,7 +193,61 @@ function EcPanel({ isOpen, onClose, jobId }) {
             <div style={styles.summaryCard}>
               <span style={styles.label}>Total Embodied Carbon</span>
               <span style={styles.value}>{result.summary.total.avg_kgCO2e.toFixed(2)} kgCO2e</span>
+              <span style={styles.subValue}>({result.summary.total.avg_tCO2e.toFixed(2)} tCO2e)</span>
             </div>
+
+            <button 
+              onClick={() => setShowDetails(!showDetails)}
+              style={styles.secondaryButton}
+            >
+              {showDetails ? 'Hide Breakdown' : 'Show Breakdown'}
+            </button>
+
+            {showDetails && (
+              <div style={styles.detailsContainer}>
+                <h4 style={styles.subtitle}>By Material Class</h4>
+                <div style={styles.tableContainer}>
+                  <table style={styles.table}>
+                    <thead>
+                      <tr>
+                        <th style={styles.th}>Material</th>
+                        <th style={styles.th}>EC (kgCO2e)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {result.summary.by_material_class.map((item, idx) => (
+                        <tr key={idx} style={styles.tr}>
+                          <td style={styles.td}>{item.material_class}</td>
+                          <td style={styles.td}>{item.ec_avg_kgCO2e.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <h4 style={{...styles.subtitle, marginTop: '16px'}}>By IFC Type</h4>
+                <div style={styles.tableContainer}>
+                  <table style={styles.table}>
+                    <thead>
+                      <tr>
+                        <th style={styles.th}>Type</th>
+                        <th style={styles.th}>Mass (kg)</th>
+                        <th style={styles.th}>EC (kgCO2e)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {result.summary.by_ifc_type.map((item, idx) => (
+                        <tr key={idx} style={styles.tr}>
+                          <td style={styles.td}>{item.ifc_type.replace('Ifc', '')}</td>
+                          <td style={styles.td}>{item.mass_kg.toFixed(0)}</td>
+                          <td style={styles.td}>{item.ec_avg_kgCO2e.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
             
             <h4 style={styles.subtitle}>Top Contributors</h4>
             <div style={styles.tableContainer}>
@@ -183,6 +273,12 @@ function EcPanel({ isOpen, onClose, jobId }) {
           </div>
         )}
       </div>
+
+      {/* Resize Handle */}
+      <div 
+        style={styles.resizeHandle}
+        onMouseDown={handleResizeMouseDown}
+      />
     </div>
   )
 }
@@ -190,8 +286,8 @@ function EcPanel({ isOpen, onClose, jobId }) {
 const styles = {
   panel: {
     position: 'absolute',
-    width: '360px',
-    maxHeight: 'calc(100vh - 100px)',
+    // width: '360px', // Removed fixed width
+    // maxHeight: 'calc(100vh - 100px)', // Removed fixed max height
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     backdropFilter: 'blur(20px)',
     borderRadius: '12px',
@@ -245,7 +341,19 @@ const styles = {
   content: {
     padding: '16px',
     overflowY: 'auto',
-    maxHeight: '600px',
+    flex: 1, // Take remaining space
+    // maxHeight: '600px', // Removed fixed max height
+  },
+  resizeHandle: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: '20px',
+    height: '20px',
+    cursor: 'nwse-resize',
+    background: 'linear-gradient(135deg, transparent 50%, rgba(0,0,0,0.1) 50%)',
+    borderBottomRightRadius: '12px',
+    zIndex: 10,
   },
   description: {
     color: '#424245',
@@ -310,6 +418,29 @@ const styles = {
     fontWeight: 700,
     color: '#1d1d1f',
   },
+  subValue: {
+    fontSize: '13px',
+    color: '#86868b',
+    marginTop: '4px',
+  },
+  secondaryButton: {
+    width: '100%',
+    padding: '8px',
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    color: '#1d1d1f',
+    border: 'none',
+    borderRadius: '8px',
+    fontSize: '12px',
+    fontWeight: 500,
+    cursor: 'pointer',
+    transition: 'background 0.2s',
+  },
+  detailsContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+    animation: 'fadeIn 0.3s ease-in-out',
+  },
   subtitle: {
     margin: '0 0 8px 0',
     fontSize: '13px',
@@ -366,6 +497,10 @@ styleSheet.textContent = `
   @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 `
 if (typeof document !== 'undefined') {

@@ -216,12 +216,32 @@ def has_material(el) -> bool:
     return bool(mats)
 
 
+def is_void_layer(material_name: str) -> bool:
+    """
+    Return True if the material name suggests a void/air/gap layer
+    that should not contribute to embodied carbon or volume share.
+    """
+    if not material_name:
+        return False
+    
+    name_lower = material_name.lower()
+    void_keywords = [
+        "air", "vapor", "vapour", "damp", "membrane", 
+        "retarder", "void", "cavity"
+    ]
+    
+    for kw in void_keywords:
+        if kw in name_lower:
+            return True
+    return False
+
+
 def get_material_layers_with_shares(el) -> list[Dict[str, Any]]:
     """
     Returns a list of dicts with:
       - name: material name
       - thickness: layer thickness (IFC length units, e.g. mm from Revit)
-      - share: thickness / total_thickness
+      - share: thickness / total_non_void_thickness (ignoring air gaps)
 
     Only handles layered materials (IfcMaterialLayerSetUsage / IfcMaterialLayerSet).
     For non-layered materials, an empty list is returned; the caller can fall back
@@ -242,16 +262,26 @@ def get_material_layers_with_shares(el) -> list[Dict[str, Any]]:
         return layers  # not a layered material
 
     material_layers = getattr(mls, "MaterialLayers", []) or []
-    total_thickness = sum((l.LayerThickness or 0.0) for l in material_layers)
-
-    if total_thickness <= 0:
-        return layers
+    
+    # Calculate total thickness of NON-VOID layers only
+    total_non_void_thickness = 0.0
+    for l in material_layers:
+        mat = l.Material
+        name = mat.Name if (mat and mat.Name) else ""
+        if not is_void_layer(name):
+            total_non_void_thickness += (l.LayerThickness or 0.0)
 
     for l in material_layers:
         t = (l.LayerThickness or 0.0)
-        share = t / total_thickness if total_thickness else 0.0
         mat = l.Material
         name = mat.Name if (mat and mat.Name) else ""
+        
+        # If void layer, share is 0. If non-void, share is t / total_non_void
+        if is_void_layer(name):
+            share = 0.0
+        else:
+            share = t / total_non_void_thickness if total_non_void_thickness > 0 else 0.0
+            
         layers.append({"name": name, "thickness": t, "share": share})
 
     return layers
@@ -357,13 +387,18 @@ def extract_lca_properties(ifc_path: str | Path) -> pd.DataFrame:
                 thickness_m = None
 
             # Per-material volume
-            layer_vol = None
-            if vol is not None and share:
-                # Best: element volume known (from geom) + relative share
-                layer_vol = vol * share
-            elif area is not None and thickness_m is not None:
-                # Fallback: approximate volume from area * thickness
-                layer_vol = area * thickness_m
+            layer_vol = 0.0
+            
+            # If it's a void layer, force volume to 0
+            if is_void_layer(mat_name):
+                layer_vol = 0.0
+            else:
+                # Primary: Area * Thickness (if available)
+                if area is not None and thickness_m is not None:
+                    layer_vol = area * thickness_m
+                # Fallback: Element Volume * Share (if available)
+                elif vol is not None:
+                    layer_vol = vol * share
 
             rows.append(
                 {
@@ -432,6 +467,15 @@ def load_ec_db(csv_path: str | Path) -> pd.DataFrame:
 
     ec_db["MaterialClass"] = ec_db["MaterialClass"].astype("string")
 
+    # Group by MaterialClass to ensure uniqueness and avoid merge explosion
+    ec_db = ec_db.groupby("MaterialClass", as_index=False).agg({
+        "Density_kg_m3": "mean",
+        "EC_min_kgCO2e_per_kg": "min",
+        "EC_avg_kgCO2e_per_kg": "mean",
+        "EC_max_kgCO2e_per_kg": "max",
+        "Notes": "first"
+    })
+
     return ec_db
 
 
@@ -466,6 +510,13 @@ def compute_ec_from_ifc(
         how="left",
         suffixes=("", "_db"),
     )
+
+    # Sanity check: ensure we haven't multiplied rows due to many-to-many merge
+    warnings = []
+    if len(df_ec) > len(df):
+        msg = f"Row explosion detected: Input rows {len(df)} -> Merged rows {len(df_ec)}. Check for duplicate MaterialClass in EC DB."
+        warnings.append(msg)
+        print(f"WARNING: {msg}")
 
     # 4) Mass and EC per row
     df_ec["Mass_kg"] = df_ec["Volume_m3"] * df_ec["Density_kg_m3"]
@@ -548,6 +599,7 @@ def compute_ec_from_ifc(
     top_elements = top[detail_cols].to_dict(orient="records")
 
     result: Dict[str, Any] = {
+        "warnings": warnings,
         "summary": {
             "total": {
                 "min_kgCO2e": total_min,
