@@ -11,11 +11,7 @@ from fastapi import APIRouter, HTTPException
 import traceback
 
 from ec_core import compute_ec_from_ifc
-
-# Adjust this path as needed – CSV should live next to this file or in a config dir
-BASE_DIR = Path(__file__).resolve().parent
-EC_DB_PATH = BASE_DIR / "prac-database.csv"
-UPLOAD_DIR = BASE_DIR / "uploads"
+from config import UPLOAD_DIR, EC_DB_PATH
 
 router = APIRouter()
 

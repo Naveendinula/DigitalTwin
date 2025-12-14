@@ -23,13 +23,8 @@ from ifc_converter import convert_ifc_to_glb
 from ifc_metadata_extractor import extract_metadata, save_metadata
 from ifc_spatial_hierarchy import extract_spatial_hierarchy, save_hierarchy
 from ec_api import router as ec_router
+from config import UPLOAD_DIR, OUTPUT_DIR, ALLOWED_EXTENSIONS, MAX_FILE_SIZE
 
-
-# Configuration
-UPLOAD_DIR = Path("./uploads")
-OUTPUT_DIR = Path("./output")
-ALLOWED_EXTENSIONS = {".ifc"}
-MAX_FILE_SIZE = 500 * 1024 * 1024  # 500 MB
 
 # Ensure directories exist
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
