@@ -205,6 +205,35 @@ function EcPanel({ isOpen, onClose, jobId }) {
 
             {showDetails && (
               <div style={styles.detailsContainer}>
+                {result.quality && (
+                  <div style={styles.qualityContainer}>
+                    <h4 style={styles.subtitle}>Data Coverage</h4>
+                    <div style={styles.qualityBarContainer}>
+                      <div 
+                        style={{
+                          ...styles.qualityFill, 
+                          width: `${(result.quality.rows_with_factors / result.quality.rows_total) * 100}%`,
+                          backgroundColor: (result.quality.rows_with_factors / result.quality.rows_total) > 0.8 ? '#34c759' : '#ff9500'
+                        }} 
+                      />
+                    </div>
+                    <p style={styles.qualityText}>
+                      {result.quality.rows_with_factors} / {result.quality.rows_total} elements mapped
+                    </p>
+                    
+                    {result.quality.rows_missing_factors > 0 && (
+                      <div style={styles.missingInfo}>
+                        <p style={styles.missingLabel}>Missing impacts for:</p>
+                        <ul style={styles.missingList}>
+                          {result.quality.missing_material_names_top.map((item, i) => (
+                            <li key={i}>{item.name} ({item.count})</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <h4 style={styles.subtitle}>By Material Class</h4>
                 <div style={styles.tableContainer}>
                   <table style={styles.table}>
@@ -298,6 +327,7 @@ const styles = {
     zIndex: 1000,
     overflow: 'hidden',
     transition: 'box-shadow 0.2s',
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
   },
   header: {
     padding: '12px 16px',
@@ -440,6 +470,47 @@ const styles = {
     flexDirection: 'column',
     gap: '8px',
     animation: 'fadeIn 0.3s ease-in-out',
+  },
+  qualityContainer: {
+    backgroundColor: 'rgba(0, 0, 0, 0.03)',
+    padding: '12px',
+    borderRadius: '8px',
+    marginBottom: '8px',
+  },
+  qualityBarContainer: {
+    height: '6px',
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    borderRadius: '3px',
+    overflow: 'hidden',
+    margin: '8px 0 4px 0',
+  },
+  qualityFill: {
+    height: '100%',
+    borderRadius: '3px',
+    transition: 'width 0.5s ease-out',
+  },
+  qualityText: {
+    fontSize: '11px',
+    color: '#86868b',
+    textAlign: 'right',
+    margin: 0,
+  },
+  missingInfo: {
+    marginTop: '8px',
+    paddingTop: '8px',
+    borderTop: '1px solid rgba(0, 0, 0, 0.06)',
+  },
+  missingLabel: {
+    fontSize: '11px',
+    fontWeight: 600,
+    color: '#1d1d1f',
+    margin: '0 0 4px 0',
+  },
+  missingList: {
+    margin: 0,
+    paddingLeft: '16px',
+    fontSize: '11px',
+    color: '#424245',
   },
   subtitle: {
     margin: '0 0 8px 0',

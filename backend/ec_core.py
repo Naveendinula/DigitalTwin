@@ -524,6 +524,31 @@ def compute_ec_from_ifc(
     df_ec["EC_avg_kgCO2e"] = df_ec["Mass_kg"] * df_ec["EC_avg_kgCO2e_per_kg"]
     df_ec["EC_max_kgCO2e"] = df_ec["Mass_kg"] * df_ec["EC_max_kgCO2e_per_kg"]
 
+    # --- Quality / Coverage Stats ---
+    # Check which rows failed to map to an EC factor
+    # We assume if EC_avg_kgCO2e_per_kg is NaN, we missed it.
+    missing_mask = df_ec["EC_avg_kgCO2e_per_kg"].isna()
+    rows_total = int(len(df_ec))
+    rows_missing = int(missing_mask.sum())
+    rows_with_factors = rows_total - rows_missing
+    
+    missing_classes = sorted(df_ec.loc[missing_mask, "MaterialClass"].dropna().unique().tolist())
+    
+    # Top missing material names
+    missing_names_series = df_ec.loc[missing_mask, "MaterialName"].value_counts().head(5)
+    missing_names_top = [
+        {"name": name, "count": int(count)}
+        for name, count in missing_names_series.items()
+    ]
+    
+    quality_stats = {
+        "rows_total": rows_total,
+        "rows_with_factors": rows_with_factors,
+        "rows_missing_factors": rows_missing,
+        "missing_material_classes": missing_classes,
+        "missing_material_names_top": missing_names_top
+    }
+
     # --- Summary: totals ---
     total_min = float(df_ec["EC_min_kgCO2e"].sum(skipna=True))
     total_avg = float(df_ec["EC_avg_kgCO2e"].sum(skipna=True))
@@ -600,6 +625,7 @@ def compute_ec_from_ifc(
 
     result: Dict[str, Any] = {
         "warnings": warnings,
+        "quality": quality_stats,
         "summary": {
             "total": {
                 "min_kgCO2e": total_min,
