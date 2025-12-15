@@ -223,13 +223,15 @@ def compute_ec_from_ifc(
     ifc_path: str | Path,
     ec_db_path: str | Path,
     max_detail_rows: int = 200,
+    overrides: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     High-level function:
       1) Extract element + layer properties from IFC
       2) Join with EC database
-      3) Compute mass + EC
-      4) Return JSON-serializable summary + (optionally) per-element rows
+      3) Apply overrides (MaterialClass, IfcType, Element)
+      4) Compute mass + EC
+      5) Return JSON-serializable summary + (optionally) per-element rows
     """
     ifc_path = Path(ifc_path)
     ec_db_path = Path(ec_db_path)
@@ -258,11 +260,111 @@ def compute_ec_from_ifc(
         warnings.append(msg)
         print(f"WARNING: {msg}")
 
-    # 4) Mass and EC per row
+    # --- Apply Overrides ---
+    if overrides:
+        # A. Material Class Overrides
+        # Applied to all elements with this material class
+        mat_overrides = overrides.get("material_classes", {})
+        for mat_class, props in mat_overrides.items():
+            mask = df_ec["MaterialClass"] == mat_class
+            if props.get("density_kg_m3") is not None:
+                df_ec.loc[mask, "Density_kg_m3"] = props["density_kg_m3"]
+            if props.get("EC_avg_kgCO2e_per_kg") is not None:
+                df_ec.loc[mask, "EC_avg_kgCO2e_per_kg"] = props["EC_avg_kgCO2e_per_kg"]
+                # Also update min/max if not provided, to avoid confusion
+                df_ec.loc[mask, "EC_min_kgCO2e_per_kg"] = props["EC_avg_kgCO2e_per_kg"]
+                df_ec.loc[mask, "EC_max_kgCO2e_per_kg"] = props["EC_avg_kgCO2e_per_kg"]
+
+        # B. IFC Type Overrides
+        # Applied as a fallback or direct override for specific types
+        # Note: This is a broad brush. Usually used if material mapping failed.
+        type_overrides = overrides.get("ifc_types", {})
+        for ifc_type, props in type_overrides.items():
+            mask = df_ec["IfcType"] == ifc_type
+            if props.get("EC_avg_kgCO2e_per_kg") is not None:
+                # Only apply if we don't already have a valid factor (fallback behavior)
+                # OR should it override? The prompt says "apply material_classes before merge, ifc_types after merge"
+                # Let's assume it overrides the factor for the type.
+                df_ec.loc[mask, "EC_avg_kgCO2e_per_kg"] = props["EC_avg_kgCO2e_per_kg"]
+                df_ec.loc[mask, "EC_min_kgCO2e_per_kg"] = props["EC_avg_kgCO2e_per_kg"]
+                df_ec.loc[mask, "EC_max_kgCO2e_per_kg"] = props["EC_avg_kgCO2e_per_kg"]
+                
+                # If density is missing, we might need it to compute mass. 
+                # But the prompt only mentioned EC factor for types.
+                # If density is missing, mass will be NaN, and EC will be NaN unless we set total EC.
+
+    # 4) Mass and EC per row (Standard Calculation)
     df_ec["Mass_kg"] = df_ec["Volume_m3"] * df_ec["Density_kg_m3"]
     df_ec["EC_min_kgCO2e"] = df_ec["Mass_kg"] * df_ec["EC_min_kgCO2e_per_kg"]
     df_ec["EC_avg_kgCO2e"] = df_ec["Mass_kg"] * df_ec["EC_avg_kgCO2e_per_kg"]
     df_ec["EC_max_kgCO2e"] = df_ec["Mass_kg"] * df_ec["EC_max_kgCO2e_per_kg"]
+
+    # --- Apply Total EC Overrides (Material Class & IfcType) ---
+    # These are applied AFTER standard calculation but BEFORE element overrides
+    if overrides:
+        # Material Class Total EC
+        mat_overrides = overrides.get("material_classes", {})
+        for key, props in mat_overrides.items():
+            if props.get("EC_total_kgCO2e") is not None:
+                total_val = props["EC_total_kgCO2e"]
+                # Match MaterialClass OR MaterialName (since frontend sends MaterialName from missing list)
+                mask = (df_ec["MaterialClass"] == key) | (df_ec["MaterialName"] == key)
+                
+                matching_count = mask.sum()
+                if matching_count > 0:
+                    # Distribute evenly among all matching rows
+                    # This assumes the user means "The total EC for this material in the project is X"
+                    val_per_item = total_val / matching_count
+                    df_ec.loc[mask, "EC_avg_kgCO2e"] = val_per_item
+                    df_ec.loc[mask, "EC_min_kgCO2e"] = val_per_item
+                    df_ec.loc[mask, "EC_max_kgCO2e"] = val_per_item
+                    
+                    # We do NOT update per-kg factors because we might not have mass/volume
+                    # This ensures the final sum is correct.
+
+        # IfcType Total EC
+        type_overrides = overrides.get("ifc_types", {})
+        for key, props in type_overrides.items():
+            if props.get("EC_total_kgCO2e") is not None:
+                total_val = props["EC_total_kgCO2e"]
+                mask = df_ec["IfcType"] == key
+                
+                matching_count = mask.sum()
+                if matching_count > 0:
+                    val_per_item = total_val / matching_count
+                    df_ec.loc[mask, "EC_avg_kgCO2e"] = val_per_item
+                    df_ec.loc[mask, "EC_min_kgCO2e"] = val_per_item
+                    df_ec.loc[mask, "EC_max_kgCO2e"] = val_per_item
+
+    # C. Element Overrides (Specific GlobalId)
+    # "If EC_total_kgCO2e is present, use it directly."
+    # This happens AFTER standard calculation to overwrite it.
+    if overrides:
+        elem_overrides = overrides.get("elements", {})
+        for global_id, props in elem_overrides.items():
+            if props.get("EC_total_kgCO2e") is not None:
+                mask = df_ec["GlobalId"] == global_id
+                total_ec = props["EC_total_kgCO2e"]
+                
+                # If an element has multiple layers (rows), how do we distribute the total EC?
+                # The simplest approach is to assign it to the first layer and zero others, 
+                # or split it. But typically overrides are for "unexploded" elements.
+                # Let's check how many rows match.
+                matching_indices = df_ec.index[mask].tolist()
+                if not matching_indices:
+                    continue
+                
+                # If multiple rows (layers), we can't easily know how to split.
+                # Strategy: Assign full value to the first row, 0 to others.
+                # This ensures the sum is correct.
+                first_idx = matching_indices[0]
+                df_ec.loc[first_idx, "EC_avg_kgCO2e"] = total_ec
+                df_ec.loc[first_idx, "EC_min_kgCO2e"] = total_ec
+                df_ec.loc[first_idx, "EC_max_kgCO2e"] = total_ec
+                
+                # Zero out the rest
+                if len(matching_indices) > 1:
+                    df_ec.loc[matching_indices[1:], ["EC_avg_kgCO2e", "EC_min_kgCO2e", "EC_max_kgCO2e"]] = 0.0
 
     # --- Quality / Coverage Stats ---
     # Check which rows failed to map to an EC factor

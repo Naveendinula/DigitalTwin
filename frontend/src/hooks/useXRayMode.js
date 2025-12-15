@@ -44,6 +44,8 @@ function useXRayMode() {
         depthWrite: false,       // Render behind solid objects
         side: THREE.DoubleSide,  // Visible from both sides
       })
+      // Mark as X-ray material
+      xRayMaterialRef.current.userData = { isXRay: true }
     }
     return xRayMaterialRef.current
   }, [])
@@ -97,18 +99,28 @@ function useXRayMode() {
     if (mesh.name?.includes('Helper') || mesh.name?.includes('Grid')) return
     
     // Store original material if not already stored
-    if (!originalMaterialsRef.current.has(mesh.uuid)) {
+    // Prefer userData.originalMaterial if available
+    let originalMat = mesh.userData.originalMaterial
+    
+    if (!originalMat) {
+        // If not in userData, check if current is safe to store
+        if (!mesh.material.userData?.isXRay && !mesh.material.userData?.isHighlight) {
+            originalMat = mesh.material
+            mesh.userData.originalMaterial = originalMat
+        }
+    }
+
+    if (!originalMaterialsRef.current.has(mesh.uuid) && originalMat) {
       originalMaterialsRef.current.set(mesh.uuid, {
         mesh,
-        material: mesh.material
+        material: originalMat
       })
     }
     
     if (isSelected) {
       // Keep original material for selected meshes
-      const stored = originalMaterialsRef.current.get(mesh.uuid)
-      if (stored) {
-        mesh.material = stored.material
+      if (originalMat) {
+        mesh.material = originalMat
       }
     } else {
       // Apply X-ray material for non-selected meshes
@@ -157,14 +169,35 @@ function useXRayMode() {
     
     // Restore all original materials
     originalMaterialsRef.current.forEach(({ mesh, material }) => {
-      if (mesh && mesh.material) {
-        // Dispose X-ray material if it's different
-        if (mesh.material !== material && mesh.material.dispose) {
-          mesh.material.dispose()
+      if (mesh) {
+        // Prefer userData.originalMaterial
+        const restoreMat = mesh.userData.originalMaterial || material
+        
+        if (mesh.material !== restoreMat) {
+            // Dispose X-ray material if it's different and is actually an X-ray material
+            if (mesh.material.userData?.isXRay && mesh.material.dispose) {
+                // Don't dispose the shared cached material!
+                // Only dispose if it's a clone
+                if (mesh.material !== xRayMaterialRef.current) {
+                    mesh.material.dispose()
+                }
+            }
+            mesh.material = restoreMat
         }
-        mesh.material = material
       }
     })
+    
+    // Also iterate through scene to catch any stragglers that might be in X-ray mode 
+    // but missed in the map (e.g. if added later)
+    if (sceneRef.current) {
+        sceneRef.current.traverse((object) => {
+            if (object.isMesh && object.material && object.material.userData?.isXRay) {
+                if (object.userData.originalMaterial) {
+                    object.material = object.userData.originalMaterial
+                }
+            }
+        })
+    }
     
     // Clear the stored materials
     originalMaterialsRef.current.clear()
@@ -190,14 +223,21 @@ function useXRayMode() {
         const isSelected = isMeshSelected(object, idsSet)
         
         // Get stored original material
-        const stored = originalMaterialsRef.current.get(object.uuid)
-        if (!stored) return
+        // Prefer userData.originalMaterial
+        const originalMat = object.userData.originalMaterial || (originalMaterialsRef.current.get(object.uuid)?.material)
+        
+        if (!originalMat) return
         
         if (isSelected) {
           // Restore original material
-          if (object.material !== stored.material) {
-            if (object.material.dispose) object.material.dispose()
-            object.material = stored.material
+          if (object.material !== originalMat) {
+            // Dispose if it's X-ray
+            if (object.material.userData?.isXRay && object.material.dispose) {
+                 if (object.material !== xRayMaterialRef.current) {
+                    object.material.dispose()
+                 }
+            }
+            object.material = originalMat
           }
         } else {
           // Apply X-ray material

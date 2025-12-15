@@ -30,6 +30,9 @@ function App() {
   const [modelUrls, setModelUrls] = useState(null)
   const [jobId, setJobId] = useState(null)
   const [ecPanelOpen, setEcPanelOpen] = useState(false)
+  // Panel stacking counter used to bring panels to front when focused
+  const [panelZCounter, setPanelZCounter] = useState(1000)
+  const [ecPanelZIndex, setEcPanelZIndex] = useState(1000)
 
   // Selection state management
   const { selectedId, handleSelect, deselect, setScene: setSelectionScene, selectById } = useSelection()
@@ -414,16 +417,7 @@ function App() {
           <span style={styles.logoIcon}>◈</span>
           <span style={styles.logoText}>DIGITAL TWIN</span>
         </div>
-        <nav style={styles.nav}>
-          <a href="#" style={styles.navLinkActive}>Overview</a>
-          <a href="#" style={styles.navLink}>Details</a>
-          <a href="#" style={styles.navLink}>Reports</a>
-          <a href="#" style={styles.navLink}>Contact</a>
-        </nav>
-        <div style={styles.headerRight}>
-          <a href="#" style={styles.loginLink}>Log in</a>
-          <button style={styles.signUpBtn}>Sign up</button>
-        </div>
+
       </header>
 
       {/* Main Content */}
@@ -452,7 +446,32 @@ function App() {
             availableViews={getAvailableViews()}
             onResetView={resetView}
             onFitToModel={fitToModel}
-            onOpenEcPanel={() => setEcPanelOpen(true)}
+            // Toggle panel open/close when Carbon button is clicked
+            onOpenEcPanel={() => {
+              // If panel is closed, open and bring to front
+              if (!ecPanelOpen) {
+                setEcPanelOpen(true)
+                setPanelZCounter(prev => {
+                  const next = prev + 1
+                  setEcPanelZIndex(next)
+                  return next
+                })
+                return
+              }
+
+              // If panel is open and already top-most, close it
+              if (ecPanelZIndex === panelZCounter) {
+                setEcPanelOpen(false)
+                return
+              }
+
+              // Otherwise bring it to front
+              setPanelZCounter(prev => {
+                const next = prev + 1
+                setEcPanelZIndex(next)
+                return next
+              })
+            }}
             hasModel={!!modelUrls}
           />
           
@@ -493,6 +512,9 @@ function App() {
             isOpen={ecPanelOpen} 
             onClose={() => setEcPanelOpen(false)} 
             jobId={jobId} 
+            onSelectContributor={handleTreeSelect}
+            focusToken={ecPanelZIndex}
+            zIndex={ecPanelZIndex}
           />
 
           {/* Keyboard shortcuts hints */}
@@ -551,44 +573,7 @@ const styles = {
     letterSpacing: '1.5px',
     color: '#1d1d1f',
   },
-  nav: {
-    display: 'flex',
-    gap: '32px',
-  },
-  navLink: {
-    fontSize: '14px',
-    color: '#86868b',
-    textDecoration: 'none',
-    fontWeight: 500,
-    transition: 'color 0.2s',
-  },
-  navLinkActive: {
-    fontSize: '14px',
-    color: '#1d1d1f',
-    textDecoration: 'none',
-    fontWeight: 500,
-  },
-  headerRight: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '16px',
-  },
-  loginLink: {
-    fontSize: '14px',
-    color: '#1d1d1f',
-    textDecoration: 'none',
-    fontWeight: 500,
-  },
-  signUpBtn: {
-    padding: '8px 16px',
-    background: '#1d1d1f',
-    color: '#ffffff',
-    border: 'none',
-    borderRadius: '6px',
-    fontSize: '13px',
-    fontWeight: 500,
-    cursor: 'pointer',
-  },
+
   mainContent: {
     flex: 1,
     display: 'flex',

@@ -97,22 +97,51 @@ function useSelection() {
   const select = useCallback((mesh) => {
     if (!mesh) return
 
-    // Store original material for later restoration
-    if (mesh.material) {
-      setOriginalMaterial(mesh.material.clone())
+    // Ensure we have the original material stored on the mesh
+    // This prevents "locking" the highlight material if we select/deselect rapidly
+    if (!mesh.userData.originalMaterial) {
+      // Only store if the current material is NOT a highlight material
+      // We check this by looking for our custom flag
+      if (!mesh.material.userData?.isHighlight && !mesh.material.userData?.isXRay) {
+        mesh.userData.originalMaterial = mesh.material
+      }
     }
+
+    // Use the stored original material for the state
+    if (mesh.userData.originalMaterial) {
+      setOriginalMaterial(mesh.userData.originalMaterial)
+    } else if (mesh.material) {
+      // Fallback: if no original stored and current doesn't look like highlight, use current
+      // But be careful not to clone a highlight
+      if (!mesh.material.userData?.isHighlight) {
+         setOriginalMaterial(mesh.material)
+         // Also store it for future safety
+         mesh.userData.originalMaterial = mesh.material
+      }
+    }
+
     setSelectedObject(mesh)
 
     // Apply highlight with better contrast
     if (mesh.material) {
-      mesh.material = mesh.material.clone()
-      mesh.material.color.setHex(HIGHLIGHT_COLOR)
-      mesh.material.transparent = true
-      mesh.material.opacity = 1
-      if (mesh.material.emissive) {
-        mesh.material.emissive.setHex(HIGHLIGHT_EMISSIVE)
-        mesh.material.emissiveIntensity = 0.5
+      // Create highlight material based on the ORIGINAL material, not the current one
+      // This ensures we don't stack clones or modify an already modified material
+      const baseMaterial = mesh.userData.originalMaterial || mesh.material
+      
+      const highlightMaterial = baseMaterial.clone()
+      highlightMaterial.color.setHex(HIGHLIGHT_COLOR)
+      highlightMaterial.transparent = true
+      highlightMaterial.opacity = 1
+      
+      if (highlightMaterial.emissive) {
+        highlightMaterial.emissive.setHex(HIGHLIGHT_EMISSIVE)
+        highlightMaterial.emissiveIntensity = 0.5
       }
+      
+      // Mark as highlight material
+      highlightMaterial.userData = { ...highlightMaterial.userData, isHighlight: true }
+      
+      mesh.material = highlightMaterial
     }
   }, [])
 
@@ -120,8 +149,13 @@ function useSelection() {
    * Clear current selection and restore original material
    */
   const deselect = useCallback(() => {
-    if (selectedObject && originalMaterial) {
-      selectedObject.material = originalMaterial
+    if (selectedObject) {
+      // Prefer restoring from userData.originalMaterial if available
+      if (selectedObject.userData?.originalMaterial) {
+        selectedObject.material = selectedObject.userData.originalMaterial
+      } else if (originalMaterial) {
+        selectedObject.material = originalMaterial
+      }
     }
     setSelectedObject(null)
     setOriginalMaterial(null)
@@ -263,8 +297,12 @@ function useSelection() {
     if (mesh) {
       console.log('Found mesh for globalId:', matchedId, mesh.name)
       // Deselect previous before selecting new
-      if (selectedObject && originalMaterial) {
-        selectedObject.material = originalMaterial
+      if (selectedObject) {
+        if (selectedObject.userData?.originalMaterial) {
+          selectedObject.material = selectedObject.userData.originalMaterial
+        } else if (originalMaterial) {
+          selectedObject.material = originalMaterial
+        }
       }
       select(mesh)
     } else {
@@ -283,8 +321,12 @@ function useSelection() {
     }
 
     // Deselect previous before selecting new
-    if (selectedObject && originalMaterial) {
-      selectedObject.material = originalMaterial
+    if (selectedObject) {
+      if (selectedObject.userData?.originalMaterial) {
+        selectedObject.material = selectedObject.userData.originalMaterial
+      } else if (originalMaterial) {
+        selectedObject.material = originalMaterial
+      }
     }
 
     if (mesh) {

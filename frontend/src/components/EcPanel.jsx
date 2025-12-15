@@ -6,11 +6,27 @@ import React, { useState, useRef, useEffect } from 'react'
  * Draggable panel for triggering and displaying Embodied Carbon calculations.
  * Matches the application's "Arctic Zen" aesthetic.
  */
-function EcPanel({ isOpen, onClose, jobId }) {
+function EcPanel({ isOpen, onClose, jobId, onSelectContributor, focusToken, zIndex }) {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
   const [showDetails, setShowDetails] = useState(false)
+  
+  // Overrides state
+  const [overrides, setOverrides] = useState({
+    material_classes: {},
+    ifc_types: {},
+    elements: {}
+  })
+  
+  // Override Modal state
+  const [overrideModal, setOverrideModal] = useState({
+    isOpen: false,
+    type: null, // 'material_class', 'ifc_type', 'element'
+    target: null, // Name/ID
+    subType: null, // 'factor' or 'total'
+    values: {} // Current values being edited
+  })
   
   // Draggable state
   const [position, setPosition] = useState({ x: 20, y: 80 })
@@ -32,6 +48,29 @@ function EcPanel({ isOpen, onClose, jobId }) {
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [])
+
+  // Bring panel into view / re-position when focusToken changes
+  useEffect(() => {
+    if (!panelRef.current) return
+
+    // Ensure panel stays inside viewport when focused
+    setPosition(prev => {
+      const maxX = Math.max(20, window.innerWidth - size.width - 20)
+      const maxY = Math.max(20, window.innerHeight - size.height - 20)
+      const x = Math.min(Math.max(20, prev.x), maxX)
+      const y = Math.min(Math.max(20, prev.y), maxY)
+      return { x, y }
+    })
+
+    // Tiny visual focus effect: briefly increase shadow
+    if (panelRef.current) {
+      const el = panelRef.current
+      const original = el.style.boxShadow
+      el.style.boxShadow = '0 12px 40px rgba(0,0,0,0.18)'
+      const t = setTimeout(() => { el.style.boxShadow = original }, 280)
+      return () => clearTimeout(t)
+    }
+  }, [focusToken, size.width, size.height])
 
   // Drag handlers
   const handleMouseDown = (e) => {
@@ -116,12 +155,22 @@ function EcPanel({ isOpen, onClose, jobId }) {
 
   if (!isOpen) return null
 
-  const handleCalculate = async () => {
+  const handleCalculate = async (overridesInput) => {
+    // Determine if we were passed specific overrides or an event object
+    // If called from onClick, overridesInput is an Event.
+    const effectiveOverrides = (overridesInput && !overridesInput.preventDefault && !overridesInput.nativeEvent) 
+      ? overridesInput 
+      : overrides
+
     setLoading(true)
     setError(null)
     try {
       const response = await fetch(`http://localhost:8000/api/ec/calculate/${jobId}`, {
-        method: 'POST'
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ overrides: effectiveOverrides })
       })
       if (!response.ok) {
         const err = await response.json()
@@ -136,6 +185,59 @@ function EcPanel({ isOpen, onClose, jobId }) {
     }
   }
 
+  // Override handlers
+  const openOverrideModal = (type, target, subType) => {
+    // Pre-fill with existing override if any
+    let existing = {}
+    if (type === 'material_class') existing = overrides.material_classes[target] || {}
+    if (type === 'ifc_type') existing = overrides.ifc_types[target] || {}
+    if (type === 'element') existing = overrides.elements[target] || {}
+
+    setOverrideModal({
+      isOpen: true,
+      type,
+      target,
+      subType,
+      values: { ...existing }
+    })
+  }
+
+  const saveOverride = () => {
+    const { type, target, values } = overrideModal
+    
+    const newOverrides = { ...overrides }
+    if (type === 'material_class') {
+      newOverrides.material_classes = { ...newOverrides.material_classes, [target]: values }
+    } else if (type === 'ifc_type') {
+      newOverrides.ifc_types = { ...newOverrides.ifc_types, [target]: values }
+    } else if (type === 'element') {
+      newOverrides.elements = { ...newOverrides.elements, [target]: values }
+    }
+    
+    setOverrides(newOverrides)
+    setOverrideModal({ isOpen: false, type: null, target: null, subType: null, values: {} })
+    
+    // Trigger recalculation with new values
+    handleCalculate(newOverrides)
+  }
+
+  const resetOverride = (type, target) => {
+    const newOverrides = { ...overrides }
+    if (type === 'material_class') {
+        const { [target]: _, ...rest } = newOverrides.material_classes
+        newOverrides.material_classes = rest
+    } else if (type === 'ifc_type') {
+        const { [target]: _, ...rest } = newOverrides.ifc_types
+        newOverrides.ifc_types = rest
+    } else if (type === 'element') {
+        const { [target]: _, ...rest } = newOverrides.elements
+        newOverrides.elements = rest
+    }
+    
+    setOverrides(newOverrides)
+    handleCalculate(newOverrides)
+  }
+
   return (
     <div 
       ref={panelRef}
@@ -145,7 +247,8 @@ function EcPanel({ isOpen, onClose, jobId }) {
         top: `${position.y}px`,
         width: `${size.width}px`,
         height: `${size.height}px`,
-        cursor: isDragging ? 'grabbing' : 'default'
+        cursor: isDragging ? 'grabbing' : 'default',
+        zIndex: zIndex || styles.panel.zIndex
       }}
       onMouseDown={handleMouseDown}
     >
@@ -154,7 +257,7 @@ function EcPanel({ isOpen, onClose, jobId }) {
           <span style={styles.dragIcon}>⋮⋮</span>
           <h3 style={styles.title}>Embodied Carbon</h3>
         </div>
-        <button onClick={onClose} style={styles.closeButton}>
+        <button onClick={onClose} style={styles.closeButton} className="ec-close-btn">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="18" y1="6" x2="6" y2="18" />
             <line x1="6" y1="6" x2="18" y2="18" />
@@ -166,7 +269,7 @@ function EcPanel({ isOpen, onClose, jobId }) {
         {error && (
           <div style={styles.error}>
             <p style={styles.errorText}>{error}</p>
-            <button onClick={handleCalculate} style={styles.retryButton}>Try Again</button>
+            <button onClick={handleCalculate} style={styles.retryButton} className="ec-secondary-btn">Try Again</button>
           </div>
         )}
 
@@ -182,7 +285,7 @@ function EcPanel({ isOpen, onClose, jobId }) {
             <p style={styles.description}>
               Calculate the embodied carbon for the current model based on material quantities.
             </p>
-            <button onClick={handleCalculate} style={styles.primaryButton}>
+            <button onClick={handleCalculate} style={styles.primaryButton} className="ec-primary-btn">
               Calculate
             </button>
           </div>
@@ -217,7 +320,28 @@ function EcPanel({ isOpen, onClose, jobId }) {
                     <p style={styles.missingLabel}>Missing impacts for:</p>
                     <ul style={styles.missingList}>
                       {result.quality.missing_material_names_top.map((item, i) => (
-                        <li key={i}>{item.name} ({item.count})</li>
+                        <li key={i} style={{ marginBottom: '4px', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                          <span>{item.name} ({item.count})</span>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button 
+                              onClick={() => openOverrideModal('material_class', item.name, 'factor')}
+                              style={styles.linkButton}
+                              className="ec-link-btn"
+                              title="Set density and EC factor"
+                            >
+                              Set factor
+                            </button>
+                            <span style={{ color: '#d2d2d7' }}>|</span>
+                            <button 
+                              onClick={() => openOverrideModal('material_class', item.name, 'total')}
+                              style={styles.linkButton}
+                              className="ec-link-btn"
+                              title="Set total EC directly"
+                            >
+                              Set total
+                            </button>
+                          </div>
+                        </li>
                       ))}
                     </ul>
                   </div>
@@ -228,6 +352,7 @@ function EcPanel({ isOpen, onClose, jobId }) {
             <button 
               onClick={() => setShowDetails(!showDetails)}
               style={styles.secondaryButton}
+              className="ec-secondary-btn"
             >
               {showDetails ? 'Hide Breakdown' : 'Show Breakdown'}
             </button>
@@ -289,13 +414,32 @@ function EcPanel({ isOpen, onClose, jobId }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {result.details.elements.map((el, idx) => (
-                    <tr key={idx} style={styles.tr}>
-                      <td style={styles.td}>{el.Name || 'Unnamed'}</td>
+                  {result.details.elements.map((el, idx) => {
+                    const isOverridden = 
+                      (el.GlobalId && overrides.elements[el.GlobalId]) ||
+                      (el.MaterialClass && overrides.material_classes[el.MaterialClass]) ||
+                      (el.IfcType && overrides.ifc_types[el.IfcType]);
+                      
+                    return (
+                    <tr 
+                      key={idx} 
+                      style={styles.tr}
+                      className={el.GlobalId ? "ec-row-hover" : ""}
+                      onClick={() => el.GlobalId && onSelectContributor && onSelectContributor(el.GlobalId)}
+                      title={el.GlobalId ? "Click to select in model" : "No model mapping"}
+                    >
+                      <td style={styles.td}>
+                        {el.Name || 'Unnamed'}
+                        {isOverridden && (
+                          <span style={styles.overrideChip} title="User overridden value">
+                            • Modified
+                          </span>
+                        )}
+                      </td>
                       <td style={styles.td}>{el.MaterialName || 'Unknown'}</td>
                       <td style={styles.td}>{(el.EC_avg_kgCO2e || 0).toFixed(2)}</td>
                     </tr>
-                  ))}
+                  )})}
                 </tbody>
               </table>
             </div>
@@ -308,6 +452,108 @@ function EcPanel({ isOpen, onClose, jobId }) {
         style={styles.resizeHandle}
         onMouseDown={handleResizeMouseDown}
       />
+
+      {/* Override Modal */}
+      {overrideModal.isOpen && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modal}>
+            <h3 style={styles.modalTitle}>
+              Override: {overrideModal.target}
+            </h3>
+            <p style={styles.modalSubtitle}>
+              {overrideModal.subType === 'factor' 
+                ? 'Set material properties to calculate EC.' 
+                : 'Set total EC value directly.'}
+            </p>
+            
+            <div style={styles.modalForm}>
+              {overrideModal.subType === 'factor' && (
+                <>
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>Density (kg/m³)</label>
+                    <input 
+                      type="number" 
+                      style={styles.input}
+                      value={overrideModal.values.density_kg_m3 || ''}
+                      onChange={e => setOverrideModal(prev => ({
+                        ...prev,
+                        values: { ...prev.values, density_kg_m3: parseFloat(e.target.value) }
+                      }))}
+                      placeholder="e.g. 2400"
+                    />
+                  </div>
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>EC Factor (kgCO2e/kg)</label>
+                    <input 
+                      type="number" 
+                      style={styles.input}
+                      step="0.01"
+                      value={overrideModal.values.EC_avg_kgCO2e_per_kg || ''}
+                      onChange={e => setOverrideModal(prev => ({
+                        ...prev,
+                        values: { ...prev.values, EC_avg_kgCO2e_per_kg: parseFloat(e.target.value) }
+                      }))}
+                      placeholder="e.g. 0.15"
+                    />
+                  </div>
+                </>
+              )}
+              
+              {overrideModal.subType === 'total' && (
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Total EC (kgCO2e)</label>
+                  <input 
+                    type="number" 
+                    style={styles.input}
+                    value={overrideModal.values.EC_total_kgCO2e || ''}
+                    onChange={e => setOverrideModal(prev => ({
+                      ...prev,
+                      values: { ...prev.values, EC_total_kgCO2e: parseFloat(e.target.value) }
+                    }))}
+                  />
+                </div>
+              )}
+            </div>
+            
+            <div style={{...styles.modalActions, justifyContent: 'space-between'}}>
+              {/* Show Reset if override exists */}
+              {(
+                (overrideModal.type === 'material_class' && overrides.material_classes[overrideModal.target]) ||
+                (overrideModal.type === 'ifc_type' && overrides.ifc_types[overrideModal.target]) ||
+                (overrideModal.type === 'element' && overrides.elements[overrideModal.target])
+              ) ? (
+                 <button 
+                  onClick={() => {
+                    resetOverride(overrideModal.type, overrideModal.target)
+                    setOverrideModal({ ...overrideModal, isOpen: false })
+                  }}
+                  style={{...styles.secondaryButton, color: '#ff3b30', width: 'auto'}}
+                  className="ec-secondary-btn"
+                >
+                  Reset
+                </button>
+              ) : <div />}
+
+              <div style={{display: 'flex', gap: '8px'}}>
+                <button 
+                  onClick={() => setOverrideModal({ ...overrideModal, isOpen: false })}
+                  style={{...styles.secondaryButton, width: 'auto'}}
+                  className="ec-secondary-btn"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={saveOverride}
+                  style={{...styles.primaryButton, width: 'auto'}}
+                  className="ec-primary-btn"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -360,13 +606,13 @@ const styles = {
     background: 'none',
     border: 'none',
     cursor: 'pointer',
-    color: '#86868b',
+    // color: '#86868b', // Moved to CSS
     padding: '4px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: '4px',
-    transition: 'background 0.2s, color 0.2s',
+    // transition: 'background 0.2s, color 0.2s', // Moved to CSS
   },
   content: {
     padding: '16px',
@@ -395,14 +641,14 @@ const styles = {
   primaryButton: {
     width: '100%',
     padding: '10px',
-    backgroundColor: '#0071e3',
-    color: '#ffffff',
+    // backgroundColor: '#0071e3', // Moved to CSS
+    // color: '#ffffff', // Moved to CSS
     border: 'none',
     borderRadius: '8px',
     fontSize: '13px',
     fontWeight: 500,
     cursor: 'pointer',
-    transition: 'background 0.2s',
+    // transition: 'background 0.2s', // Moved to CSS
   },
   loading: {
     display: 'flex',
@@ -456,14 +702,14 @@ const styles = {
   secondaryButton: {
     width: '100%',
     padding: '8px',
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-    color: '#1d1d1f',
+    // backgroundColor: 'rgba(0, 0, 0, 0.05)', // Moved to CSS
+    // color: '#1d1d1f', // Moved to CSS
     border: 'none',
     borderRadius: '8px',
     fontSize: '12px',
     fontWeight: 500,
     cursor: 'pointer',
-    transition: 'background 0.2s',
+    // transition: 'background 0.2s', // Moved to CSS
   },
   detailsContainer: {
     display: 'flex',
@@ -553,16 +799,89 @@ const styles = {
   },
   retryButton: {
     padding: '6px 12px',
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-    color: '#1d1d1f',
+    // backgroundColor: 'rgba(0, 0, 0, 0.05)', // Moved to CSS
+    // color: '#1d1d1f', // Moved to CSS
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
     fontSize: '12px',
-  }
+  },
+  linkButton: {
+    background: 'none',
+    border: 'none',
+    // color: '#0071e3', // Moved to CSS
+    fontSize: '11px',
+    cursor: 'pointer',
+    padding: 0,
+    textDecoration: 'underline',
+  },
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    backdropFilter: 'blur(2px)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 20,
+  },
+  modal: {
+    backgroundColor: '#fff',
+    borderRadius: '12px',
+    padding: '20px',
+    width: '80%',
+    maxWidth: '300px',
+    boxShadow: '0 12px 40px rgba(0,0,0,0.2)',
+  },
+  modalTitle: {
+    margin: '0 0 8px 0',
+    fontSize: '14px',
+    fontWeight: 600,
+    color: '#1d1d1f',
+  },
+  modalSubtitle: {
+    margin: '0 0 16px 0',
+    fontSize: '12px',
+    color: '#86868b',
+  },
+  modalForm: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+    marginBottom: '20px',
+  },
+  formGroup: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+  },
+  input: {
+    padding: '8px',
+    borderRadius: '6px',
+    border: '1px solid #d2d2d7',
+    fontSize: '13px',
+    width: '100%',
+    boxSizing: 'border-box',
+  },
+  modalActions: {
+    display: 'flex',
+    gap: '8px',
+    justifyContent: 'flex-end',
+  },
+  overrideChip: {
+    display: 'inline-block',
+    marginLeft: '6px',
+    fontSize: '9px',
+    color: '#ff9500',
+    fontWeight: 600,
+    textTransform: 'uppercase',
+  },
 }
 
-// Add spinner animation
+// Add spinner animation and button styles
 const styleSheet = document.createElement('style')
 styleSheet.textContent = `
   @keyframes spin {
@@ -572,6 +891,47 @@ styleSheet.textContent = `
   @keyframes fadeIn {
     from { opacity: 0; transform: translateY(-5px); }
     to { opacity: 1; transform: translateY(0); }
+  }
+  .ec-row-hover:hover {
+    background-color: rgba(0, 113, 227, 0.1) !important;
+    cursor: pointer;
+  }
+  
+  /* Button Classes */
+  .ec-primary-btn {
+    background-color: #0071e3;
+    color: #ffffff;
+    transition: background-color 0.2s ease;
+  }
+  .ec-primary-btn:hover {
+    background-color: #005bb5 !important; /* Darker blue on hover */
+  }
+  
+  .ec-secondary-btn {
+    background-color: rgba(0, 0, 0, 0.05);
+    color: #1d1d1f;
+    transition: background-color 0.2s ease;
+  }
+  .ec-secondary-btn:hover {
+    background-color: rgba(0, 0, 0, 0.12) !important; /* Darker gray on hover */
+  }
+  
+  .ec-link-btn {
+    color: #0071e3;
+    transition: color 0.2s ease;
+  }
+  .ec-link-btn:hover {
+    color: #005bb5 !important;
+    text-decoration: underline;
+  }
+  
+  .ec-close-btn {
+    color: #86868b;
+    transition: background-color 0.2s, color 0.2s;
+  }
+  .ec-close-btn:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+    color: #1d1d1f !important;
   }
 `
 if (typeof document !== 'undefined') {

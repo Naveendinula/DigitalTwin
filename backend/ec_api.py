@@ -6,8 +6,10 @@ from an uploaded IFC model (identified by job_id).
 
 from pathlib import Path
 import glob
+from typing import Dict, Optional
 
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 import traceback
 
 from ec_core import compute_ec_from_ifc
@@ -15,8 +17,30 @@ from config import UPLOAD_DIR, EC_DB_PATH
 
 router = APIRouter()
 
+# --- Request Models for Overrides ---
+
+class MaterialClassOverride(BaseModel):
+    density_kg_m3: Optional[float] = None
+    EC_avg_kgCO2e_per_kg: Optional[float] = None
+    EC_total_kgCO2e: Optional[float] = None
+
+class IfcTypeOverride(BaseModel):
+    EC_avg_kgCO2e_per_kg: Optional[float] = None
+    EC_total_kgCO2e: Optional[float] = None
+
+class ElementOverride(BaseModel):
+    EC_total_kgCO2e: Optional[float] = None
+
+class EcOverrides(BaseModel):
+    material_classes: Dict[str, MaterialClassOverride] = {}
+    ifc_types: Dict[str, IfcTypeOverride] = {}
+    elements: Dict[str, ElementOverride] = {}
+
+class CalculateEcRequest(BaseModel):
+    overrides: Optional[EcOverrides] = None
+
 @router.post("/api/ec/calculate/{job_id}")
-async def calculate_ec(job_id: str):
+async def calculate_ec(job_id: str, request: Optional[CalculateEcRequest] = None):
     if not EC_DB_PATH.exists():
         raise HTTPException(
             status_code=500,
@@ -37,12 +61,16 @@ async def calculate_ec(job_id: str):
     # Use the first matching file
     ifc_path = Path(matching_files[0])
 
+    # Extract overrides if present
+    overrides_dict = request.overrides.dict() if request and request.overrides else None
+
     # Compute EC
     try:
         result = compute_ec_from_ifc(
             ifc_path=ifc_path,
             ec_db_path=EC_DB_PATH,
             max_detail_rows=200,
+            overrides=overrides_dict
         )
     except Exception as e:
         print(f"Error calculating EC: {e}")
