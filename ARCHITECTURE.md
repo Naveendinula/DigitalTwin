@@ -1,8 +1,17 @@
 # Architecture Documentation
 
 > **Status**: Living Document  
-> **Last Updated**: December 14, 2025  
+> **Last Updated**: December 15, 2025  
 > **Owner**: Naveen Panditharatne
+
+## Recent additions / changes
+
+- **Date:** 2025-12-15
+- **Implemented EC Overrides:** Added support for overriding embodied carbon at the *material class*, *IFC type*, or *element* level; includes a server-side path to apply **Total EC** overrides distributed across matching rows.
+- **Backend updates:** Core calculation and API changes in `backend/ec_core.py` and `backend/ec_api.py` to accept and apply overrides.
+- **Frontend updates:** `EcPanel.jsx` includes an overrides modal, improved breakdown UI, and moved visual styling to class-based rules (injected style block) to support consistent `:hover` behavior.
+- **Selection & X-Ray fixes:** Resolved edge cases and toggling bugs in `frontend/src/hooks/useSelection.js` and `frontend/src/hooks/useXRayMode.js`.
+- **Testing & Notes:** Manual verification completed for override distribution and UI hover states; recommend adding automated integration tests for the override flow.
 
 ## 1. Purpose & Scope
 
