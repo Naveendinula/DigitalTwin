@@ -8,8 +8,9 @@ import React, { useState, useCallback } from 'react'
  * 
  * @param {function} onModelReady - Callback when model is processed, receives URLs object
  * @param {boolean} hasModel - Whether a model is currently loaded
+ * @param {function} onReset - Callback to reset the model state in parent
  */
-function UploadPanel({ onModelReady, hasModel }) {
+function UploadPanel({ onModelReady, hasModel, onReset }) {
   const [isDragging, setIsDragging] = useState(false)
   const [uploadState, setUploadState] = useState('idle') // idle, uploading, processing, error
   const [progress, setProgress] = useState('')
@@ -138,6 +139,7 @@ function UploadPanel({ onModelReady, hasModel }) {
     setUploadState('idle')
     setError(null)
     setProgress('')
+    if (onReset) onReset()
   }
 
   // If model is loaded, show minimal floating button

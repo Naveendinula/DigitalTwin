@@ -506,7 +506,16 @@ function App() {
           </Viewer>
           
           {/* Upload new model button */}
-          <UploadPanel onModelReady={handleModelReady} hasModel={true} />
+          <UploadPanel 
+            onModelReady={handleModelReady} 
+            hasModel={true} 
+            onReset={() => {
+              setModelUrls(null)
+              setJobId(null)
+              setEcPanelOpen(false)
+              clearAll()
+            }}
+          />
           
           <EcPanel 
             isOpen={ecPanelOpen} 
