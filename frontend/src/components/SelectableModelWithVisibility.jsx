@@ -97,10 +97,25 @@ function SelectableModel({
    * - Otherwise, allow normal click behavior (orbit, etc.)
    */
   const handlePointerDown = (event) => {
-    event.stopPropagation()
     const clickedMesh = event.object
 
     if (!clickedMesh || !clickedMesh.isMesh) return
+
+    // Ignore clicks on invisible objects (check self and ancestors)
+    let current = clickedMesh
+    let isVisible = true
+    while (current) {
+      if (current.visible === false) {
+        isVisible = false
+        break
+      }
+      // Stop if we reach the scene root
+      if (current === scene) break
+      current = current.parent
+    }
+    if (!isVisible) return
+
+    event.stopPropagation()
 
     // Check if this is a Shift+Click (always allows section picking when in section mode)
     const isShiftClick = event.nativeEvent?.shiftKey || false
