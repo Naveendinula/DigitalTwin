@@ -631,6 +631,14 @@ const styles = {
     borderBottomRightRadius: '12px',
     zIndex: 10,
   },
+  initial: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '100%',
+    paddingBottom: '40px',
+  },
   description: {
     color: '#424245',
     fontSize: '13px',
@@ -655,6 +663,7 @@ const styles = {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
+    height: '100%',
     padding: '20px',
     color: '#86868b',
     fontSize: '13px',
