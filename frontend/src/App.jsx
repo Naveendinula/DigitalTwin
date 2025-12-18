@@ -9,6 +9,7 @@ import ViewerToolbar from './components/ViewerToolbar'
 import AxisViewWidget from './components/AxisViewWidget'
 import SectionModeHint from './components/SectionModeHint'
 import SectionPlanePanel from './components/SectionPlanePanel'
+import SectionPlaneHelper from './components/SectionPlaneHelper'
 import KeyboardHints from './components/KeyboardHints'
 import EcPanel from './components/EcPanel'
 import { useToast } from './components/Toast'
@@ -57,7 +58,11 @@ function App() {
     enableSectionPicking,
     nudgeSectionPlane,
     resetPlaneOffset,
-    alignCameraToSection
+    alignCameraToSection,
+    sectionPlaneVisible,
+    toggleSectionPlaneVisibility,
+    sectionPlaneSize,
+    setSectionPlaneSize
   } = useSectionMode()
   
   // X-Ray mode for isolation effect
@@ -486,6 +491,10 @@ function App() {
             onReset={clearSectionPlane}
             onResetOffset={resetPlaneOffset}
             onChangePlane={enableSectionPicking}
+            sectionPlaneVisible={sectionPlaneVisible}
+            onTogglePlaneVisibility={toggleSectionPlaneVisibility}
+            sectionPlaneSize={sectionPlaneSize}
+            onSectionPlaneSizeChange={setSectionPlaneSize}
           />
           
           <Viewer 
@@ -493,6 +502,11 @@ function App() {
             onRendererReady={handleRendererReady}
             onControlsReady={handleControlsReady}
           >
+            <SectionPlaneHelper 
+              activeSectionPlane={activeSectionPlane}
+              visible={sectionPlaneVisible}
+              size={sectionPlaneSize}
+            />
             <SelectableModel 
               url={modelUrls.glbUrl}
               onSelect={handleSelect}

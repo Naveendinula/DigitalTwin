@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from 'react'
 import * as THREE from 'three'
+import { computeSceneBounds } from '../utils/cameraUtils'
 
 /**
  * @typedef {Object} SectionPickResult
@@ -42,8 +43,14 @@ function useSectionMode() {
   
   // Active section plane state (full state object)
   const [activeSectionPlane, setActiveSectionPlaneState] = useState(null)
+
+  // Section plane visualization visibility
+  const [sectionPlaneVisible, setSectionPlaneVisible] = useState(true)
+
+  // Size of the helper plane
+  const [sectionPlaneSize, setSectionPlaneSize] = useState(100)
   
-  // Reference to the Three.js scene
+  // Reference to the scene
   const sceneRef = useRef(null)
   
   // Reference to the camera
@@ -62,10 +69,23 @@ function useSectionMode() {
   const originalClippingPlanesRef = useRef(new Map())
 
   /**
-   * Set the scene reference for raycasting
+   * Set the scene reference for raycasting and calculate initial plane size
    */
   const setScene = useCallback((scene) => {
     sceneRef.current = scene
+    
+    // Calculate initial plane size based on scene bounds
+    if (scene) {
+      // Small timeout to ensure scene graph is updated
+      setTimeout(() => {
+        const bounds = computeSceneBounds(scene)
+        if (bounds && bounds.maxDimension > 0) {
+          // Use max dimension * 1.5 to ensure it covers the model comfortably
+          setSectionPlaneSize(bounds.maxDimension * 1.5)
+          console.log('Section plane size set to:', bounds.maxDimension * 1.5)
+        }
+      }, 100)
+    }
   }, [])
 
   /**
@@ -402,7 +422,8 @@ function useSectionMode() {
     
     // Add a small offset to prevent Z-fighting when the plane is exactly on a surface
     // This moves the clipping plane slightly inward (along the normal direction)
-    const zFightingOffset = 0.001
+    // Increased offset to 0.01 to be more robust against Z-fighting
+    const zFightingOffset = 0.01
     const offsetOrigin = origin.clone().addScaledVector(normal, zFightingOffset)
     
     // Create THREE.Plane with the offset origin
@@ -551,6 +572,13 @@ function useSectionMode() {
     return true
   }, [sectionModeEnabled, findMeshInfo, createSectionPlane])
 
+  /**
+   * Toggle section plane visualization visibility
+   */
+  const toggleSectionPlaneVisibility = useCallback(() => {
+    setSectionPlaneVisible(prev => !prev)
+  }, [])
+
   // Legacy getter for backward compatibility
   const sectionPlane = activeSectionPlane
 
@@ -560,6 +588,8 @@ function useSectionMode() {
     sectionPlanePickingEnabled,
     sectionPlane,
     activeSectionPlane,
+    sectionPlaneVisible,
+    sectionPlaneSize,
     
     // Setup
     setScene,
@@ -571,6 +601,7 @@ function useSectionMode() {
     setSectionMode,
     toggleSectionMode,
     clearSectionPlane,
+    createSectionPlane,
     setActiveSectionPlane,
     enableSectionPicking,
     disableSectionPicking,
@@ -578,12 +609,8 @@ function useSectionMode() {
     nudgeSectionPlane,
     resetPlaneOffset,
     getNudgeStep,
-    
-    // Actions
-    createSectionPlane,
-    handleSectionClick,
-    alignCameraToSection,
-    getModelBoundingSphereRadius
+    toggleSectionPlaneVisibility,
+    setSectionPlaneSize
   }
 }
 

@@ -1,6 +1,24 @@
 import { useState, useCallback, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 
+// Constants
+const HIGHLIGHT_COLOR = 0x00D4FF // Bright cyan
+const HIGHLIGHT_EMISSIVE = 0x0088AA // Emissive cyan
+
+/**
+ * Check if a string looks like an IFC GlobalId
+ * IFC GlobalIds are 22 characters, base64-like encoded
+ */
+const isLikelyGlobalId = (str) => {
+  if (!str || typeof str !== 'string') return false
+  // GlobalIds are typically 22 chars and alphanumeric with $ and _
+  // They don't contain "openings" or other descriptive text
+  if (str.includes('-') || str.includes('openings')) return false
+  if (str === 'Scene' || str === 'RootNode') return false
+  // Most GlobalIds start with a digit or letter
+  return str.length >= 20 && str.length <= 24
+}
+
 /**
  * useSelection Hook
  * 
@@ -11,29 +29,67 @@ import * as THREE from 'three'
  * @returns {object} Selection state and handlers
  */
 function useSelection() {
-  const [selectedObject, setSelectedObject] = useState(null)
-  const [originalMaterial, setOriginalMaterial] = useState(null)
+  // Track multiple selected meshes
+  const [selectedMeshes, setSelectedMeshes] = useState(new Set())
+  // Map of uuid -> originalMaterial for restoration
+  const originalMaterials = useRef(new Map())
+  
+  // Index for fast lookup: GlobalId -> Mesh[]
+  const meshIndex = useRef(new Map())
   
   // Reference to the scene for traversal
   const sceneRef = useRef(null)
 
-  // Highlight color for selected objects - bright cyan for contrast with X-ray
-  const HIGHLIGHT_COLOR = 0x00D4FF // Bright cyan
-  const HIGHLIGHT_EMISSIVE = 0x0088AA // Emissive cyan
-
   /**
-   * Check if a string looks like an IFC GlobalId
-   * IFC GlobalIds are 22 characters, base64-like encoded
+   * Build index of meshes by GlobalId
    */
-  const isLikelyGlobalId = (str) => {
-    if (!str || typeof str !== 'string') return false
-    // GlobalIds are typically 22 chars and alphanumeric with $ and _
-    // They don't contain "openings" or other descriptive text
-    if (str.includes('-') || str.includes('openings')) return false
-    if (str === 'Scene' || str === 'RootNode') return false
-    // Most GlobalIds start with a digit or letter
-    return str.length >= 20 && str.length <= 24
-  }
+  const buildIndex = useCallback((scene) => {
+    if (!scene) return
+    
+    console.log('Building mesh index...')
+    const index = new Map()
+    let count = 0
+    
+    scene.traverse((object) => {
+      if (!object.isMesh) return
+      
+      // Keys to index this mesh by
+      const keys = new Set()
+      
+      // 1. Exact name
+      if (object.name) keys.add(object.name)
+      
+      // 2. userData.GlobalId
+      if (object.userData?.GlobalId) keys.add(object.userData.GlobalId)
+      
+      // 3. Parent/Ancestor names (up to a limit)
+      let ancestor = object.parent
+      let depth = 0
+      while (ancestor && depth < 5) {
+        if (ancestor.name && isLikelyGlobalId(ancestor.name)) {
+          keys.add(ancestor.name)
+        }
+        if (ancestor.userData?.GlobalId) {
+          keys.add(ancestor.userData.GlobalId)
+        }
+        ancestor = ancestor.parent
+        depth++
+      }
+      
+      // Add to index
+      keys.forEach(key => {
+        if (!index.has(key)) {
+          index.set(key, [])
+        }
+        index.get(key).push(object)
+      })
+      
+      count++
+    })
+    
+    meshIndex.current = index
+    console.log(`Mesh index built: ${index.size} keys for ${count} meshes`)
+  }, [])
 
   /**
    * Find GlobalId from a mesh or its parents
@@ -42,18 +98,13 @@ function useSelection() {
   const findGlobalId = useCallback((mesh) => {
     if (!mesh) return null
     
-    console.log('=== Finding GlobalId ===')
-    console.log('Starting from mesh:', mesh.name, 'type:', mesh.type)
-    
     // First check if mesh name itself is a GlobalId (unlikely but possible)
     if (isLikelyGlobalId(mesh.name)) {
-      console.log('✓ Found GlobalId in mesh name:', mesh.name)
       return mesh.name
     }
     
     // Check userData for GlobalId
     if (mesh.userData?.GlobalId) {
-      console.log('✓ Found GlobalId in userData:', mesh.userData.GlobalId)
       return mesh.userData.GlobalId
     }
     
@@ -62,17 +113,13 @@ function useSelection() {
     let parent = mesh.parent
     let depth = 0
     while (parent && depth < 10) {
-      console.log(`  Parent at depth ${depth}: name="${parent.name}", type=${parent.type}`)
-      
       // Check if parent name looks like a GlobalId
       if (isLikelyGlobalId(parent.name)) {
-        console.log(`✓ Found GlobalId in parent (depth ${depth}):`, parent.name)
         return parent.name
       }
       
       // Check parent userData
       if (parent.userData?.GlobalId) {
-        console.log('✓ Found GlobalId in parent userData:', parent.userData.GlobalId)
         return parent.userData.GlobalId
       }
       
@@ -81,86 +128,89 @@ function useSelection() {
     }
     
     // Fallback: return mesh name even if it doesn't look like a GlobalId
-    // This helps with debugging
     if (mesh.name && mesh.name.length > 0) {
-      console.log('⚠ Using mesh name as fallback (not a GlobalId):', mesh.name)
       return mesh.name
     }
     
-    console.log('✗ No GlobalId found for mesh')
     return null
   }, [])
 
   /**
-   * Handle selection of a mesh
+   * Apply highlight to a mesh
    */
-  const select = useCallback((mesh) => {
+  const highlightMesh = useCallback((mesh) => {
+    if (!mesh || !mesh.material) return
+
+    // Store original material if not already stored
+    if (!originalMaterials.current.has(mesh.uuid)) {
+       // Prefer userData.originalMaterial if available (from X-Ray or other tools)
+       const original = mesh.userData.originalMaterial || mesh.material
+       originalMaterials.current.set(mesh.uuid, original)
+    }
+
+    // Create highlight material
+    const baseMaterial = originalMaterials.current.get(mesh.uuid)
+    const highlightMaterial = baseMaterial.clone()
+    highlightMaterial.color.setHex(HIGHLIGHT_COLOR)
+    highlightMaterial.transparent = true
+    highlightMaterial.opacity = 1 // Solid highlight
+    
+    if (highlightMaterial.emissive) {
+      highlightMaterial.emissive.setHex(HIGHLIGHT_EMISSIVE)
+      highlightMaterial.emissiveIntensity = 0.5
+    }
+    
+    highlightMaterial.userData = { ...highlightMaterial.userData, isHighlight: true }
+    mesh.material = highlightMaterial
+  }, [])
+
+  /**
+   * Restore original material for a mesh
+   */
+  const restoreMesh = useCallback((mesh) => {
     if (!mesh) return
-
-    // Ensure we have the original material stored on the mesh
-    // This prevents "locking" the highlight material if we select/deselect rapidly
-    if (!mesh.userData.originalMaterial) {
-      // Only store if the current material is NOT a highlight material
-      // We check this by looking for our custom flag
-      if (!mesh.material.userData?.isHighlight && !mesh.material.userData?.isXRay) {
-        mesh.userData.originalMaterial = mesh.material
-      }
-    }
-
-    // Use the stored original material for the state
-    if (mesh.userData.originalMaterial) {
-      setOriginalMaterial(mesh.userData.originalMaterial)
-    } else if (mesh.material) {
-      // Fallback: if no original stored and current doesn't look like highlight, use current
-      // But be careful not to clone a highlight
-      if (!mesh.material.userData?.isHighlight) {
-         setOriginalMaterial(mesh.material)
-         // Also store it for future safety
-         mesh.userData.originalMaterial = mesh.material
-      }
-    }
-
-    setSelectedObject(mesh)
-
-    // Apply highlight with better contrast
-    if (mesh.material) {
-      // Create highlight material based on the ORIGINAL material, not the current one
-      // This ensures we don't stack clones or modify an already modified material
-      const baseMaterial = mesh.userData.originalMaterial || mesh.material
-      
-      const highlightMaterial = baseMaterial.clone()
-      highlightMaterial.color.setHex(HIGHLIGHT_COLOR)
-      highlightMaterial.transparent = true
-      highlightMaterial.opacity = 1
-      
-      if (highlightMaterial.emissive) {
-        highlightMaterial.emissive.setHex(HIGHLIGHT_EMISSIVE)
-        highlightMaterial.emissiveIntensity = 0.5
-      }
-      
-      // Mark as highlight material
-      highlightMaterial.userData = { ...highlightMaterial.userData, isHighlight: true }
-      
-      mesh.material = highlightMaterial
+    
+    if (originalMaterials.current.has(mesh.uuid)) {
+      const original = originalMaterials.current.get(mesh.uuid)
+      mesh.material = original
+      originalMaterials.current.delete(mesh.uuid)
+    } else if (mesh.userData?.originalMaterial) {
+        // Fallback
+        mesh.material = mesh.userData.originalMaterial
     }
   }, [])
+
+  /**
+   * Select meshes
+   */
+  const select = useCallback((meshes) => {
+    const meshArray = Array.isArray(meshes) ? meshes : [meshes]
+    const validMeshes = meshArray.filter(m => m && m.isMesh)
+    
+    if (validMeshes.length === 0) return
+
+    // Deselect current
+    selectedMeshes.forEach(m => restoreMesh(m))
+    
+    // Select new
+    const newSet = new Set()
+    validMeshes.forEach(m => {
+        highlightMesh(m)
+        newSet.add(m)
+    })
+    
+    setSelectedMeshes(newSet)
+  }, [selectedMeshes, highlightMesh, restoreMesh])
 
   /**
    * Clear current selection and restore original material
    */
   const deselect = useCallback(() => {
-    if (selectedObject) {
-      // Prefer restoring from userData.originalMaterial if available
-      if (selectedObject.userData?.originalMaterial) {
-        selectedObject.material = selectedObject.userData.originalMaterial
-      } else if (originalMaterial) {
-        selectedObject.material = originalMaterial
-      }
-    }
-    setSelectedObject(null)
-    setOriginalMaterial(null)
+    selectedMeshes.forEach(m => restoreMesh(m))
+    setSelectedMeshes(new Set())
+    originalMaterials.current.clear()
     console.log('Selection cleared')
-  }, [selectedObject, originalMaterial])
+  }, [selectedMeshes, restoreMesh])
 
   /**
    * Set the scene reference for mesh traversal
@@ -168,99 +218,25 @@ function useSelection() {
   const setScene = useCallback((scene) => {
     sceneRef.current = scene
     console.log('Selection hook: Scene reference set')
-  }, [])
+    buildIndex(scene)
+  }, [buildIndex])
 
   /**
-   * Find mesh by globalId in the scene
-   * Traverses the scene graph looking for matching object names, ancestor names, or userData.GlobalId
-   * Handles nested hierarchies (e.g., stairs with stair flights)
+   * Find meshes by globalId using index
    */
-  const findMeshByGlobalId = useCallback((globalId) => {
-    if (!sceneRef.current || !globalId) return null
-    
-    let foundMesh = null
-    let foundByAncestor = null
-    let foundByContains = null
-    
-    console.log('Searching for globalId:', globalId)
-    
-    sceneRef.current.traverse((object) => {
-      if (foundMesh) return
-      
-      // Check if this object's name matches the globalId exactly
-      if (object.name === globalId) {
-        console.log('✓ Exact name match:', object.name, 'type:', object.type)
-        if (object.isMesh) {
-          foundMesh = object
-        } else {
-          object.traverse((child) => {
-            if (!foundMesh && child.isMesh) {
-              foundMesh = child
-            }
-          })
-        }
-        return
-      }
-      
-      // Check userData.GlobalId
-      if (object.userData?.GlobalId === globalId) {
-        console.log('✓ userData.GlobalId match:', object.name)
-        if (object.isMesh) {
-          foundMesh = object
-        } else {
-          object.traverse((child) => {
-            if (!foundMesh && child.isMesh) {
-              foundMesh = child
-            }
-          })
-        }
-        return
-      }
-      
-      // Check if object name contains the globalId
-      if (!foundByContains && object.name && object.name.includes(globalId)) {
-        if (object.isMesh) {
-          foundByContains = object
-        } else {
-          object.traverse((child) => {
-            if (!foundByContains && child.isMesh) {
-              foundByContains = child
-            }
-          })
-        }
-      }
-      
-      // For meshes, check the ENTIRE ancestor chain
-      if (!foundMesh && !foundByAncestor && object.isMesh) {
-        let ancestor = object.parent
-        let depth = 0
-        const maxDepth = 10
-        
-        while (ancestor && depth < maxDepth) {
-          if (ancestor.name === globalId) {
-            console.log('✓ Ancestor name match at depth', depth, ':', ancestor.name)
-            foundByAncestor = object
-            break
-          }
-          if (ancestor.userData?.GlobalId === globalId) {
-            foundByAncestor = object
-            break
-          }
-          ancestor = ancestor.parent
-          depth++
-        }
-      }
-    })
-    
-    const result = foundMesh || foundByAncestor || foundByContains
-    if (result) {
-      console.log('Found mesh:', result.name, 'parent:', result.parent?.name)
-    } else {
-      console.warn('No mesh found for globalId:', globalId)
+  const findMeshesByGlobalId = useCallback((globalId) => {
+    if (!meshIndex.current.size && sceneRef.current) {
+        // Try building index if empty
+        buildIndex(sceneRef.current)
     }
     
-    return result
-  }, [])
+    if (meshIndex.current.has(globalId)) {
+        return meshIndex.current.get(globalId)
+    }
+    
+    // Fallback: try fuzzy search or just return empty
+    return []
+  }, [buildIndex])
 
   /**
    * Select element(s) by globalId - used for programmatic selection from tree
@@ -282,72 +258,51 @@ function useSelection() {
     
     console.log('Selecting by ID:', ids)
     
-    // Try to find a mesh for any of the IDs (useful when parent doesn't exist but children do)
-    let mesh = null
-    let matchedId = null
-    
+    const meshesToSelect = []
     for (const id of ids) {
-      mesh = findMeshByGlobalId(id)
-      if (mesh) {
-        matchedId = id
-        break
-      }
+        const found = findMeshesByGlobalId(id)
+        if (found && found.length > 0) {
+            meshesToSelect.push(...found)
+        }
     }
     
-    if (mesh) {
-      console.log('Found mesh for globalId:', matchedId, mesh.name)
-      // Deselect previous before selecting new
-      if (selectedObject) {
-        if (selectedObject.userData?.originalMaterial) {
-          selectedObject.material = selectedObject.userData.originalMaterial
-        } else if (originalMaterial) {
-          selectedObject.material = originalMaterial
-        }
-      }
-      select(mesh)
+    if (meshesToSelect.length > 0) {
+        console.log(`Found ${meshesToSelect.length} meshes for selection`)
+        select(meshesToSelect)
     } else {
-      console.warn('No mesh found for any of the globalIds:', ids.slice(0, 3).join(', '), ids.length > 3 ? `... and ${ids.length - 3} more` : '')
+        console.warn('No meshes found for IDs')
+        deselect()
     }
-  }, [findMeshByGlobalId, selectedObject, originalMaterial, select, deselect])
+  }, [findMeshesByGlobalId, select, deselect])
 
   /**
    * Handle click - select new object or deselect if same/empty
    */
   const handleSelect = useCallback((mesh) => {
-    // If clicking the same object, deselect
-    if (mesh && selectedObject && mesh.uuid === selectedObject.uuid) {
-      deselect()
-      return
+    if (!mesh) {
+        deselect()
+        return
     }
-
-    // Deselect previous before selecting new
-    if (selectedObject) {
-      if (selectedObject.userData?.originalMaterial) {
-        selectedObject.material = selectedObject.userData.originalMaterial
-      } else if (originalMaterial) {
-        selectedObject.material = originalMaterial
-      }
+    
+    // If clicking already selected, deselect
+    if (selectedMeshes.has(mesh) && selectedMeshes.size === 1) {
+        deselect()
+        return
     }
-
-    if (mesh) {
-      select(mesh)
-    } else {
-      deselect()
-    }
-  }, [selectedObject, originalMaterial, select, deselect])
+    
+    select(mesh)
+  }, [selectedMeshes, select, deselect])
 
   // Extract GlobalId from selected object - use useMemo for proper recalculation
   const selectedId = useMemo(() => {
-    if (!selectedObject) return null
-    const id = findGlobalId(selectedObject)
-    console.log('=== Selected ID computed ===')
-    console.log('selectedObject:', selectedObject?.name)
-    console.log('selectedId:', id)
-    return id
-  }, [selectedObject, findGlobalId])
+    if (selectedMeshes.size === 0) return null
+    // Return the ID of the first mesh
+    const firstMesh = selectedMeshes.values().next().value
+    return findGlobalId(firstMesh)
+  }, [selectedMeshes, findGlobalId])
 
   return {
-    selectedObject,
+    selectedObject: selectedMeshes.size > 0 ? selectedMeshes.values().next().value : null,
     selectedId,
     handleSelect,
     deselect,

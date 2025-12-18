@@ -16,6 +16,8 @@ import React, { useEffect, useCallback, useState } from 'react'
  * @param {function} onResetOffset - Callback to reset offset to 0
  * @param {function} onToggleSectionMode - Callback to toggle section mode
  * @param {function} onChangePlane - Callback to enable plane picking mode
+ * @param {boolean} sectionPlaneVisible - Whether plane visualization is visible
+ * @param {function} onTogglePlaneVisibility - Callback to toggle plane visualization
  * @param {number} nudgeStep - Step size for nudge operations
  */
 function SectionPlanePanel({
@@ -28,6 +30,10 @@ function SectionPlanePanel({
   onResetOffset,
   onToggleSectionMode,
   onChangePlane,
+  sectionPlaneVisible,
+  onTogglePlaneVisibility,
+  sectionPlaneSize,
+  onSectionPlaneSizeChange,
   nudgeStep = 0.5
 }) {
   // Local state for custom step input
@@ -68,14 +74,6 @@ function SectionPlanePanel({
         event.preventDefault()
         onNudge?.(customStep)
         break
-      case 'v':
-      case 'V':
-        // Align view
-        if (activeSectionPlane) {
-          event.preventDefault()
-          onAlignCamera?.()
-        }
-        break
       case 'Escape':
         // Reset/clear plane
         if (activeSectionPlane) {
@@ -86,7 +84,7 @@ function SectionPlanePanel({
       default:
         break
     }
-  }, [sectionModeEnabled, activeSectionPlane, customStep, onToggleSectionMode, onNudge, onAlignCamera, onReset])
+  }, [sectionModeEnabled, activeSectionPlane, customStep, onToggleSectionMode, onNudge, onReset])
 
   // Register keyboard listener
   useEffect(() => {
@@ -205,18 +203,26 @@ function SectionPlanePanel({
             />
           </div>
 
+          {/* Plane Size Control */}
+          <div style={styles.stepControl}>
+            <span style={styles.stepLabel}>Size:</span>
+            <input
+              type="range"
+              min="10"
+              max="1000"
+              step="10"
+              value={sectionPlaneSize || 100}
+              onChange={(e) => onSectionPlaneSizeChange?.(parseFloat(e.target.value))}
+              style={{ flex: 1, margin: '0 8px', cursor: 'pointer' }}
+              title="Adjust plane visualization size"
+            />
+            <span style={styles.stepLabel} style={{ minWidth: '30px', textAlign: 'right' }}>
+              {Math.round(sectionPlaneSize || 100)}
+            </span>
+          </div>
+
           {/* Action Buttons - Row 1 */}
           <div style={styles.actions}>
-            <button
-              style={styles.actionButton}
-              onClick={onAlignCamera}
-              title="Align camera perpendicular to section (V key)"
-              aria-label="Align camera to section"
-            >
-              <AlignViewIcon />
-              <span>Align View</span>
-            </button>
-            
             <button
               style={styles.actionButton}
               onClick={onResetOffset}
@@ -241,6 +247,16 @@ function SectionPlanePanel({
             </button>
             
             <button
+              style={styles.actionButton}
+              onClick={onTogglePlaneVisibility}
+              title={sectionPlaneVisible ? "Hide plane visualization" : "Show plane visualization"}
+              aria-label="Toggle plane visibility"
+            >
+              {sectionPlaneVisible ? <EyeIcon /> : <EyeOffIcon />}
+              <span>{sectionPlaneVisible ? 'Hide Plane' : 'Show Plane'}</span>
+            </button>
+
+            <button
               style={styles.actionButtonDanger}
               onClick={onReset}
               title="Clear section plane (Esc key)"
@@ -262,9 +278,7 @@ function SectionPlanePanel({
               {' · '}
               <kbd style={styles.kbd}>[</kbd><kbd style={styles.kbd}>]</kbd> move
               {' · '}
-              <kbd style={styles.kbd}>V</kbd> align
-              {' · '}
-              <kbd style={styles.kbd}>Shift</kbd>+click pick
+              <kbd style={styles.kbd}>Esc</kbd> clear
             </>
           )}
         </span>
@@ -352,6 +366,24 @@ function ClearIcon() {
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
       <polyline points="3 6 5 6 21 6" />
       <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    </svg>
+  )
+}
+
+function EyeIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  )
+}
+
+function EyeOffIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+      <line x1="1" y1="1" x2="23" y2="23" />
     </svg>
   )
 }

@@ -72,7 +72,10 @@ function Viewer({ children, onMissed, onRendererReady, onControlsReady }) {
         background: 'linear-gradient(180deg, #f0f0f2 0%, #e8e8ed 100%)'
       }}
       onPointerMissed={handlePointerMissed}
-      gl={{ localClippingEnabled: true }}
+      gl={{ 
+        localClippingEnabled: true,
+        logarithmicDepthBuffer: true
+      }}
     >
       {/* Renderer setup and controls */}
       <RendererSetup 
