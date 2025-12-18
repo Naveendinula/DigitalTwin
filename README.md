@@ -3,63 +3,42 @@
 Web BIM viewer and embodied carbon analysis tool (FastAPI backend + React/Three.js frontend).
 
 ## Demo (videos)
-Videos load from `frontend/public/media/mp4/` with posters in `frontend/public/media/posters/`. Add the encoded clips to those paths and the embeds below will play.
+Videos load from `frontend/public/media/mp4/`. Add the encoded clips to that path and the embeds below will play.
 
 <figure>
-  <video controls preload="none" width="720" poster="/media/posters/upload.png">
-    <source src="/media/mp4/upload.mp4" type="video/mp4" />
-    Your browser does not support the video tag. Download the MP4 from /media/mp4/.
+  <video controls preload="none" width="720">
+    <source src="/media/mp4/Views.mp4" type="video/mp4" />
+    Your browser does not support the video tag.
   </video>
-  <figcaption><strong>Upload & process</strong> — Upload an IFC, trigger conversion, and see the model load.</figcaption>
+  <figcaption><strong>View Presets</strong> — Seamlessly switch between Top, Front, Side, and Free Orbit views to navigate the model efficiently.</figcaption>
 </figure>
 
 <figure>
-  <video controls preload="none" width="720" poster="/media/posters/structure-properties.png">
-    <source src="/media/mp4/structure-properties.mp4" type="video/mp4" />
+  <video controls preload="none" width="720">
+    <source src="/media/mp4/Panels.mp4" type="video/mp4" />
   </video>
-  <figcaption><strong>Structure → properties</strong> — Navigate the spatial tree and inspect element properties.</figcaption>
+  <figcaption><strong>Spatial Tree & Properties</strong> — Explore the BIM hierarchy through the structure tree and view metadata for any selected element.</figcaption>
 </figure>
 
 <figure>
-  <video controls preload="none" width="720" poster="/media/posters/focus.png">
-    <source src="/media/mp4/focus.mp4" type="video/mp4" />
-  </video>
-  <figcaption><strong>Focus (F)</strong> — Select elements and snap the camera to them.</figcaption>
-</figure>
-
-<figure>
-  <video controls preload="none" width="720" poster="/media/posters/isolate.png">
-    <source src="/media/mp4/isolate.mp4" type="video/mp4" />
-  </video>
-  <figcaption><strong>Isolate / ghost</strong> — Hide everything else or use the X-ray/ghost view.</figcaption>
-</figure>
-
-<figure>
-  <video controls preload="none" width="720" poster="/media/posters/section-plane.png">
-    <source src="/media/mp4/section-plane.mp4" type="video/mp4" />
-  </video>
-  <figcaption><strong>Section plane</strong> — Create and nudge cut planes to inspect interiors.</figcaption>
-</figure>
-
-<figure>
-  <video controls preload="none" width="720" poster="/media/posters/view-presets.png">
-    <source src="/media/mp4/view-presets.mp4" type="video/mp4" />
-  </video>
-  <figcaption><strong>View presets</strong> — Jump between top/front/side/free camera presets.</figcaption>
-</figure>
-
-<figure>
-  <video controls preload="none" width="720" poster="/media/posters/xray.png">
+  <video controls preload="none" width="720">
     <source src="/media/mp4/xray.mp4" type="video/mp4" />
   </video>
-  <figcaption><strong>X-Ray</strong> — Toggle transparent rendering to highlight selections.</figcaption>
+  <figcaption><strong>X-Ray Visualization</strong> — Use ghosted transparency to see through the model and focus on specific systems or components.</figcaption>
 </figure>
 
 <figure>
-  <video controls preload="none" width="720" poster="/media/posters/ec-panel.png">
-    <source src="/media/mp4/ec-panel.mp4" type="video/mp4" />
+  <video controls preload="none" width="720">
+    <source src="/media/mp4/plane.mp4" type="video/mp4" />
   </video>
-  <figcaption><strong>Embodied Carbon panel</strong> — Run EC calculation, review hot spots, and apply overrides.</figcaption>
+  <figcaption><strong>Sectioning Tools</strong> — Define and manipulate section planes with adjustable size and visibility to reveal internal details.</figcaption>
+</figure>
+
+<figure>
+  <video controls preload="none" width="720">
+    <source src="/media/mp4/embodiedcarbon.mp4" type="video/mp4" />
+  </video>
+  <figcaption><strong>Carbon Analysis</strong> — Calculate embodied carbon impact, identify high-impact materials, and manage data overrides.</figcaption>
 </figure>
 
 ## Features (code refs)

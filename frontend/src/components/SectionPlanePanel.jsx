@@ -204,21 +204,34 @@ function SectionPlanePanel({
           </div>
 
           {/* Plane Size Control */}
-          <div style={styles.stepControl}>
-            <span style={styles.stepLabel}>Size:</span>
-            <input
-              type="range"
-              min="10"
-              max="1000"
-              step="10"
-              value={sectionPlaneSize || 100}
-              onChange={(e) => onSectionPlaneSizeChange?.(parseFloat(e.target.value))}
-              style={{ flex: 1, margin: '0 8px', cursor: 'pointer' }}
-              title="Adjust plane visualization size"
-            />
-            <span style={styles.stepLabel} style={{ minWidth: '30px', textAlign: 'right' }}>
-              {Math.round(sectionPlaneSize || 100)}
-            </span>
+          <div style={styles.controlGroup}>
+            <span style={styles.controlLabel}>Plane Size</span>
+            <div style={styles.nudgeControls}>
+              <button
+                style={styles.nudgeButton}
+                onClick={() => onSectionPlaneSizeChange?.(Math.max(10, (sectionPlaneSize || 100) - 10))}
+                title="Decrease plane size"
+                aria-label="Decrease plane size"
+              >
+                <MinusIcon />
+                <span style={styles.nudgeLabel}>Smaller</span>
+              </button>
+              
+              <div style={styles.offsetDisplay}>
+                <span style={styles.offsetValue}>{Math.round(sectionPlaneSize || 100)}</span>
+                <span style={styles.offsetUnit}>units</span>
+              </div>
+              
+              <button
+                style={styles.nudgeButton}
+                onClick={() => onSectionPlaneSizeChange?.((sectionPlaneSize || 100) + 10)}
+                title="Increase plane size"
+                aria-label="Increase plane size"
+              >
+                <PlusIcon />
+                <span style={styles.nudgeLabel}>Larger</span>
+              </button>
+            </div>
           </div>
 
           {/* Action Buttons - Row 1 */}

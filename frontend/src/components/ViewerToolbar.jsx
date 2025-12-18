@@ -143,18 +143,6 @@ function ViewerToolbar({
         </button>
       )}
 
-      {/* Align View Button - only show when there's an active plane */}
-      {hasSectionPlane && (
-        <button
-          style={styles.toolButton}
-          onClick={onAlignCamera}
-          title="Align Camera to Section Plane"
-        >
-          <AlignViewIcon />
-          <span style={styles.toolLabel}>Align View</span>
-        </button>
-      )}
-
       {/* Clear Section Plane Button - only show when there's an active plane */}
       {hasSectionPlane && (
         <button
