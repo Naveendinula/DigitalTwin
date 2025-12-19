@@ -3,43 +3,37 @@
 Web BIM viewer and embodied carbon analysis tool (FastAPI backend + React/Three.js frontend).
 
 ## Demo (videos)
-Videos load from `frontend/public/media/mp4/`. Add the encoded clips to that path and the embeds below will play.
 
-<figure>
-  <video controls preload="none" width="720">
-    <source src="/media/mp4/Views.mp4" type="video/mp4" />
-    Your browser does not support the video tag.
-  </video>
-  <figcaption><strong>View Presets</strong> — Seamlessly switch between Top, Front, Side, and Free Orbit views to navigate the model efficiently.</figcaption>
-</figure>
+**View Presets** — Seamlessly switch between Top, Front, Side, and Free Orbit views to navigate the model efficiently.  
 
-<figure>
-  <video controls preload="none" width="720">
-    <source src="/media/mp4/Panels.mp4" type="video/mp4" />
-  </video>
-  <figcaption><strong>Spatial Tree & Properties</strong> — Explore the BIM hierarchy through the structure tree and view metadata for any selected element.</figcaption>
-</figure>
 
-<figure>
-  <video controls preload="none" width="720">
-    <source src="/media/mp4/xray.mp4" type="video/mp4" />
-  </video>
-  <figcaption><strong>X-Ray Visualization</strong> — Use ghosted transparency to see through the model and focus on specific systems or components.</figcaption>
-</figure>
+https://github.com/user-attachments/assets/45576f1c-da17-4ace-b5e9-e2861f07262e
 
-<figure>
-  <video controls preload="none" width="720">
-    <source src="/media/mp4/plane.mp4" type="video/mp4" />
-  </video>
-  <figcaption><strong>Sectioning Tools</strong> — Define and manipulate section planes with adjustable size and visibility to reveal internal details.</figcaption>
-</figure>
 
-<figure>
-  <video controls preload="none" width="720">
-    <source src="/media/mp4/embodiedcarbon.mp4" type="video/mp4" />
-  </video>
-  <figcaption><strong>Carbon Analysis</strong> — Calculate embodied carbon impact, identify high-impact materials, and manage data overrides.</figcaption>
-</figure>
+**Spatial Tree & Properties** — Explore the BIM hierarchy through the structure tree and view metadata for any selected element.  
+
+
+https://github.com/user-attachments/assets/41357258-03f8-4040-8af1-2a6e34233bc6
+
+
+**X-Ray Visualization** — Use ghosted transparency to see through the model and focus on specific systems or components.  
+
+
+https://github.com/user-attachments/assets/96940227-d8cf-4f1b-aaa4-802d20939165
+
+
+**Sectioning Tools** — Define and manipulate section planes with adjustable size and visibility to reveal internal details.  
+
+
+https://github.com/user-attachments/assets/bf68e68c-2698-4f9a-8ae8-6141028c3cf4
+
+
+**Carbon Analysis** — Calculate embodied carbon impact, identify high-impact materials, and manage data overrides.  
+
+
+
+https://github.com/user-attachments/assets/5751eb02-0a86-45bd-b953-781083907653
+
 
 ## Features (code refs)
 - 3D viewer with selection, focus, isolate, section planes, and view presets (`frontend/src/components/Viewer.jsx`, `frontend/src/components/SelectableModelWithVisibility.jsx`).
