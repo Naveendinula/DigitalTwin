@@ -19,6 +19,7 @@ import useSectionMode from './hooks/useSectionMode'
 import useXRayMode from './hooks/useXRayMode'
 import useCameraFocus from './hooks/useCameraFocus'
 import useViewMode from './hooks/useViewMode'
+import { getEcColor } from './utils/colorUtils'
 
 /**
  * Main Application Component
@@ -324,12 +325,26 @@ function App() {
   /**
    * Handle selection from tree view - selects element(s) in the 3D model and focuses camera
    */
-  const handleTreeSelect = useCallback((globalIdOrIds) => {
-    console.log('Selected from tree:', globalIdOrIds)
-    selectById(globalIdOrIds)
+  const handleTreeSelect = useCallback((globalIdOrIds, ecData) => {
+    console.log('Selected from tree:', globalIdOrIds, ecData)
+    
+    let options = {}
+    const ids = Array.isArray(globalIdOrIds) ? globalIdOrIds : [globalIdOrIds]
+
+    if (ecData) {
+        const { ecValue, minEc, maxEc } = ecData
+        const color = getEcColor(ecValue, minEc, maxEc)
+        options = { color }
+        
+        // Enable X-ray to make others translucent
+        enableXRay(ids)
+    } else {
+        disableXRay()
+    }
+
+    selectById(globalIdOrIds, options)
     
     // Track selected IDs for 'F' key focus
-    const ids = Array.isArray(globalIdOrIds) ? globalIdOrIds : [globalIdOrIds]
     lastSelectedIdsRef.current = ids
     
     // Focus camera on selected element(s) with feedback
@@ -340,7 +355,7 @@ function App() {
     } else if (result.count > 1) {
       showToast(`Focused on ${result.count} elements`, 'info', 2000)
     }
-  }, [selectById, focusOnElements, showToast])
+  }, [selectById, focusOnElements, showToast, enableXRay, disableXRay])
 
   /**
    * Handle section pick from model click
@@ -535,6 +550,7 @@ function App() {
             isOpen={ecPanelOpen} 
             onClose={() => setEcPanelOpen(false)} 
             jobId={jobId} 
+            selectedId={selectedId}
             onSelectContributor={handleTreeSelect}
             focusToken={ecPanelZIndex}
             zIndex={ecPanelZIndex}

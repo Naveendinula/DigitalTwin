@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef } from 'react'
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import * as THREE from 'three'
 
 // Constants
@@ -138,7 +138,7 @@ function useSelection() {
   /**
    * Apply highlight to a mesh
    */
-  const highlightMesh = useCallback((mesh) => {
+  const highlightMesh = useCallback((mesh, options = {}) => {
     if (!mesh || !mesh.material) return
 
     // Store original material if not already stored
@@ -149,16 +149,11 @@ function useSelection() {
     }
 
     // Create highlight material
-    const baseMaterial = originalMaterials.current.get(mesh.uuid)
-    const highlightMaterial = baseMaterial.clone()
-    highlightMaterial.color.setHex(HIGHLIGHT_COLOR)
-    highlightMaterial.transparent = true
-    highlightMaterial.opacity = 1 // Solid highlight
-    
-    if (highlightMaterial.emissive) {
-      highlightMaterial.emissive.setHex(HIGHLIGHT_EMISSIVE)
-      highlightMaterial.emissiveIntensity = 0.5
-    }
+    // Use MeshBasicMaterial to ensure visibility regardless of lighting
+    const highlightMaterial = new THREE.MeshBasicMaterial({
+      color: options.color || HIGHLIGHT_COLOR,
+      side: THREE.DoubleSide
+    })
     
     highlightMaterial.userData = { ...highlightMaterial.userData, isHighlight: true }
     mesh.material = highlightMaterial
@@ -183,7 +178,7 @@ function useSelection() {
   /**
    * Select meshes
    */
-  const select = useCallback((meshes) => {
+  const select = useCallback((meshes, options = {}) => {
     const meshArray = Array.isArray(meshes) ? meshes : [meshes]
     const validMeshes = meshArray.filter(m => m && m.isMesh)
     
@@ -195,7 +190,7 @@ function useSelection() {
     // Select new
     const newSet = new Set()
     validMeshes.forEach(m => {
-        highlightMesh(m)
+        highlightMesh(m, options)
         newSet.add(m)
     })
     
@@ -241,8 +236,9 @@ function useSelection() {
   /**
    * Select element(s) by globalId - used for programmatic selection from tree
    * @param {string | string[]} globalIds - Single globalId or array of globalIds
+   * @param {object} options - Selection options (color, pulse)
    */
-  const selectById = useCallback((globalIds) => {
+  const selectById = useCallback((globalIds, options = {}) => {
     if (!globalIds) {
       deselect()
       return
@@ -268,7 +264,7 @@ function useSelection() {
     
     if (meshesToSelect.length > 0) {
         console.log(`Found ${meshesToSelect.length} meshes for selection`)
-        select(meshesToSelect)
+        select(meshesToSelect, options)
     } else {
         console.warn('No meshes found for IDs')
         deselect()

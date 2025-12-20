@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
+import { getEcColor } from '../utils/colorUtils'
 
 /**
  * EcPanel Component
@@ -6,7 +7,7 @@ import React, { useState, useRef, useEffect } from 'react'
  * Draggable panel for triggering and displaying Embodied Carbon calculations.
  * Matches the application's "Arctic Zen" aesthetic.
  */
-function EcPanel({ isOpen, onClose, jobId, onSelectContributor, focusToken, zIndex }) {
+function EcPanel({ isOpen, onClose, jobId, selectedId, onSelectContributor, focusToken, zIndex }) {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
@@ -251,6 +252,7 @@ function EcPanel({ isOpen, onClose, jobId, onSelectContributor, focusToken, zInd
         zIndex: zIndex || styles.panel.zIndex
       }}
       onMouseDown={handleMouseDown}
+      onPointerDown={(e) => e.stopPropagation()}
     >
       <div style={styles.header} className="drag-handle">
         <div style={styles.titleContainer}>
@@ -414,18 +416,42 @@ function EcPanel({ isOpen, onClose, jobId, onSelectContributor, focusToken, zInd
                   </tr>
                 </thead>
                 <tbody>
-                  {result.details.elements.map((el, idx) => {
+                  {(() => {
+                    // Calculate min/max for color scaling
+                    const ecValues = result.details.elements
+                      .map(e => e.EC_avg_kgCO2e || 0)
+                      .filter(v => v > 0)
+                    const minEc = ecValues.length ? Math.min(...ecValues) : 0
+                    const maxEc = ecValues.length ? Math.max(...ecValues) : 0
+
+                    return result.details.elements.map((el, idx) => {
                     const isOverridden = 
                       (el.GlobalId && overrides.elements[el.GlobalId]) ||
                       (el.MaterialClass && overrides.material_classes[el.MaterialClass]) ||
                       (el.IfcType && overrides.ifc_types[el.IfcType]);
+                    
+                    const isSelected = el.GlobalId && selectedId === el.GlobalId
+                    const ecColor = getEcColor(el.EC_avg_kgCO2e || 0, minEc, maxEc)
+                    const baseBg = ecColor ? `${ecColor}33` : 'transparent' // ~20% alpha
+                    const baseBorder = ecColor ? `3px solid ${ecColor}` : '3px solid transparent'
                       
                     return (
                     <tr 
                       key={idx} 
-                      style={styles.tr}
+                      style={{
+                        ...styles.tr,
+                        backgroundColor: isSelected ? 'rgba(0, 212, 255, 0.15)' : baseBg,
+                        borderLeft: isSelected ? '3px solid #00D4FF' : baseBorder
+                      }}
                       className={el.GlobalId ? "ec-row-hover" : ""}
-                      onClick={() => el.GlobalId && onSelectContributor && onSelectContributor(el.GlobalId)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        el.GlobalId && onSelectContributor && onSelectContributor(el.GlobalId, {
+                          ecValue: el.EC_avg_kgCO2e || 0,
+                          minEc,
+                          maxEc
+                        })
+                      }}
                       title={el.GlobalId ? "Click to select in model" : "No model mapping"}
                     >
                       <td style={styles.td}>
@@ -439,7 +465,7 @@ function EcPanel({ isOpen, onClose, jobId, onSelectContributor, focusToken, zInd
                       <td style={styles.td}>{el.MaterialName || 'Unknown'}</td>
                       <td style={styles.td}>{(el.EC_avg_kgCO2e || 0).toFixed(2)}</td>
                     </tr>
-                  )})}
+                  )})})()}
                 </tbody>
               </table>
             </div>

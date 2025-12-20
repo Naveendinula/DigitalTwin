@@ -119,6 +119,11 @@ function useXRayMode() {
     
     if (isSelected) {
       // Keep original material for selected meshes
+      // If it's already highlighted, don't overwrite it
+      if (mesh.material.userData?.isHighlight) {
+        return
+      }
+
       if (originalMat) {
         mesh.material = originalMat
       }
@@ -229,6 +234,10 @@ function useXRayMode() {
         if (!originalMat) return
         
         if (isSelected) {
+          // If another system already applied a highlight, keep it
+          if (object.material?.userData?.isHighlight) {
+            return
+          }
           // Restore original material
           if (object.material !== originalMat) {
             // Dispose if it's X-ray
