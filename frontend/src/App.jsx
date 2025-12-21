@@ -200,6 +200,14 @@ function App() {
   }, [deselect, showAll, disableXRay])
 
   /**
+   * Close Embodied Carbon panel and disable X-ray mode
+   */
+  const handleCloseEcPanel = useCallback(() => {
+    setEcPanelOpen(false)
+    disableXRay()
+  }, [disableXRay])
+
+  /**
    * Focus on current selection (for 'F' key shortcut)
    */
   const focusOnCurrentSelection = useCallback(() => {
@@ -481,7 +489,7 @@ function App() {
 
               // If panel is open and already top-most, close it
               if (ecPanelZIndex === panelZCounter) {
-                setEcPanelOpen(false)
+                handleCloseEcPanel()
                 return
               }
 
@@ -541,14 +549,14 @@ function App() {
             onReset={() => {
               setModelUrls(null)
               setJobId(null)
-              setEcPanelOpen(false)
+              handleCloseEcPanel()
               clearAll()
             }}
           />
           
           <EcPanel 
             isOpen={ecPanelOpen} 
-            onClose={() => setEcPanelOpen(false)} 
+            onClose={handleCloseEcPanel} 
             jobId={jobId} 
             selectedId={selectedId}
             onSelectContributor={handleTreeSelect}

@@ -3,43 +3,14 @@
 Web BIM viewer and embodied carbon analysis tool (FastAPI backend + React/Three.js frontend).
 
 ## Demo (videos)
-Videos load from `frontend/public/media/mp4/`. Add the encoded clips to that path and the embeds below will play.
 
-<figure>
-  <video controls preload="none" width="720">
-    <source src="/media/mp4/Views.mp4" type="video/mp4" />
-    Your browser does not support the video tag.
-  </video>
-  <figcaption><strong>View Presets</strong> — Seamlessly switch between Top, Front, Side, and Free Orbit views to navigate the model efficiently.</figcaption>
-</figure>
+- **View Presets** — Seamlessly switch between Top, Front, Side, and Free Orbit views to navigate the model efficiently.
+- **Spatial Tree & Properties** — Browse the BIM hierarchy in the structure tree and inspect metadata for any selected element.
+- **X-Ray Visualization** — Toggle ghosted transparency to see through the model and focus on specific components.
+- **Sectioning Tools** — Create and adjust section planes (size, position, visibility) to reveal internal details.
+- **Carbon Analysis** — Compute embodied carbon, surface high-impact materials, and apply data overrides when needed.
 
-<figure>
-  <video controls preload="none" width="720">
-    <source src="/media/mp4/Panels.mp4" type="video/mp4" />
-  </video>
-  <figcaption><strong>Spatial Tree & Properties</strong> — Explore the BIM hierarchy through the structure tree and view metadata for any selected element.</figcaption>
-</figure>
 
-<figure>
-  <video controls preload="none" width="720">
-    <source src="/media/mp4/xray.mp4" type="video/mp4" />
-  </video>
-  <figcaption><strong>X-Ray Visualization</strong> — Use ghosted transparency to see through the model and focus on specific systems or components.</figcaption>
-</figure>
-
-<figure>
-  <video controls preload="none" width="720">
-    <source src="/media/mp4/plane.mp4" type="video/mp4" />
-  </video>
-  <figcaption><strong>Sectioning Tools</strong> — Define and manipulate section planes with adjustable size and visibility to reveal internal details.</figcaption>
-</figure>
-
-<figure>
-  <video controls preload="none" width="720">
-    <source src="/media/mp4/embodiedcarbon.mp4" type="video/mp4" />
-  </video>
-  <figcaption><strong>Carbon Analysis</strong> — Calculate embodied carbon impact, identify high-impact materials, and manage data overrides.</figcaption>
-</figure>
 
 ## Features (code refs)
 - 3D viewer with selection, focus, isolate, section planes, and view presets (`frontend/src/components/Viewer.jsx`, `frontend/src/components/SelectableModelWithVisibility.jsx`).
