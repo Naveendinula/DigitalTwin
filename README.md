@@ -5,10 +5,40 @@ Web BIM viewer and embodied carbon analysis tool (FastAPI backend + React/Three.
 ## Demo (videos)
 
 - **View Presets** — Seamlessly switch between Top, Front, Side, and Free Orbit views to navigate the model efficiently.
+
+  
+
+https://github.com/user-attachments/assets/fd9dc671-8727-4203-ad1a-35b3a2dcab0b
+
+
 - **Spatial Tree & Properties** — Browse the BIM hierarchy in the structure tree and inspect metadata for any selected element.
+
+
+
+https://github.com/user-attachments/assets/d86d45f3-8f72-48b9-bc86-1c71edf0c468
+
+
 - **X-Ray Visualization** — Toggle ghosted transparency to see through the model and focus on specific components.
+
+
+https://github.com/user-attachments/assets/dac63ecb-087d-411e-8207-ea8177473f0a
+
+
+
 - **Sectioning Tools** — Create and adjust section planes (size, position, visibility) to reveal internal details.
+
+
+
+https://github.com/user-attachments/assets/ca7e57e8-f8cd-462f-93fc-4dc9269db3f9
+
+
 - **Carbon Analysis** — Compute embodied carbon, surface high-impact materials, and apply data overrides when needed.
+
+
+
+
+https://github.com/user-attachments/assets/13ed555d-da2b-4b52-ab9b-3861132c5abe
+
 
 
 
