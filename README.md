@@ -7,7 +7,7 @@ Videos load from `frontend/public/media/mp4/`. Add the encoded clips to that pat
 
 <figure>
   <video controls preload="none" width="720">
-    <source src="frontend/public/media/mp4/Views.mp4" type="video/mp4" />
+    <source src="/media/mp4/Views.mp4" type="video/mp4" />
     Your browser does not support the video tag.
   </video>
   <figcaption><strong>View Presets</strong> — Seamlessly switch between Top, Front, Side, and Free Orbit views to navigate the model efficiently.</figcaption>
@@ -15,28 +15,28 @@ Videos load from `frontend/public/media/mp4/`. Add the encoded clips to that pat
 
 <figure>
   <video controls preload="none" width="720">
-    <source src="frontend/public/media/mp4/Panels.mp4" type="video/mp4" />
+    <source src="/media/mp4/Panels.mp4" type="video/mp4" />
   </video>
   <figcaption><strong>Spatial Tree & Properties</strong> — Explore the BIM hierarchy through the structure tree and view metadata for any selected element.</figcaption>
 </figure>
 
 <figure>
   <video controls preload="none" width="720">
-    <source src="frontend/public/media/mp4/xray.mp4" type="video/mp4" />
+    <source src="/media/mp4/xray.mp4" type="video/mp4" />
   </video>
   <figcaption><strong>X-Ray Visualization</strong> — Use ghosted transparency to see through the model and focus on specific systems or components.</figcaption>
 </figure>
 
 <figure>
   <video controls preload="none" width="720">
-    <source src="frontend/public/media/mp4/plane.mp4" type="video/mp4" />
+    <source src="/media/mp4/plane.mp4" type="video/mp4" />
   </video>
   <figcaption><strong>Sectioning Tools</strong> — Define and manipulate section planes with adjustable size and visibility to reveal internal details.</figcaption>
 </figure>
 
 <figure>
   <video controls preload="none" width="720">
-    <source src="frontend/public/media/mp4/embodiedcarbon.mp4" type="video/mp4" />
+    <source src="/media/mp4/embodiedcarbon.mp4" type="video/mp4" />
   </video>
   <figcaption><strong>Carbon Analysis</strong> — Calculate embodied carbon impact, identify high-impact materials, and manage data overrides.</figcaption>
 </figure>
