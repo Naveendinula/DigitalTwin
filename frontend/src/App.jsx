@@ -347,7 +347,10 @@ function App() {
         // Enable X-ray to make others translucent
         enableXRay(ids)
     } else {
-        disableXRay()
+        // Only disable X-ray if we're not in isolation mode
+        if (!isolatedIds) {
+            disableXRay()
+        }
     }
 
     selectById(globalIdOrIds, options)
@@ -363,7 +366,7 @@ function App() {
     } else if (result.count > 1) {
       showToast(`Focused on ${result.count} elements`, 'info', 2000)
     }
-  }, [selectById, focusOnElements, showToast, enableXRay, disableXRay])
+  }, [selectById, focusOnElements, showToast, enableXRay, disableXRay, isolatedIds])
 
   /**
    * Handle section pick from model click
