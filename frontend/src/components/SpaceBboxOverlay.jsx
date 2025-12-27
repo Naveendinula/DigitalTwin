@@ -17,7 +17,7 @@ function SpaceBboxOverlay({ enabled, jobId, onSpaceSelect, highlightedSpaceIds =
     let isMounted = true
     setLoading(true)
     setError(null)
-    onStatus?.({ hasSpaces: false, count: 0, error: null, loading: true })
+    onStatus?.({ hasSpaces: false, count: 0, error: null, loading: true, checked: false })
 
     fetch(`http://localhost:8000/api/spaces/bboxes/${jobId}`)
       .then(res => {
@@ -28,12 +28,12 @@ function SpaceBboxOverlay({ enabled, jobId, onSpaceSelect, highlightedSpaceIds =
         if (!isMounted) return
         const nextSpaces = Array.isArray(data.spaces) ? data.spaces : []
         setSpaces(nextSpaces)
-        onStatus?.({ hasSpaces: nextSpaces.length > 0, count: nextSpaces.length, error: null })
+        onStatus?.({ hasSpaces: nextSpaces.length > 0, count: nextSpaces.length, error: null, loading: false, checked: true })
       })
       .catch(err => {
         if (!isMounted) return
         setError(err.message)
-        onStatus?.({ hasSpaces: false, count: 0, error: err.message })
+        onStatus?.({ hasSpaces: false, count: 0, error: err.message, loading: false, checked: true })
       })
       .finally(() => {
         if (!isMounted) return

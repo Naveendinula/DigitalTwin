@@ -37,7 +37,7 @@ function App() {
   const [hvacPanelOpen, setHvacPanelOpen] = useState(false)
   const [spaceOverlayEnabled, setSpaceOverlayEnabled] = useState(false)
   const [highlightedSpaceIds, setHighlightedSpaceIds] = useState([])
-  const [spaceOverlayStatus, setSpaceOverlayStatus] = useState({ hasSpaces: false, count: 0, error: null })
+  const [spaceOverlayStatus, setSpaceOverlayStatus] = useState({ hasSpaces: false, count: 0, error: null, loading: false, checked: false })
   const lastSpaceToastRef = useRef({ jobId: null, type: null })
   // Panel stacking counter used to bring panels to front when focused
   const [panelZCounter, setPanelZCounter] = useState(1000)
@@ -433,6 +433,7 @@ function App() {
 
   useEffect(() => {
     if (!spaceOverlayEnabled) return
+    if (!spaceOverlayStatus.checked || spaceOverlayStatus.loading) return
     if (spaceOverlayStatus.error) {
       if (lastSpaceToastRef.current.jobId !== jobId || lastSpaceToastRef.current.type !== 'error') {
         showToast(`Spaces overlay error: ${spaceOverlayStatus.error}`, 'warning')
@@ -446,7 +447,19 @@ function App() {
         lastSpaceToastRef.current = { jobId, type: 'empty' }
       }
     }
-  }, [spaceOverlayEnabled, spaceOverlayStatus, showToast])
+  }, [spaceOverlayEnabled, spaceOverlayStatus, showToast, jobId])
+
+  useEffect(() => {
+    lastSpaceToastRef.current = { jobId, type: null }
+    setSpaceOverlayStatus(prev => ({ ...prev, checked: false }))
+  }, [jobId])
+
+  useEffect(() => {
+    if (!spaceOverlayEnabled) {
+      lastSpaceToastRef.current = { jobId, type: null }
+      setSpaceOverlayStatus(prev => ({ ...prev, checked: false }))
+    }
+  }, [spaceOverlayEnabled, jobId])
 
   const spaceElementMapRef = useRef(new Map())
 
@@ -676,7 +689,15 @@ function App() {
                 return next
               })
             }}
-            onToggleSpaceOverlay={() => setSpaceOverlayEnabled(prev => !prev)}
+            onToggleSpaceOverlay={() => {
+              setSpaceOverlayEnabled(prev => {
+                const next = !prev
+                if (next) {
+                  setSpaceOverlayStatus({ hasSpaces: false, count: 0, error: null, loading: true, checked: false })
+                }
+                return next
+              })
+            }}
             spaceOverlayEnabled={spaceOverlayEnabled}
             hasModel={!!modelUrls}
           />
