@@ -6,6 +6,11 @@
 
 ## Recent additions / changes
 
+- **Date:** 2025-12-26
+- **HVAC/FM analysis:** Added HVAC/FM core and API endpoints to map equipment -> terminals -> spaces; results cached in `output/{job_id}/hvac_fm.json` with room identifiers.
+- **Space overlays:** Added space bbox endpoint with cached `space_bboxes.json` for overlay rendering.
+- **Frontend updates:** Added HVAC/FM panel and spaces overlay toggle (bbox rendering + selection highlight).
+
 - **Date:** 2025-12-15
 - **Implemented EC Overrides:** Added support for overriding embodied carbon at the *material class*, *IFC type*, or *element* level; includes a server-side path to apply **Total EC** overrides distributed across matching rows.
 - **Backend updates:** Core calculation and API changes in `backend/ec_core.py` and `backend/ec_api.py` to accept and apply overrides.
@@ -25,7 +30,9 @@ The system bridges the gap between complex BIM files and accessible web visualiz
 *   **3D Visualization**: The user views the 3D model in the browser, navigating via orbit/pan/zoom controls.
 *   **Element Inspection**: Clicking a 3D element reveals its specific BIM properties (Psets, quantities, materials) in a side panel.
 *   **Embodied Carbon Analysis**: The user triggers an EC calculation. The system maps model materials to a backend database (`prac-database.csv`) and visualizes the carbon footprint (kgCO2e) per element and in aggregate.
+*   **HVAC/FM Analysis**: The user runs HVAC/FM analysis to derive served terminals and served spaces from equipment.
 *   **Spatial Navigation**: Users can isolate parts of the building (e.g., specific floors or rooms) using the spatial hierarchy tree.
+*   **Space Overlay**: Users toggle translucent space bounding boxes for quick room context in the 3D view.
 
 ## 3. Repository Tour
 
@@ -39,6 +46,8 @@ The system bridges the gap between complex BIM files and accessible web visualiz
 *   `config.py`: Centralized configuration (paths, constants).
 *   `ec_api.py`: API router specifically for Embodied Carbon endpoints.
 *   `ec_core.py`: Orchestrator for EC calculations.
+*   `fm_api.py`: API router for HVAC/FM analysis and space bbox endpoints.
+*   `fm_hvac_core.py`: HVAC/FM core logic (equipment -> terminals -> spaces).
 *   `domain/`:
     *   `materials.py`: Material classification and extraction logic.
     *   `geometry.py`: IfcOpenShell geometry processing.
@@ -53,6 +62,8 @@ The system bridges the gap between complex BIM files and accessible web visualiz
 *   `src/main.jsx`: **Entrypoint**. Bootstraps the React application.
 *   `src/components/Viewer.jsx`: The core 3D canvas using `@react-three/fiber`.
 *   `src/components/EcPanel.jsx`: UI for triggering and displaying EC analysis results.
+*   `src/components/HvacFmPanel.jsx`: UI for HVAC/FM analysis results and filters.
+*   `src/components/SpaceBboxOverlay.jsx`: Renders space bbox overlays in the viewer.
 *   `src/components/PropertyPanel.jsx`: Displays element-specific metadata.
 *   `src/components/UploadPanel.jsx`: Handles file selection and upload progress.
 
@@ -81,6 +92,8 @@ graph TB
         Converter["IFC Converter"]
         Extractor["Metadata Extractor"]
         ECCore["EC Calculator"]
+        HvacCore["HVAC/FM Core"]
+        SpaceBBox["Space BBox Extractor"]
     end
 
     subgraph Storage
@@ -98,6 +111,8 @@ graph TB
     Server -->|Triggers| Converter
     Server -->|Triggers| Extractor
     Server -->|Calls| ECCore
+    Server -->|Calls| HvacCore
+    Server -->|Calls| SpaceBBox
 
     Converter -->|Reads| Uploads
     Converter -->|Writes GLB| Outputs
@@ -107,6 +122,12 @@ graph TB
 
     ECCore -->|Reads| Uploads
     ECCore -->|Reads| ECDB
+
+    HvacCore -->|Reads| Uploads
+    HvacCore -->|Writes JSON| Outputs
+
+    SpaceBBox -->|Reads| Uploads
+    SpaceBBox -->|Writes JSON| Outputs
 ```
 
 ### Data Flow: Embodied Carbon Calculation
@@ -118,6 +139,19 @@ graph TB
 6.  **Compute**: Mass = Volume × Density; EC = Mass × Factor.
 7.  **Response**: JSON object with summaries (Total tCO2e) and element-level details is returned.
 8.  **Render**: Frontend `EcPanel` visualizes the data.
+
+### Data Flow: HVAC/FM Analysis
+1.  **Request**: Frontend sends `POST /api/fm/hvac/analyze/{jobId}`.
+2.  **Load**: Backend locates the `.ifc` file in `uploads/`.
+3.  **Traverse**: `fm_hvac_core.py` discovers equipment, traverses ports, and maps terminals to spaces.
+4.  **Cache**: Result JSON is written to `output/{jobId}/hvac_fm.json`.
+5.  **Fetch**: Frontend calls `GET /api/fm/hvac/{jobId}` to render results in `HvacFmPanel`.
+
+### Data Flow: Space BBox Overlay
+1.  **Request**: Frontend sends `GET /api/spaces/bboxes/{jobId}`.
+2.  **Compute**: Backend computes space bboxes using IfcOpenShell geometry.
+3.  **Cache**: Result JSON is written to `output/{jobId}/space_bboxes.json`.
+4.  **Render**: Frontend overlays translucent boxes in `SpaceBboxOverlay`.
 
 ## 5. Dependencies
 

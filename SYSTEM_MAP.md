@@ -32,10 +32,14 @@ graph TD
         IFCConv["IfcConvert (Geometry)"]
         MetaExt[Metadata Extractor]
         ECCalc[EC Calculator]
+        HvacCore["HVAC/FM Core"]
+        SpaceBBox["Space BBox Extractor"]
         
         Router --> IFCConv
         Router --> MetaExt
         Router --> ECCalc
+        Router --> HvacCore
+        Router --> SpaceBBox
     end
 
     subgraph "Data Layer"
@@ -43,6 +47,8 @@ graph TD
         GLBFiles[Processed GLB]
         JSONMeta[JSON Metadata]
         ECDB["EC Database (CSV)"]
+        HVACJson[HVAC/FM JSON]
+        SpaceBBoxJson[Space BBoxes JSON]
         
         IFCConv -- Reads --> IFCFiles
         IFCConv -- Writes --> GLBFiles
@@ -52,6 +58,12 @@ graph TD
         
         ECCalc -- Reads --> IFCFiles
         ECCalc -- Reads --> ECDB
+
+        HvacCore -- Reads --> IFCFiles
+        HvacCore -- Writes --> HVACJson
+
+        SpaceBBox -- Reads --> IFCFiles
+        SpaceBBox -- Writes --> SpaceBBoxJson
     end
 ```
 
@@ -66,6 +78,8 @@ graph LR
         Main[main.py]
         Core[ec_core.py]
         API[ec_api.py]
+        FmCore[fm_hvac_core.py]
+        FmAPI[fm_api.py]
         DB[prac-database.csv]
         Uploads[uploads/]
         Output[output/]
@@ -73,6 +87,8 @@ graph LR
         BE --> Main
         BE --> Core
         BE --> API
+        BE --> FmCore
+        BE --> FmAPI
         BE --> DB
         BE --> Uploads
         BE --> Output
@@ -84,11 +100,15 @@ graph LR
         Comps[components/]
         Viewer[Viewer.jsx]
         Panel[EcPanel.jsx]
+        HvacPanel[HvacFmPanel.jsx]
+        SpaceOverlay[SpaceBboxOverlay.jsx]
         
         FE --> Src
         Src --> Comps
         Comps --> Viewer
         Comps --> Panel
+        Comps --> HvacPanel
+        Comps --> SpaceOverlay
     end
     
     Root --> Backend
@@ -132,4 +152,37 @@ sequenceDiagram
     Core-->>API: Return Results
     API-->>UI: JSON Data
     UI->>User: Display Charts & Stats
+```
+
+### 3. HVAC/FM Analysis
+```mermaid
+sequenceDiagram
+    participant User
+    participant UI as Frontend
+    participant API as Backend API
+    participant Core as HVAC/FM Core
+
+    User->>UI: Click "Analyze HVAC FM"
+    UI->>API: POST /api/fm/hvac/analyze/{job_id}
+    API->>Core: Traverse equipment -> terminals -> spaces
+    Core-->>API: Cache hvac_fm.json
+    UI->>API: GET /api/fm/hvac/{job_id}
+    API-->>UI: JSON Data
+    UI->>User: Display served spaces and terminals
+```
+
+### 4. Space BBox Overlay
+```mermaid
+sequenceDiagram
+    participant User
+    participant UI as Frontend
+    participant API as Backend API
+    participant BBox as Space BBox Extractor
+
+    User->>UI: Toggle "Spaces"
+    UI->>API: GET /api/spaces/bboxes/{job_id}
+    API->>BBox: Compute bboxes
+    BBox-->>API: Cache space_bboxes.json
+    API-->>UI: JSON Data
+    UI->>User: Render translucent space boxes
 ```
