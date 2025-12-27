@@ -29,6 +29,9 @@ function ViewerToolbar({
   onResetView,
   onFitToModel,
   onOpenEcPanel,
+  onOpenHvacPanel,
+  onToggleSpaceOverlay,
+  spaceOverlayEnabled,
   hasModel
 }) {
   const [viewMenuOpen, setViewMenuOpen] = useState(false)
@@ -143,6 +146,38 @@ function ViewerToolbar({
         </button>
       )}
 
+      {/* HVAC/FM Button */}
+      {hasModel && (
+        <button
+          style={styles.toolButton}
+          onClick={onOpenHvacPanel}
+          title="Analyze HVAC/FM"
+        >
+          <FanIcon />
+          <span style={styles.toolLabel}>HVAC/FM</span>
+        </button>
+      )}
+
+      {/* Spaces Overlay Toggle */}
+      {hasModel && (
+        <button
+          style={{
+            ...styles.toolButton,
+            ...(spaceOverlayEnabled ? styles.toolButtonActive : {})
+          }}
+          onClick={onToggleSpaceOverlay}
+          title="Show Spaces"
+        >
+          <BoxIcon active={spaceOverlayEnabled} />
+          <span style={{
+            ...styles.toolLabel,
+            ...(spaceOverlayEnabled ? styles.toolLabelActive : {})
+          }}>
+            Spaces
+          </span>
+        </button>
+      )}
+
       {/* Clear Section Plane Button - only show when there's an active plane */}
       {hasSectionPlane && (
         <button
@@ -221,6 +256,52 @@ function LeafIcon() {
     >
       <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z" />
       <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" />
+    </svg>
+  )
+}
+
+/**
+ * Fan Icon - For HVAC/FM
+ */
+function FanIcon() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="#1d1d1f"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="2" />
+      <path d="M12 4c2 0 3 1 3 3-2 0-3 1-3 3-2 0-3-1-3-3 0-2 1-3 3-3Z" />
+      <path d="M20 12c0 2-1 3-3 3 0-2-1-3-3-3 0-2 1-3 3-3 2 0 3 1 3 3Z" />
+      <path d="M12 20c-2 0-3-1-3-3 2 0 3-1 3-3 2 0 3 1 3 3 0 2-1 3-3 3Z" />
+      <path d="M4 12c0-2 1-3 3-3 0 2 1 3 3 3 0 2-1 3-3 3-2 0-3-1-3-3Z" />
+    </svg>
+  )
+}
+
+/**
+ * Box Icon - For space overlays
+ */
+function BoxIcon({ active }) {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={active ? '#ffffff' : '#1d1d1f'}
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M3 7l9-4 9 4-9 4-9-4z" />
+      <path d="M3 7v10l9 4 9-4V7" />
+      <path d="M12 11v10" />
     </svg>
   )
 }

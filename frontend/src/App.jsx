@@ -12,6 +12,8 @@ import SectionPlanePanel from './components/SectionPlanePanel'
 import SectionPlaneHelper from './components/SectionPlaneHelper'
 import KeyboardHints from './components/KeyboardHints'
 import EcPanel from './components/EcPanel'
+import HvacFmPanel from './components/HvacFmPanel'
+import SpaceBboxOverlay from './components/SpaceBboxOverlay'
 import { useToast } from './components/Toast'
 import useSelection from './hooks/useSelection'
 import useVisibility from './hooks/useVisibility'
@@ -32,9 +34,15 @@ function App() {
   const [modelUrls, setModelUrls] = useState(null)
   const [jobId, setJobId] = useState(null)
   const [ecPanelOpen, setEcPanelOpen] = useState(false)
+  const [hvacPanelOpen, setHvacPanelOpen] = useState(false)
+  const [spaceOverlayEnabled, setSpaceOverlayEnabled] = useState(false)
+  const [highlightedSpaceIds, setHighlightedSpaceIds] = useState([])
+  const [spaceOverlayStatus, setSpaceOverlayStatus] = useState({ hasSpaces: false, count: 0, error: null })
+  const lastSpaceToastRef = useRef({ jobId: null, type: null })
   // Panel stacking counter used to bring panels to front when focused
   const [panelZCounter, setPanelZCounter] = useState(1000)
   const [ecPanelZIndex, setEcPanelZIndex] = useState(1000)
+  const [hvacPanelZIndex, setHvacPanelZIndex] = useState(1000)
 
   // Selection state management
   const { selectedId, handleSelect, deselect, setScene: setSelectionScene, selectById } = useSelection()
@@ -94,6 +102,7 @@ function App() {
     resetView,
     fitToModel,
     getAvailableViews,
+    getModelBounds,
     invalidateBoundsCache
   } = useViewMode()
   
@@ -125,6 +134,7 @@ function App() {
   const cameraRef = useRef(null)
   const glRef = useRef(null)
   const controlsRef = useRef(null)
+  const pendingFitRef = useRef(false)
 
   /**
    * Handle model ready after upload
@@ -135,8 +145,11 @@ function App() {
     setJobId(urls.jobId)
     // Reset section mode when loading a new model
     setSectionMode(false)
+    setSpaceOverlayEnabled(false)
     // Invalidate bounds cache for new model
     invalidateBoundsCache()
+    // Auto-fit once the model and controls are ready
+    pendingFitRef.current = true
   }, [setSectionMode, invalidateBoundsCache])
 
   /**
@@ -159,8 +172,15 @@ function App() {
       setSectionRenderer(gl)
       glRef.current = gl
     }
+    if (pendingFitRef.current) {
+      const bounds = getModelBounds(true)
+      if (bounds && cameraRef.current && controlsRef.current) {
+        fitToModel()
+        pendingFitRef.current = false
+      }
+    }
     console.log('Scene registered with visibility, section, selection, X-ray, focus, and view mode controllers')
-  }, [setScene, setSectionScene, setSelectionScene, setXRayScene, setFocusScene, setViewModeScene, setSectionCamera, setFocusCamera, setViewModeCamera, setSectionRenderer])
+  }, [setScene, setSectionScene, setSelectionScene, setXRayScene, setFocusScene, setViewModeScene, setSectionCamera, setFocusCamera, setViewModeCamera, setSectionRenderer, fitToModel, getModelBounds])
 
   /**
    * Handle renderer ready from Viewer
@@ -185,8 +205,15 @@ function App() {
     setFocusControls(controls)
     setViewModeControls(controls)
     controlsRef.current = controls
+    if (pendingFitRef.current) {
+      const bounds = getModelBounds(true)
+      if (bounds && cameraRef.current && controlsRef.current) {
+        fitToModel()
+        pendingFitRef.current = false
+      }
+    }
     console.log('Orbit controls ready')
-  }, [setSectionControls, setFocusControls, setViewModeControls])
+  }, [setSectionControls, setFocusControls, setViewModeControls, fitToModel, getModelBounds])
 
   /**
    * Clear all selection and X-ray mode
@@ -204,6 +231,14 @@ function App() {
    */
   const handleCloseEcPanel = useCallback(() => {
     setEcPanelOpen(false)
+    disableXRay()
+  }, [disableXRay])
+
+  /**
+   * Close HVAC/FM panel and disable X-ray mode
+   */
+  const handleCloseHvacPanel = useCallback(() => {
+    setHvacPanelOpen(false)
     disableXRay()
   }, [disableXRay])
 
@@ -368,6 +403,122 @@ function App() {
     }
   }, [selectById, focusOnElements, showToast, enableXRay, disableXRay, isolatedIds])
 
+  const handleHvacSelectDetail = useCallback((payload) => {
+    if (!payload) return
+    const ids = [payload.equipmentId, ...(payload.terminalIds || [])].filter(Boolean)
+    if (ids.length === 0) return
+
+    showAll()
+    enableXRay(ids)
+    selectById(ids)
+
+    if (spaceOverlayEnabled) {
+      setHighlightedSpaceIds((payload.spaceIds || []).filter(Boolean))
+    } else {
+      setHighlightedSpaceIds([])
+    }
+
+    lastSelectedIdsRef.current = ids
+    const result = focusOnElements(ids)
+    if (!result.found) {
+      showToast('No geometry found for selected equipment', 'warning')
+    }
+  }, [showAll, enableXRay, selectById, focusOnElements, showToast, spaceOverlayEnabled])
+
+  useEffect(() => {
+    if (!spaceOverlayEnabled) {
+      setHighlightedSpaceIds([])
+    }
+  }, [spaceOverlayEnabled])
+
+  useEffect(() => {
+    if (!spaceOverlayEnabled) return
+    if (spaceOverlayStatus.error) {
+      if (lastSpaceToastRef.current.jobId !== jobId || lastSpaceToastRef.current.type !== 'error') {
+        showToast(`Spaces overlay error: ${spaceOverlayStatus.error}`, 'warning')
+        lastSpaceToastRef.current = { jobId, type: 'error' }
+      }
+      return
+    }
+    if (!spaceOverlayStatus.hasSpaces) {
+      if (lastSpaceToastRef.current.jobId !== jobId || lastSpaceToastRef.current.type !== 'empty') {
+        showToast('No spaces found in this model.', 'info', 2500)
+        lastSpaceToastRef.current = { jobId, type: 'empty' }
+      }
+    }
+  }, [spaceOverlayEnabled, spaceOverlayStatus, showToast])
+
+  const spaceElementMapRef = useRef(new Map())
+
+  useEffect(() => {
+    if (!modelUrls?.hierarchyUrl) {
+      spaceElementMapRef.current = new Map()
+      return
+    }
+
+    fetch(modelUrls.hierarchyUrl)
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to load hierarchy')
+        return res.json()
+      })
+      .then(data => {
+        const map = new Map()
+
+        const isSpatialNode = (nodeType) => {
+          return nodeType === 'IfcProject'
+            || nodeType === 'IfcSite'
+            || nodeType === 'IfcBuilding'
+            || nodeType === 'IfcBuildingStorey'
+            || nodeType === 'IfcSpace'
+        }
+
+        const collectElementIds = (node) => {
+          const ids = []
+          const stack = [node]
+          while (stack.length) {
+            const current = stack.pop()
+            if (!current) continue
+            if (current.globalId && !isSpatialNode(current.type) && current.type !== 'Category') {
+              ids.push(current.globalId)
+            }
+            if (current.children) {
+              current.children.forEach(child => stack.push(child))
+            }
+          }
+          return ids
+        }
+
+        const traverse = (node) => {
+          if (!node) return
+          if (node.type === 'IfcSpace' && node.globalId) {
+            map.set(node.globalId, collectElementIds(node))
+          }
+          if (node.children) {
+            node.children.forEach(child => traverse(child))
+          }
+        }
+
+        traverse(data)
+        spaceElementMapRef.current = map
+      })
+      .catch(() => {
+        spaceElementMapRef.current = new Map()
+      })
+  }, [modelUrls])
+
+  const handleSpaceSelect = useCallback((spaceGlobalId) => {
+    if (!spaceGlobalId) return
+    const elementIds = spaceElementMapRef.current.get(spaceGlobalId) || []
+    if (elementIds.length === 0) {
+      showToast('No elements found for this space', 'info')
+      return
+    }
+
+    handleIsolate(elementIds, { behavior: 'FOCUS' })
+    selectById(elementIds)
+    lastSelectedIdsRef.current = elementIds
+  }, [handleIsolate, selectById, showToast])
+
   /**
    * Handle section pick from model click
    */
@@ -503,6 +654,30 @@ function App() {
                 return next
               })
             }}
+            onOpenHvacPanel={() => {
+              if (!hvacPanelOpen) {
+                setHvacPanelOpen(true)
+                setPanelZCounter(prev => {
+                  const next = prev + 1
+                  setHvacPanelZIndex(next)
+                  return next
+                })
+                return
+              }
+
+              if (hvacPanelZIndex === panelZCounter) {
+                handleCloseHvacPanel()
+                return
+              }
+
+              setPanelZCounter(prev => {
+                const next = prev + 1
+                setHvacPanelZIndex(next)
+                return next
+              })
+            }}
+            onToggleSpaceOverlay={() => setSpaceOverlayEnabled(prev => !prev)}
+            spaceOverlayEnabled={spaceOverlayEnabled}
             hasModel={!!modelUrls}
           />
           
@@ -543,6 +718,14 @@ function App() {
               position={[0, 0, 0]}
               scale={1}
             />
+
+          <SpaceBboxOverlay
+              enabled={spaceOverlayEnabled}
+              jobId={jobId}
+              onSpaceSelect={handleSpaceSelect}
+              highlightedSpaceIds={highlightedSpaceIds}
+              onStatus={setSpaceOverlayStatus}
+            />
           </Viewer>
           
           {/* Upload new model button */}
@@ -553,6 +736,9 @@ function App() {
               setModelUrls(null)
               setJobId(null)
               handleCloseEcPanel()
+              handleCloseHvacPanel()
+              setSpaceOverlayEnabled(false)
+              setHighlightedSpaceIds([])
               clearAll()
             }}
           />
@@ -565,6 +751,15 @@ function App() {
             onSelectContributor={handleTreeSelect}
             focusToken={ecPanelZIndex}
             zIndex={ecPanelZIndex}
+          />
+
+          <HvacFmPanel
+            isOpen={hvacPanelOpen}
+            onClose={handleCloseHvacPanel}
+            jobId={jobId}
+            onSelectEquipment={handleHvacSelectDetail}
+            focusToken={hvacPanelZIndex}
+            zIndex={hvacPanelZIndex}
           />
 
           {/* Keyboard shortcuts hints */}

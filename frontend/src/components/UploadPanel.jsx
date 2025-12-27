@@ -1,5 +1,33 @@
 import React, { useState, useCallback } from 'react'
 
+const STAGE_LABELS = {
+  queued: 'Queued for processing...',
+  converting_glb: 'Converting geometry to GLB...',
+  extracting_metadata: 'Extracting metadata...',
+  extracting_hierarchy: 'Building spatial hierarchy...',
+  finalizing: 'Finalizing outputs...',
+  completed: 'Finalizing outputs...'
+}
+
+const STAGE_HINTS = {
+  queued: 'Waiting for a worker to start...',
+  converting_glb: 'Generating viewable geometry from the IFC file.',
+  extracting_metadata: 'Reading BIM properties and attributes.',
+  extracting_hierarchy: 'Building the navigation tree.',
+  finalizing: 'Writing output files to disk.'
+}
+
+const normalizeStage = (stage, status) => {
+  if (stage) return stage
+  if (status === 'pending') return 'queued'
+  return null
+}
+
+const getStageLabel = (stage, status) => {
+  if (stage && STAGE_LABELS[stage]) return STAGE_LABELS[stage]
+  return `Processing... (${status})`
+}
+
 /**
  * UploadPanel Component - Arctic Zen Minimalist Design
  * 
@@ -14,6 +42,7 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
   const [isDragging, setIsDragging] = useState(false)
   const [uploadState, setUploadState] = useState('idle') // idle, uploading, processing, error
   const [progress, setProgress] = useState('')
+  const [jobStage, setJobStage] = useState(null)
   const [error, setError] = useState(null)
 
   const API_URL = 'http://localhost:8000'
@@ -22,10 +51,10 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
    * Poll job status until complete
    */
   const pollJobStatus = useCallback(async (jobId) => {
-    const maxAttempts = 120 // 2 minutes max
-    let attempts = 0
+    const maxDurationMs = 30 * 60 * 1000 // 30 minutes max
+    const startTime = Date.now()
 
-    while (attempts < maxAttempts) {
+    while (Date.now() - startTime < maxDurationMs) {
       try {
         const response = await fetch(`${API_URL}/job/${jobId}`)
         const job = await response.json()
@@ -42,17 +71,18 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
         } else if (job.status === 'failed') {
           throw new Error(job.error || 'Processing failed')
         } else {
-          setProgress(`Processing... (${job.status})`)
+          const normalizedStage = normalizeStage(job.stage, job.status)
+          setJobStage(normalizedStage)
+          setProgress(getStageLabel(normalizedStage, job.status))
         }
       } catch (err) {
         throw err
       }
 
-      attempts++
       await new Promise(resolve => setTimeout(resolve, 1000))
     }
 
-    throw new Error('Processing timeout')
+    throw new Error('Processing timeout after 30 minutes')
   }, [API_URL, onModelReady])
 
   /**
@@ -67,6 +97,7 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
     setUploadState('uploading')
     setError(null)
     setProgress('Uploading...')
+    setJobStage(null)
 
     try {
       const formData = new FormData()
@@ -85,6 +116,7 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
       const job = await response.json()
       setUploadState('processing')
       setProgress(`Processing ${file.name}...`)
+      setJobStage('queued')
 
       // Poll for completion
       await pollJobStatus(job.job_id)
@@ -93,6 +125,7 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
       console.error('Upload error:', err)
       setError(err.message || 'Upload failed')
       setUploadState('error')
+      setJobStage(null)
     }
   }, [API_URL, pollJobStatus])
 
@@ -139,6 +172,7 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
     setUploadState('idle')
     setError(null)
     setProgress('')
+    setJobStage(null)
     if (onReset) onReset()
   }
 
@@ -260,9 +294,13 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
                 <div style={styles.processing}>
                   <div style={styles.spinner}></div>
                   <p style={styles.progressText}>{progress}</p>
-                  <p style={styles.hint}>
-                    {uploadState === 'processing' && 'Converting geometry and extracting metadata...'}
-                  </p>
+                  {uploadState === 'processing' && (
+                    <p style={styles.hint}>
+                      {jobStage && STAGE_HINTS[jobStage]
+                        ? STAGE_HINTS[jobStage]
+                        : 'Processing can take several minutes for large models.'}
+                    </p>
+                  )}
                 </div>
               )}
 

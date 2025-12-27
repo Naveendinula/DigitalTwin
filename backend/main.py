@@ -23,6 +23,7 @@ from ifc_converter import convert_ifc_to_glb
 from ifc_metadata_extractor import extract_metadata, save_metadata
 from ifc_spatial_hierarchy import extract_spatial_hierarchy, save_hierarchy
 from ec_api import router as ec_router
+from fm_api import router as fm_router
 from config import UPLOAD_DIR, OUTPUT_DIR, ALLOWED_EXTENSIONS, MAX_FILE_SIZE
 
 
@@ -39,6 +40,7 @@ app = FastAPI(
 
 # Include EC router
 app.include_router(ec_router)
+app.include_router(fm_router)
 
 # Enable CORS for frontend
 app.add_middleware(
@@ -59,11 +61,20 @@ class JobStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
 
+class JobStage(str, Enum):
+    QUEUED = "queued"
+    CONVERTING_GLB = "converting_glb"
+    EXTRACTING_METADATA = "extracting_metadata"
+    EXTRACTING_HIERARCHY = "extracting_hierarchy"
+    FINALIZING = "finalizing"
+    COMPLETED = "completed"
+    FAILED = "failed"
 
 class ConversionJob(BaseModel):
     job_id: str
     status: JobStatus
     ifc_filename: str
+    stage: Optional[JobStage] = None
     glb_url: Optional[str] = None
     metadata_url: Optional[str] = None
     hierarchy_url: Optional[str] = None
@@ -98,6 +109,7 @@ async def process_ifc_file(job_id: str, ifc_path: Path) -> None:
     
     try:
         job.status = JobStatus.PROCESSING
+        job.stage = JobStage.CONVERTING_GLB
         
         # Create output directory for this job
         job_output_dir = OUTPUT_DIR / job_id
@@ -121,6 +133,7 @@ async def process_ifc_file(job_id: str, ifc_path: Path) -> None:
         )
         
         # 2. Extract metadata
+        job.stage = JobStage.EXTRACTING_METADATA
         print(f"[{job_id}] Extracting metadata...")
         metadata = await loop.run_in_executor(
             None,
@@ -135,6 +148,7 @@ async def process_ifc_file(job_id: str, ifc_path: Path) -> None:
         )
         
         # 3. Extract spatial hierarchy
+        job.stage = JobStage.EXTRACTING_HIERARCHY
         print(f"[{job_id}] Extracting spatial hierarchy...")
         hierarchy = await loop.run_in_executor(
             None,
@@ -149,7 +163,9 @@ async def process_ifc_file(job_id: str, ifc_path: Path) -> None:
         )
         
         # Update job with URLs
+        job.stage = JobStage.FINALIZING
         job.status = JobStatus.COMPLETED
+        job.stage = JobStage.COMPLETED
         job.glb_url = f"/files/{job_id}/model.glb"
         job.metadata_url = f"/files/{job_id}/metadata.json"
         job.hierarchy_url = f"/files/{job_id}/hierarchy.json"
@@ -159,6 +175,7 @@ async def process_ifc_file(job_id: str, ifc_path: Path) -> None:
     except Exception as e:
         print(f"[{job_id}] Processing failed: {e}")
         job.status = JobStatus.FAILED
+        job.stage = JobStage.FAILED
         job.error = str(e)
     
     finally:
@@ -200,6 +217,7 @@ async def upload_ifc(
     job = ConversionJob(
         job_id=job_id,
         status=JobStatus.PENDING,
+        stage=JobStage.QUEUED,
         ifc_filename=file.filename
     )
     jobs[job_id] = job
