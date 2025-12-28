@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useMemo } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import * as THREE from 'three'
 
 /**
@@ -29,6 +29,10 @@ function useXRayMode() {
   
   // Cached X-ray material (shared instance for performance)
   const xRayMaterialRef = useRef(null)
+  const meshIndexRef = useRef(new Map())
+  const allMeshesRef = useRef([])
+  const selectedMeshesRef = useRef(new Set())
+  const xrayMeshesRef = useRef(new Set())
 
   /**
    * Get or create cached X-ray material
@@ -50,13 +54,40 @@ function useXRayMode() {
     return xRayMaterialRef.current
   }, [])
 
-  /**
-   * Create a clone of X-ray material (for individual mesh assignment)
-   * Cloning allows per-mesh material state if needed
-   */
-  const createXRayMaterial = useCallback(() => {
-    return getXRayMaterial().clone()
-  }, [getXRayMaterial])
+  const buildMeshIndex = useCallback((scene) => {
+    if (!scene) return
+
+    const index = new Map()
+    const meshes = []
+
+    scene.traverse((object) => {
+      if (!object.isMesh) return
+      meshes.push(object)
+
+      const keys = new Set()
+      if (object.name) keys.add(object.name)
+      if (object.userData?.GlobalId) keys.add(object.userData.GlobalId)
+
+      let ancestor = object.parent
+      let depth = 0
+      while (ancestor && depth < 5) {
+        if (ancestor.name) keys.add(ancestor.name)
+        if (ancestor.userData?.GlobalId) keys.add(ancestor.userData.GlobalId)
+        ancestor = ancestor.parent
+        depth++
+      }
+
+      keys.forEach((key) => {
+        if (!index.has(key)) {
+          index.set(key, new Set())
+        }
+        index.get(key).add(object)
+      })
+    })
+
+    meshIndexRef.current = index
+    allMeshesRef.current = meshes
+  }, [])
 
   /**
    * Check if a mesh matches any of the selected globalIds
@@ -129,15 +160,27 @@ function useXRayMode() {
       }
     } else {
       // Apply X-ray material for non-selected meshes
-      mesh.material = createXRayMaterial()
+      mesh.material = getXRayMaterial()
     }
-  }, [createXRayMaterial])
+  }, [getXRayMaterial])
 
   /**
    * Set scene reference
    */
   const setScene = useCallback((scene) => {
     sceneRef.current = scene
+    buildMeshIndex(scene)
+  }, [buildMeshIndex])
+
+  const getMeshesForIds = useCallback((idsSet) => {
+    const selectedMeshes = new Set()
+    idsSet.forEach((id) => {
+      const meshes = meshIndexRef.current.get(id)
+      if (meshes) {
+        meshes.forEach(mesh => selectedMeshes.add(mesh))
+      }
+    })
+    return selectedMeshes
   }, [])
 
   /**
@@ -155,11 +198,21 @@ function useXRayMode() {
     
     console.log('Enabling X-ray mode, selected IDs:', selectedIds)
     
-    // Traverse scene and apply X-ray effect
-    sceneRef.current.traverse((object) => {
-      if (object.isMesh) {
-        const isSelected = isMeshSelected(object, idsSet)
-        setXRayForMesh(object, isSelected)
+    if (!meshIndexRef.current.size || !allMeshesRef.current.length) {
+      buildMeshIndex(sceneRef.current)
+    }
+
+    const selectedMeshes = getMeshesForIds(idsSet)
+    selectedMeshesRef.current = new Set()
+    xrayMeshesRef.current = new Set()
+
+    allMeshesRef.current.forEach((mesh) => {
+      const isSelected = selectedMeshes.has(mesh)
+      setXRayForMesh(mesh, isSelected)
+      if (isSelected) {
+        selectedMeshesRef.current.add(mesh)
+      } else {
+        xrayMeshesRef.current.add(mesh)
       }
     })
     
@@ -207,6 +260,8 @@ function useXRayMode() {
     // Clear the stored materials
     originalMaterialsRef.current.clear()
     selectedIdsRef.current.clear()
+    selectedMeshesRef.current.clear()
+    xrayMeshesRef.current.clear()
     
     setXRayEnabled(false)
   }, [])
@@ -220,43 +275,49 @@ function useXRayMode() {
     if (!xRayEnabled || !sceneRef.current) return
     
     const idsSet = new Set(selectedIds)
-    selectedIdsRef.current = idsSet
-    
-    // Re-apply X-ray with new selection
-    sceneRef.current.traverse((object) => {
-      if (object.isMesh) {
-        const isSelected = isMeshSelected(object, idsSet)
-        
-        // Get stored original material
-        // Prefer userData.originalMaterial
-        const originalMat = object.userData.originalMaterial || (originalMaterialsRef.current.get(object.uuid)?.material)
-        
-        if (!originalMat) return
-        
-        if (isSelected) {
-          // If another system already applied a highlight, keep it
-          if (object.material?.userData?.isHighlight) {
-            return
-          }
-          // Restore original material
-          if (object.material !== originalMat) {
-            // Dispose if it's X-ray
-            if (object.material.userData?.isXRay && object.material.dispose) {
-                 if (object.material !== xRayMaterialRef.current) {
-                    object.material.dispose()
-                 }
-            }
-            object.material = originalMat
-          }
-        } else {
-          // Apply X-ray material
-          if (!object.material.wireframe) {
-            object.material = createXRayMaterial()
-          }
+    if (idsSet.size === selectedIdsRef.current.size) {
+      let unchanged = true
+      idsSet.forEach(id => {
+        if (!selectedIdsRef.current.has(id)) {
+          unchanged = false
         }
+      })
+      if (unchanged) return
+    }
+    selectedIdsRef.current = idsSet
+
+    if (!meshIndexRef.current.size || !allMeshesRef.current.length) {
+      buildMeshIndex(sceneRef.current)
+    }
+
+    let nextSelectedMeshes = getMeshesForIds(idsSet)
+    if (selectedIds.length > 0 && nextSelectedMeshes.size === 0) {
+      nextSelectedMeshes = new Set()
+      allMeshesRef.current.forEach((mesh) => {
+        if (isMeshSelected(mesh, idsSet)) {
+          nextSelectedMeshes.add(mesh)
+        }
+      })
+    }
+
+    const prevSelected = selectedMeshesRef.current
+    const prevSelectedArray = Array.from(prevSelected)
+    prevSelectedArray.forEach((mesh) => {
+      if (!nextSelectedMeshes.has(mesh)) {
+        setXRayForMesh(mesh, false)
+        prevSelected.delete(mesh)
+        xrayMeshesRef.current.add(mesh)
       }
     })
-  }, [xRayEnabled, isMeshSelected, createXRayMaterial])
+
+    nextSelectedMeshes.forEach((mesh) => {
+      if (!prevSelected.has(mesh)) {
+        setXRayForMesh(mesh, true)
+        prevSelected.add(mesh)
+        xrayMeshesRef.current.delete(mesh)
+      }
+    })
+  }, [xRayEnabled, isMeshSelected, setXRayForMesh, buildMeshIndex, getMeshesForIds])
 
   /**
    * Toggle X-ray mode

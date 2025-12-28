@@ -62,6 +62,7 @@ function SpaceBboxOverlay({ enabled, jobId, onSpaceSelect, highlightedSpaceIds =
       opacity: 0.15,
       depthWrite: false,
       depthTest: false,
+      side: THREE.DoubleSide,
     })
   }, [])
   const highlightMaterial = useMemo(() => {
@@ -71,6 +72,7 @@ function SpaceBboxOverlay({ enabled, jobId, onSpaceSelect, highlightedSpaceIds =
       opacity: 0.35,
       depthWrite: false,
       depthTest: false,
+      side: THREE.DoubleSide,
     })
   }, [])
 
