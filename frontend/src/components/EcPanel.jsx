@@ -141,9 +141,11 @@ function EcPanel({ isOpen, onClose, jobId, selectedId, onSelectContributor, focu
     if (isDragging) {
       window.addEventListener('mousemove', handleMouseMove)
       window.addEventListener('mouseup', handleMouseUp)
+      document.body.style.userSelect = 'none'
     } else if (isResizing) {
       window.addEventListener('mousemove', handleResizeMouseMove)
       window.addEventListener('mouseup', handleResizeMouseUp)
+      document.body.style.userSelect = 'none'
     }
     
     return () => {
@@ -151,6 +153,7 @@ function EcPanel({ isOpen, onClose, jobId, selectedId, onSelectContributor, focu
       window.removeEventListener('mouseup', handleMouseUp)
       window.removeEventListener('mousemove', handleResizeMouseMove)
       window.removeEventListener('mouseup', handleResizeMouseUp)
+      document.body.style.userSelect = ''
     }
   }, [isDragging, isResizing])
 
@@ -663,7 +666,7 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     height: '100%',
-    paddingBottom: '40px',
+    gap: '12px',
   },
   description: {
     color: '#424245',

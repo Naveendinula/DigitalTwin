@@ -67,25 +67,40 @@ function useSectionMode() {
   
   // Store original material clipping planes for restoration
   const originalClippingPlanesRef = useRef(new Map())
+  const initialPlaneSizeRef = useRef(false)
+  const sizeInitTimerRef = useRef(null)
+  const lastSceneRef = useRef(null)
 
   /**
    * Set the scene reference for raycasting and calculate initial plane size
    */
   const setScene = useCallback((scene) => {
     sceneRef.current = scene
-    
-    // Calculate initial plane size based on scene bounds
-    if (scene) {
-      // Small timeout to ensure scene graph is updated
-      setTimeout(() => {
-        const bounds = computeSceneBounds(scene)
-        if (bounds && bounds.maxDimension > 0) {
-          // Use max dimension * 1.5 to ensure it covers the model comfortably
-          setSectionPlaneSize(bounds.maxDimension * 1.5)
-          console.log('Section plane size set to:', bounds.maxDimension * 1.5)
-        }
-      }, 100)
+    if (!scene) return
+
+    if (lastSceneRef.current !== scene) {
+      lastSceneRef.current = scene
+      initialPlaneSizeRef.current = false
     }
+
+    if (initialPlaneSizeRef.current) return
+
+    if (sizeInitTimerRef.current) {
+      clearTimeout(sizeInitTimerRef.current)
+    }
+
+    // Calculate initial plane size based on scene bounds
+    // Only run once per scene to avoid feedback with the helper plane.
+    sizeInitTimerRef.current = setTimeout(() => {
+      if (!sceneRef.current || initialPlaneSizeRef.current) return
+      const bounds = computeSceneBounds(sceneRef.current)
+      if (bounds && bounds.maxDimension > 0) {
+        // Use max dimension * 1.5 to ensure it covers the model comfortably
+        setSectionPlaneSize(bounds.maxDimension * 1.5)
+        initialPlaneSizeRef.current = true
+        console.log('Section plane size set to:', bounds.maxDimension * 1.5)
+      }
+    }, 100)
   }, [])
 
   /**

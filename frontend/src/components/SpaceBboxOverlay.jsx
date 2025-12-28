@@ -15,7 +15,7 @@ const getSpaceLabel = (space) => {
  *
  * Renders translucent bbox overlays for IfcSpace elements.
  */
-function SpaceBboxOverlay({ enabled, jobId, onSpaceSelect, highlightedSpaceIds = [], onStatus }) {
+function SpaceBboxOverlay({ enabled, jobId, onSpaceSelect, highlightedSpaceIds = [], onStatus, selectedSpaceId, onSpacesLoaded }) {
   const [spaces, setSpaces] = useState([])
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -38,6 +38,7 @@ function SpaceBboxOverlay({ enabled, jobId, onSpaceSelect, highlightedSpaceIds =
         const nextSpaces = Array.isArray(data.spaces) ? data.spaces : []
         setSpaces(nextSpaces)
         onStatus?.({ hasSpaces: nextSpaces.length > 0, count: nextSpaces.length, error: null, loading: false, checked: true })
+        onSpacesLoaded?.(nextSpaces)
       })
       .catch(err => {
         if (!isMounted) return
@@ -67,9 +68,9 @@ function SpaceBboxOverlay({ enabled, jobId, onSpaceSelect, highlightedSpaceIds =
   }, [])
   const highlightMaterial = useMemo(() => {
     return new THREE.MeshBasicMaterial({
-      color: 0x00d4ff,
+      color: 0xff5500, // High contrast orange-red
       transparent: true,
-      opacity: 0.35,
+      opacity: 0.4,
       depthWrite: false,
       depthTest: false,
       side: THREE.DoubleSide,
@@ -117,7 +118,7 @@ function SpaceBboxOverlay({ enabled, jobId, onSpaceSelect, highlightedSpaceIds =
     <group name="SpaceBboxOverlay">
       {spaceMeshes.map((entry) => {
         const { space, center, scale, matrix } = entry
-        const isHighlighted = space.globalId && highlightedSet.has(space.globalId)
+        const isHighlighted = (space.globalId && highlightedSet.has(space.globalId)) || (selectedSpaceId && space.globalId === selectedSpaceId)
         const label = getSpaceLabel(space)
 
         const mesh = (

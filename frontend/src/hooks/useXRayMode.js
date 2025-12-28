@@ -6,7 +6,7 @@ import * as THREE from 'three'
  * 
  * Implements X-ray/ghost effect for non-selected elements.
  * When enabled, non-selected meshes become semi-transparent wireframes
- * while selected meshes remain solid with their original materials.
+ * or ghosted solids while selected meshes remain solid with their original materials.
  * 
  * Performance optimizations:
  * - Cached X-ray material to avoid recreation
@@ -27,8 +27,10 @@ function useXRayMode() {
   // Currently selected IDs when X-ray is active
   const selectedIdsRef = useRef(new Set())
   
-  // Cached X-ray material (shared instance for performance)
+  // Cached X-ray materials (shared instances for performance)
   const xRayMaterialRef = useRef(null)
+  const ghostMaterialRef = useRef(null)
+  const xRayModeRef = useRef('wireframe')
   const meshIndexRef = useRef(new Map())
   const allMeshesRef = useRef([])
   const selectedMeshesRef = useRef(new Set())
@@ -36,9 +38,25 @@ function useXRayMode() {
 
   /**
    * Get or create cached X-ray material
-   * Dark blue-gray wireframe, very translucent
+   * Dark wireframe or ghosted solid depending on mode
    */
-  const getXRayMaterial = useCallback(() => {
+  const getXRayMaterial = useCallback((mode = xRayModeRef.current) => {
+    const resolvedMode = mode === 'ghost' ? 'ghost' : 'wireframe'
+    if (resolvedMode === 'ghost') {
+      if (!ghostMaterialRef.current) {
+        ghostMaterialRef.current = new THREE.MeshBasicMaterial({
+          color: 0x7f8799,        // Soft cool gray
+          wireframe: false,
+          transparent: true,
+          opacity: 0.15,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        })
+        ghostMaterialRef.current.userData = { isXRay: true, mode: 'ghost' }
+      }
+      return ghostMaterialRef.current
+    }
+
     if (!xRayMaterialRef.current) {
       xRayMaterialRef.current = new THREE.MeshBasicMaterial({
         color: 0x2a2a3e,        // Slightly lighter blue-gray
@@ -49,7 +67,7 @@ function useXRayMode() {
         side: THREE.DoubleSide,  // Visible from both sides
       })
       // Mark as X-ray material
-      xRayMaterialRef.current.userData = { isXRay: true }
+      xRayMaterialRef.current.userData = { isXRay: true, mode: 'wireframe' }
     }
     return xRayMaterialRef.current
   }, [])
@@ -122,7 +140,7 @@ function useXRayMode() {
    * @param {THREE.Mesh} mesh - The mesh to modify
    * @param {boolean} isSelected - Whether this mesh is selected
    */
-  const setXRayForMesh = useCallback((mesh, isSelected) => {
+  const setXRayForMesh = useCallback((mesh, isSelected, mode) => {
     if (!mesh.isMesh || !mesh.material) return
     
     // Skip meshes that are part of helpers, grids, etc.
@@ -160,7 +178,8 @@ function useXRayMode() {
       }
     } else {
       // Apply X-ray material for non-selected meshes
-      mesh.material = getXRayMaterial()
+      const resolvedMode = mode || xRayModeRef.current
+      mesh.material = getXRayMaterial(resolvedMode)
     }
   }, [getXRayMaterial])
 
@@ -187,16 +206,19 @@ function useXRayMode() {
    * Enable X-ray mode with selected elements
    * @param {string[]} selectedIds - Array of globalIds that should remain solid
    */
-  const enableXRay = useCallback((selectedIds = []) => {
+  const enableXRay = useCallback((selectedIds = [], options = {}) => {
     if (!sceneRef.current) {
       console.warn('useXRayMode: Scene not set')
       return
     }
+
+    const resolvedMode = options.mode === 'ghost' ? 'ghost' : 'wireframe'
+    xRayModeRef.current = resolvedMode
     
     const idsSet = new Set(selectedIds)
     selectedIdsRef.current = idsSet
     
-    console.log('Enabling X-ray mode, selected IDs:', selectedIds)
+    console.log('Enabling X-ray mode:', resolvedMode, 'selected IDs:', selectedIds)
     
     if (!meshIndexRef.current.size || !allMeshesRef.current.length) {
       buildMeshIndex(sceneRef.current)
@@ -208,7 +230,7 @@ function useXRayMode() {
 
     allMeshesRef.current.forEach((mesh) => {
       const isSelected = selectedMeshes.has(mesh)
-      setXRayForMesh(mesh, isSelected)
+      setXRayForMesh(mesh, isSelected, resolvedMode)
       if (isSelected) {
         selectedMeshesRef.current.add(mesh)
       } else {
@@ -217,7 +239,7 @@ function useXRayMode() {
     })
     
     setXRayEnabled(true)
-  }, [isMeshSelected, setXRayForMesh])
+  }, [buildMeshIndex, getMeshesForIds, setXRayForMesh])
 
   /**
    * Disable X-ray mode and restore all original materials
@@ -236,7 +258,7 @@ function useXRayMode() {
             if (mesh.material.userData?.isXRay && mesh.material.dispose) {
                 // Don't dispose the shared cached material!
                 // Only dispose if it's a clone
-                if (mesh.material !== xRayMaterialRef.current) {
+                if (mesh.material !== xRayMaterialRef.current && mesh.material !== ghostMaterialRef.current) {
                     mesh.material.dispose()
                 }
             }
@@ -271,8 +293,18 @@ function useXRayMode() {
    * Useful when selection changes while X-ray is active
    * @param {string[]} selectedIds - New array of selected globalIds
    */
-  const updateXRaySelection = useCallback((selectedIds = []) => {
+  const updateXRaySelection = useCallback((selectedIds = [], options = {}) => {
     if (!xRayEnabled || !sceneRef.current) return
+
+    const resolvedMode = options.mode === 'ghost' ? 'ghost' : options.mode === 'wireframe' ? 'wireframe' : xRayModeRef.current
+    if (resolvedMode !== xRayModeRef.current) {
+      xRayModeRef.current = resolvedMode
+      xrayMeshesRef.current.forEach((mesh) => {
+        if (mesh?.material?.userData?.isXRay) {
+          mesh.material = getXRayMaterial(resolvedMode)
+        }
+      })
+    }
     
     const idsSet = new Set(selectedIds)
     if (idsSet.size === selectedIdsRef.current.size) {
@@ -304,7 +336,7 @@ function useXRayMode() {
     const prevSelectedArray = Array.from(prevSelected)
     prevSelectedArray.forEach((mesh) => {
       if (!nextSelectedMeshes.has(mesh)) {
-        setXRayForMesh(mesh, false)
+        setXRayForMesh(mesh, false, resolvedMode)
         prevSelected.delete(mesh)
         xrayMeshesRef.current.add(mesh)
       }
@@ -312,22 +344,22 @@ function useXRayMode() {
 
     nextSelectedMeshes.forEach((mesh) => {
       if (!prevSelected.has(mesh)) {
-        setXRayForMesh(mesh, true)
+        setXRayForMesh(mesh, true, resolvedMode)
         prevSelected.add(mesh)
         xrayMeshesRef.current.delete(mesh)
       }
     })
-  }, [xRayEnabled, isMeshSelected, setXRayForMesh, buildMeshIndex, getMeshesForIds])
+  }, [xRayEnabled, isMeshSelected, setXRayForMesh, buildMeshIndex, getMeshesForIds, getXRayMaterial])
 
   /**
    * Toggle X-ray mode
    * @param {string[]} selectedIds - IDs to keep solid when enabling
    */
-  const toggleXRay = useCallback((selectedIds = []) => {
+  const toggleXRay = useCallback((selectedIds = [], options = {}) => {
     if (xRayEnabled) {
       disableXRay()
     } else {
-      enableXRay(selectedIds)
+      enableXRay(selectedIds, options)
     }
   }, [xRayEnabled, enableXRay, disableXRay])
 

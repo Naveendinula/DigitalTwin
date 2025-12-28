@@ -14,6 +14,7 @@ import KeyboardHints from './components/KeyboardHints'
 import EcPanel from './components/EcPanel'
 import HvacFmPanel from './components/HvacFmPanel'
 import SpaceBboxOverlay from './components/SpaceBboxOverlay'
+import SpaceNavigator from './components/SpaceNavigator'
 import { useToast } from './components/Toast'
 import useSelection from './hooks/useSelection'
 import useVisibility from './hooks/useVisibility'
@@ -38,6 +39,8 @@ function App() {
   const [spaceOverlayEnabled, setSpaceOverlayEnabled] = useState(false)
   const [highlightedSpaceIds, setHighlightedSpaceIds] = useState([])
   const [spaceOverlayStatus, setSpaceOverlayStatus] = useState({ hasSpaces: false, count: 0, error: null, loading: false, checked: false })
+  const [allSpaces, setAllSpaces] = useState([])
+  const [selectedSpaceIndex, setSelectedSpaceIndex] = useState(-1)
   const lastSpaceToastRef = useRef({ jobId: null, type: null })
   // Panel stacking counter used to bring panels to front when focused
   const [panelZCounter, setPanelZCounter] = useState(1000)
@@ -359,7 +362,7 @@ function App() {
       } else {
         // FOCUS: Ghost others (X-Ray)
         showAll() // Ensure everything is visible first
-        enableXRay(globalIds)
+        enableXRay(globalIds, { mode: 'wireframe' })
       }
       setIsolatedIds(globalIds)
     }
@@ -380,7 +383,7 @@ function App() {
         options = { color }
         
         // Enable X-ray to make others translucent
-        enableXRay(ids)
+        enableXRay(ids, { mode: 'wireframe' })
     } else {
         // Only disable X-ray if we're not in isolation mode
         if (!isolatedIds) {
@@ -423,7 +426,7 @@ function App() {
     if (ids.length === 0) return
 
     showAll()
-    enableXRay(ids)
+    enableXRay(ids, { mode: 'ghost' })
     selectById(ids)
 
     enableSpaceOverlayForSpaces(payload.spaceIds)
@@ -435,9 +438,43 @@ function App() {
     }
   }, [showAll, enableXRay, selectById, focusOnElements, showToast, enableSpaceOverlayForSpaces])
 
+  const handleSpacesLoaded = useCallback((spaces) => {
+    setAllSpaces(spaces)
+    // Reset selection when new spaces are loaded
+    setSelectedSpaceIndex(-1)
+  }, [])
+
+  const handleNextSpace = useCallback(() => {
+    if (allSpaces.length === 0) return
+    setSelectedSpaceIndex(prev => {
+      const next = prev + 1
+      return next >= allSpaces.length ? 0 : next
+    })
+  }, [allSpaces.length])
+
+  const handlePrevSpace = useCallback(() => {
+    if (allSpaces.length === 0) return
+    setSelectedSpaceIndex(prev => {
+      const next = prev - 1
+      return next < 0 ? allSpaces.length - 1 : next
+    })
+  }, [allSpaces.length])
+
+  // Focus on selected space when cycling
+  useEffect(() => {
+    if (selectedSpaceIndex >= 0 && allSpaces[selectedSpaceIndex]) {
+      const space = allSpaces[selectedSpaceIndex]
+      // Optional: Focus camera on space?
+      // For now, just let the overlay highlight it.
+      // If we want to focus:
+      // if (space.bbox) { ... logic to focus on bbox ... }
+    }
+  }, [selectedSpaceIndex, allSpaces])
+
   useEffect(() => {
     if (!spaceOverlayEnabled) {
       setHighlightedSpaceIds([])
+      setSelectedSpaceIndex(-1)
     }
   }, [spaceOverlayEnabled])
 
@@ -753,9 +790,18 @@ function App() {
           <SpaceBboxOverlay
               enabled={spaceOverlayEnabled}
               jobId={jobId}
-              onSpaceSelect={handleSpaceSelect}
+              onSpaceSelect={(id) => {
+                console.log('Space selected:', id)
+                // If we are in cycling mode (no highlighted subset), update the index
+                if (highlightedSpaceIds.length === 0 && allSpaces.length > 0) {
+                  const idx = allSpaces.findIndex(s => s.globalId === id)
+                  if (idx !== -1) setSelectedSpaceIndex(idx)
+                }
+              }}
               highlightedSpaceIds={highlightedSpaceIds}
               onStatus={setSpaceOverlayStatus}
+              selectedSpaceId={selectedSpaceIndex >= 0 && allSpaces[selectedSpaceIndex] ? allSpaces[selectedSpaceIndex].globalId : null}
+              onSpacesLoaded={handleSpacesLoaded}
             />
           </Viewer>
           
@@ -794,6 +840,20 @@ function App() {
             zIndex={hvacPanelZIndex}
             spaceOverlayLoading={spaceOverlayStatus.loading}
           />
+
+          {spaceOverlayEnabled && highlightedSpaceIds.length === 0 && allSpaces.length > 0 && (
+            <SpaceNavigator
+              currentIndex={selectedSpaceIndex >= 0 ? selectedSpaceIndex + 1 : 0}
+              totalCount={allSpaces.length}
+              currentName={
+                selectedSpaceIndex >= 0 && allSpaces[selectedSpaceIndex]
+                  ? `${allSpaces[selectedSpaceIndex].room_no || ''} ${allSpaces[selectedSpaceIndex].room_name || allSpaces[selectedSpaceIndex].name || ''}`.trim()
+                  : 'Select a space'
+              }
+              onNext={handleNextSpace}
+              onPrev={handlePrevSpace}
+            />
+          )}
 
           {/* Keyboard shortcuts hints */}
           <KeyboardHints />
