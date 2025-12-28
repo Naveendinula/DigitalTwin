@@ -1,5 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import * as THREE from 'three'
+import { Text } from '@react-three/drei'
+
+const getSpaceLabel = (space) => {
+  if (!space) return 'Unknown'
+  const roomNo = space.room_no || ''
+  const roomName = space.room_name || ''
+  const label = `${roomNo} ${roomName}`.trim()
+  return label || space.name || space.globalId || 'Unknown'
+}
 
 /**
  * SpaceBboxOverlay
@@ -68,7 +77,13 @@ function SpaceBboxOverlay({ enabled, jobId, onSpaceSelect, highlightedSpaceIds =
   const highlightedSet = useMemo(() => new Set(highlightedSpaceIds), [highlightedSpaceIds])
 
   const spaceMeshes = useMemo(() => {
-    return spaces.map((space) => {
+    // If highlightedSpaceIds is provided and not empty, filter to show only those spaces.
+    // Otherwise, show all spaces.
+    const spacesToShow = highlightedSpaceIds.length > 0
+      ? spaces.filter(s => highlightedSet.has(s.globalId))
+      : spaces
+
+    return spacesToShow.map((space) => {
       const min = space?.bbox?.min
       const max = space?.bbox?.max
       if (!min || !max) return null
@@ -92,7 +107,7 @@ function SpaceBboxOverlay({ enabled, jobId, onSpaceSelect, highlightedSpaceIds =
         matrix,
       }
     }).filter(Boolean)
-  }, [spaces])
+  }, [spaces, highlightedSet, highlightedSpaceIds.length])
 
   if (!enabled || loading || error || spaceMeshes.length === 0) return null
 
@@ -101,6 +116,8 @@ function SpaceBboxOverlay({ enabled, jobId, onSpaceSelect, highlightedSpaceIds =
       {spaceMeshes.map((entry) => {
         const { space, center, scale, matrix } = entry
         const isHighlighted = space.globalId && highlightedSet.has(space.globalId)
+        const label = getSpaceLabel(space)
+
         const mesh = (
           <mesh
             key={space.globalId || `${center[0]}-${center[1]}-${center[2]}`}
@@ -115,13 +132,35 @@ function SpaceBboxOverlay({ enabled, jobId, onSpaceSelect, highlightedSpaceIds =
           />
         )
 
+        const labelElement = (
+          <Text
+            key={`${space.globalId}-label`}
+            position={[center[0], center[1] + scale[1] / 2 + 0.2, center[2]]}
+            fontSize={0.5}
+            color="black"
+            anchorX="center"
+            anchorY="bottom"
+            outlineWidth={0.05}
+            outlineColor="white"
+          >
+            {label}
+          </Text>
+        )
+
         if (!matrix) {
-          return mesh
+          return (
+            <group key={`${space.globalId}-container`}>
+              {mesh}
+              {labelElement}
+            </group>
+          )
         }
 
         return (
           <group key={`${space.globalId}-group`} matrix={matrix} matrixAutoUpdate={false}>
             {mesh}
+            {/* Note: Label is also transformed by matrix, which is usually desired */}
+            {labelElement}
           </group>
         )
       })}

@@ -403,6 +403,20 @@ function App() {
     }
   }, [selectById, focusOnElements, showToast, enableXRay, disableXRay, isolatedIds])
 
+  const enableSpaceOverlayForSpaces = useCallback((spaceIds) => {
+    const ids = (spaceIds || []).filter(Boolean)
+    if (ids.length === 0) {
+      setHighlightedSpaceIds([])
+      setSpaceOverlayEnabled(false)
+      return
+    }
+    if (!spaceOverlayEnabled) {
+      setSpaceOverlayStatus({ hasSpaces: false, count: 0, error: null, loading: true, checked: false })
+      setSpaceOverlayEnabled(true)
+    }
+    setHighlightedSpaceIds(ids)
+  }, [spaceOverlayEnabled])
+
   const handleHvacSelectDetail = useCallback((payload) => {
     if (!payload) return
     const ids = [payload.equipmentId, ...(payload.terminalIds || [])].filter(Boolean)
@@ -412,18 +426,14 @@ function App() {
     enableXRay(ids)
     selectById(ids)
 
-    if (spaceOverlayEnabled) {
-      setHighlightedSpaceIds((payload.spaceIds || []).filter(Boolean))
-    } else {
-      setHighlightedSpaceIds([])
-    }
+    enableSpaceOverlayForSpaces(payload.spaceIds)
 
     lastSelectedIdsRef.current = ids
     const result = focusOnElements(ids)
     if (!result.found) {
       showToast('No geometry found for selected equipment', 'warning')
     }
-  }, [showAll, enableXRay, selectById, focusOnElements, showToast, spaceOverlayEnabled])
+  }, [showAll, enableXRay, selectById, focusOnElements, showToast, enableSpaceOverlayForSpaces])
 
   useEffect(() => {
     if (!spaceOverlayEnabled) {
@@ -778,9 +788,11 @@ function App() {
             isOpen={hvacPanelOpen}
             onClose={handleCloseHvacPanel}
             jobId={jobId}
+            selectedId={selectedId}
             onSelectEquipment={handleHvacSelectDetail}
             focusToken={hvacPanelZIndex}
             zIndex={hvacPanelZIndex}
+            spaceOverlayLoading={spaceOverlayStatus.loading}
           />
 
           {/* Keyboard shortcuts hints */}

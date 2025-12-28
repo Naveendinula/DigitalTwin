@@ -1,18 +1,35 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react'
 
+const getSpaceLabel = (space) => {
+  if (!space) return 'Unknown'
+  const roomNo = space.room_no || ''
+  const roomName = space.room_name || ''
+  const label = `${roomNo} ${roomName}`.trim()
+  return label || space.name || space.globalId || 'Unknown'
+}
+
+const getTerminalLabel = (terminal) => {
+  if (!terminal) return 'Unknown'
+  return terminal.name || terminal.tag || terminal.globalId || 'Unknown'
+}
+
 /**
  * HvacFmPanel Component
  *
  * Draggable panel for triggering and displaying HVAC/FM analysis results.
  * Matches the application's existing panel conventions.
  */
-function HvacFmPanel({ isOpen, onClose, jobId, onSelectEquipment, focusToken, zIndex }) {
+function HvacFmPanel({ isOpen, onClose, jobId, selectedId, onSelectEquipment, focusToken, zIndex, spaceOverlayLoading }) {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
   const [selectedEquipmentId, setSelectedEquipmentId] = useState(null)
+  const [showEquipmentSpaces, setShowEquipmentSpaces] = useState(true)
   const [storeyFilter, setStoreyFilter] = useState('All')
   const [systemFilter, setSystemFilter] = useState('All')
+  const [activeTab, setActiveTab] = useState('equipment')
+  const [spaceSearch, setSpaceSearch] = useState('')
+  const [selectedSpaceId, setSelectedSpaceId] = useState(null)
 
   // Draggable state
   const [position, setPosition] = useState({ x: 420, y: 80 })
@@ -176,15 +193,65 @@ function HvacFmPanel({ isOpen, onClose, jobId, onSelectEquipment, focusToken, zI
     [equipmentList, selectedEquipmentId]
   )
 
-  const getSpaceLabel = (space) => {
-    if (!space) return 'Unknown'
-    return space.name || space.globalId || 'Unknown'
-  }
+  const spacesMap = useMemo(() => {
+    const map = {}
+    if (!result?.equipment) return map
 
-  const getTerminalLabel = (terminal) => {
-    if (!terminal) return 'Unknown'
-    return terminal.name || terminal.tag || terminal.globalId || 'Unknown'
-  }
+    result.equipment.forEach(equip => {
+      if (!equip.servedSpaces) return
+      equip.servedSpaces.forEach(space => {
+        if (!map[space.globalId]) {
+          map[space.globalId] = {
+            spaceInfo: space,
+            servedBy: [],
+            terminals: []
+          }
+        }
+        // Add equipment
+        if (!map[space.globalId].servedBy.find(e => e.globalId === equip.globalId)) {
+          map[space.globalId].servedBy.push(equip)
+        }
+        // Add terminals from this equipment
+        if (equip.servedTerminals) {
+           equip.servedTerminals.forEach(term => {
+               if (!map[space.globalId].terminals.find(t => t.globalId === term.globalId)) {
+                   map[space.globalId].terminals.push(term)
+               }
+           })
+        }
+      })
+    })
+    return map
+  }, [result])
+
+  const filteredSpaces = useMemo(() => {
+    const allSpaces = Object.values(spacesMap)
+    if (!spaceSearch) return allSpaces
+    const lower = spaceSearch.toLowerCase()
+    return allSpaces.filter(item => {
+      const label = getSpaceLabel(item.spaceInfo).toLowerCase()
+      return label.includes(lower)
+    })
+  }, [spacesMap, spaceSearch])
+
+  const selectedSpace = useMemo(() => {
+      return spacesMap[selectedSpaceId]
+  }, [spacesMap, selectedSpaceId])
+
+  useEffect(() => {
+    if (!selectedId || !result?.equipment?.length) return
+    const match = result.equipment.find(item => item.globalId === selectedId)
+    if (match) {
+      setSelectedEquipmentId(match.globalId)
+      setActiveTab('equipment')
+      return
+    }
+
+    if (spacesMap[selectedId]) {
+        setSelectedSpaceId(selectedId)
+        setActiveTab('spaces')
+    }
+  }, [selectedId, result, spacesMap])
 
   if (!isOpen) return null
 
@@ -244,116 +311,245 @@ function HvacFmPanel({ isOpen, onClose, jobId, onSelectEquipment, focusToken, zI
 
         {!loading && result && (
           <div style={styles.result}>
-            <div style={styles.summaryCard}>
-              <span style={styles.label}>Equipment</span>
-              <span style={styles.value}>{result.summary?.equipment_count || 0}</span>
-              <span style={styles.subValue}>
-                {result.summary?.served_terminal_count || 0} terminals, {result.summary?.served_space_count || 0} spaces
-              </span>
-            </div>
-
-            <div style={styles.filterRow}>
-              <div style={styles.filterGroup}>
-                <span style={styles.filterLabel}>Storey</span>
-                <select
-                  style={styles.select}
-                  value={storeyFilter}
-                  onChange={(e) => setStoreyFilter(e.target.value)}
-                >
-                  {availableStoreys.map(storey => (
-                    <option key={storey} value={storey}>{storey}</option>
-                  ))}
-                </select>
+            <div style={styles.tabContainer}>
+              <div
+                style={{...styles.tab, ...(activeTab === 'equipment' ? styles.activeTab : {})}}
+                onClick={() => setActiveTab('equipment')}
+              >
+                Equipment
               </div>
-              <div style={styles.filterGroup}>
-                <span style={styles.filterLabel}>System</span>
-                <select
-                  style={styles.select}
-                  value={systemFilter}
-                  onChange={(e) => setSystemFilter(e.target.value)}
-                >
-                  {availableSystems.map(system => (
-                    <option key={system} value={system}>{system}</option>
-                  ))}
-                </select>
+              <div
+                style={{...styles.tab, ...(activeTab === 'spaces' ? styles.activeTab : {})}}
+                onClick={() => setActiveTab('spaces')}
+              >
+                Spaces
               </div>
             </div>
 
-            <div style={styles.tableContainer}>
-              <table style={styles.table}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>Mark/Tag</th>
-                    <th style={styles.th}>Storey</th>
-                    <th style={styles.th}>Systems</th>
-                    <th style={styles.th}>Terminals</th>
-                    <th style={styles.th}>Spaces</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredEquipment.map((item) => {
-                    const isSelected = item.globalId === selectedEquipmentId
-                    const tagLabel = item.tag || item.name || 'Unnamed'
-                    return (
-                      <tr
-                        key={item.globalId}
+            {activeTab === 'equipment' && (
+              <>
+                <div style={styles.summaryCard}>
+                  <span style={styles.label}>Equipment</span>
+                  <span style={styles.value}>{result.summary?.equipment_count || 0}</span>
+                  <span style={styles.subValue}>
+                    {result.summary?.served_terminal_count || 0} terminals, {result.summary?.served_space_count || 0} spaces
+                  </span>
+                </div>
+
+                <div style={styles.filterRow}>
+                  <div style={styles.filterGroup}>
+                    <span style={styles.filterLabel}>Storey</span>
+                    <select
+                      style={styles.select}
+                      value={storeyFilter}
+                      onChange={(e) => setStoreyFilter(e.target.value)}
+                    >
+                      {availableStoreys.map(storey => (
+                        <option key={storey} value={storey}>{storey}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={styles.filterGroup}>
+                    <span style={styles.filterLabel}>System</span>
+                    <select
+                      style={styles.select}
+                      value={systemFilter}
+                      onChange={(e) => setSystemFilter(e.target.value)}
+                    >
+                      {availableSystems.map(system => (
+                        <option key={system} value={system}>{system}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div style={styles.tableContainer}>
+                  <table style={styles.table}>
+                    <thead>
+                      <tr>
+                        <th style={styles.th}>Mark/Tag</th>
+                        <th style={styles.th}>Storey</th>
+                        <th style={styles.th}>Systems</th>
+                        <th style={styles.th}>Terminals</th>
+                        <th style={styles.th}>Spaces</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredEquipment.map((item) => {
+                        const isSelected = item.globalId === selectedEquipmentId
+                        const tagLabel = item.tag || item.name || 'Unnamed'
+                        return (
+                          <tr
+                            key={item.globalId}
+                            style={{
+                              ...styles.tr,
+                              backgroundColor: isSelected ? 'rgba(0, 212, 255, 0.15)' : 'transparent',
+                              borderLeft: isSelected ? '3px solid #00D4FF' : '3px solid transparent'
+                            }}
+                            className="hvac-row-hover"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setSelectedEquipmentId(item.globalId)
+                              setShowEquipmentSpaces(true)
+                              onSelectEquipment?.({
+                                equipmentId: item.globalId,
+                                terminalIds: (item.servedTerminals || []).map(terminal => terminal.globalId).filter(Boolean),
+                                spaceIds: (item.servedSpaces || []).map(space => space.globalId).filter(Boolean),
+                              })
+                            }}
+                            title="Click to select in model"
+                          >
+                            <td style={styles.td}>{tagLabel}</td>
+                            <td style={styles.td}>{item.storey || '-'}</td>
+                            <td style={styles.td}>{item.systems?.length || 0}</td>
+                            <td style={styles.td}>{item.servedTerminals?.length || 0}</td>
+                            <td style={styles.td}>{item.servedSpaces?.length || 0}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {selectedEquipment && (
+                  <div style={styles.detailsContainer}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <h4 style={{ ...styles.subtitle, marginBottom: 0 }}>Impacted spaces</h4>
+                      <button
+                        disabled={spaceOverlayLoading}
+                        className={!showEquipmentSpaces ? 'hvac-secondary-btn' : ''}
                         style={{
-                          ...styles.tr,
-                          backgroundColor: isSelected ? 'rgba(0, 212, 255, 0.15)' : 'transparent',
-                          borderLeft: isSelected ? '3px solid #00D4FF' : '3px solid transparent'
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '6px 10px',
+                          borderRadius: '8px',
+                          border: 'none',
+                          background: showEquipmentSpaces ? 'rgba(0, 212, 255, 0.15)' : undefined,
+                          color: showEquipmentSpaces ? '#008299' : undefined,
+                          fontSize: '11px',
+                          cursor: spaceOverlayLoading ? 'wait' : 'pointer',
+                          fontWeight: 600,
+                          opacity: spaceOverlayLoading ? 0.7 : 1,
+                          transition: 'all 0.2s ease'
                         }}
-                        className="hvac-row-hover"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setSelectedEquipmentId(item.globalId)
+                        onClick={() => {
+                          const nextState = !showEquipmentSpaces
+                          setShowEquipmentSpaces(nextState)
                           onSelectEquipment?.({
-                            equipmentId: item.globalId,
-                            terminalIds: (item.servedTerminals || []).map(terminal => terminal.globalId).filter(Boolean),
-                            spaceIds: (item.servedSpaces || []).map(space => space.globalId).filter(Boolean),
+                            equipmentId: selectedEquipment.globalId,
+                            terminalIds: (selectedEquipment.servedTerminals || []).map(t => t.globalId).filter(Boolean),
+                            spaceIds: nextState ? (selectedEquipment.servedSpaces || []).map(s => s.globalId).filter(Boolean) : [],
                           })
                         }}
-                        title="Click to select in model"
                       >
-                        <td style={styles.td}>{tagLabel}</td>
-                        <td style={styles.td}>{item.storey || '-'}</td>
-                        <td style={styles.td}>{item.systems?.length || 0}</td>
-                        <td style={styles.td}>{item.servedTerminals?.length || 0}</td>
-                        <td style={styles.td}>{item.servedSpaces?.length || 0}</td>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: showEquipmentSpaces ? 1 : 0.7 }}>
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                          <circle cx="12" cy="12" r="3" />
+                        </svg>
+                        {spaceOverlayLoading ? 'Loading...' : (showEquipmentSpaces ? 'Spaces Visible' : 'Show Spaces')}
+                      </button>
+                    </div>
+                    {selectedEquipment.servedSpaces?.length ? (
+                      <ul style={styles.list}>
+                        {selectedEquipment.servedSpaces.map((space) => (
+                          <li key={space.globalId || space.name} style={styles.listItem}>
+                            {getSpaceLabel(space)}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p style={styles.emptyText}>No spaces linked.</p>
+                    )}
+
+                    <h4 style={{ ...styles.subtitle, marginTop: '12px' }}>Impacted terminals</h4>
+                    {selectedEquipment.servedTerminals?.length ? (
+                      <ul style={styles.list}>
+                        {selectedEquipment.servedTerminals.map((terminal) => (
+                          <li key={terminal.globalId} style={styles.listItem}>
+                            {getTerminalLabel(terminal)}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p style={styles.emptyText}>No terminals linked.</p>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+
+            {activeTab === 'spaces' && (
+              <>
+                <input
+                  style={styles.searchInput}
+                  placeholder="Search spaces..."
+                  value={spaceSearch}
+                  onChange={(e) => setSpaceSearch(e.target.value)}
+                />
+                <div style={styles.tableContainer}>
+                  <table style={styles.table}>
+                    <thead>
+                      <tr>
+                        <th style={styles.th}>Space</th>
+                        <th style={styles.th}>Served By</th>
                       </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
+                    </thead>
+                    <tbody>
+                      {filteredSpaces.map((item) => {
+                        const isSelected = item.spaceInfo.globalId === selectedSpaceId
+                        return (
+                          <tr
+                            key={item.spaceInfo.globalId}
+                            style={{
+                              ...styles.tr,
+                              backgroundColor: isSelected ? 'rgba(0, 212, 255, 0.15)' : 'transparent',
+                              borderLeft: isSelected ? '3px solid #00D4FF' : '3px solid transparent'
+                            }}
+                            className="hvac-row-hover"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setSelectedSpaceId(item.spaceInfo.globalId)
+                              onSelectEquipment?.({
+                                equipmentId: null,
+                                terminalIds: [
+                                  ...item.servedBy.map(e => e.globalId),
+                                  ...item.terminals.map(t => t.globalId)
+                                ].filter(Boolean),
+                                spaceIds: [item.spaceInfo.globalId],
+                              })
+                            }}
+                          >
+                            <td style={styles.td}>{getSpaceLabel(item.spaceInfo)}</td>
+                            <td style={styles.td}>{item.servedBy.length} equip</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
 
-            {selectedEquipment && (
-              <div style={styles.detailsContainer}>
-                <h4 style={styles.subtitle}>Impacted spaces</h4>
-                {selectedEquipment.servedSpaces?.length ? (
-                  <ul style={styles.list}>
-                    {selectedEquipment.servedSpaces.map((space) => (
-                      <li key={space.globalId || space.name} style={styles.listItem}>
-                        {getSpaceLabel(space)}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p style={styles.emptyText}>No spaces linked.</p>
+                {selectedSpace && (
+                  <div style={styles.detailsContainer}>
+                    <h4 style={styles.subtitle}>Served By</h4>
+                    <ul style={styles.list}>
+                      {selectedSpace.servedBy.map(equip => (
+                        <li key={equip.globalId} style={styles.listItem}>
+                          {equip.tag || equip.name}
+                        </li>
+                      ))}
+                    </ul>
+                    <h4 style={{...styles.subtitle, marginTop: '12px'}}>Terminals</h4>
+                    <ul style={styles.list}>
+                      {selectedSpace.terminals.map(term => (
+                        <li key={term.globalId} style={styles.listItem}>
+                          {getTerminalLabel(term)}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
-
-                <h4 style={{ ...styles.subtitle, marginTop: '12px' }}>Impacted terminals</h4>
-                {selectedEquipment.servedTerminals?.length ? (
-                  <ul style={styles.list}>
-                    {selectedEquipment.servedTerminals.map((terminal) => (
-                      <li key={terminal.globalId} style={styles.listItem}>
-                        {getTerminalLabel(terminal)}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p style={styles.emptyText}>No terminals linked.</p>
-                )}
-              </div>
+              </>
             )}
           </div>
         )}
@@ -508,6 +704,36 @@ const styles = {
     fontSize: '13px',
     color: '#86868b',
     marginTop: '4px',
+  },
+  tabContainer: {
+    display: 'flex',
+    borderBottom: '1px solid rgba(0,0,0,0.1)',
+    marginBottom: '16px',
+  },
+  tab: {
+    flex: 1,
+    padding: '10px',
+    textAlign: 'center',
+    cursor: 'pointer',
+    fontSize: '13px',
+    fontWeight: 500,
+    color: '#86868b',
+    borderBottom: '2px solid transparent',
+    transition: 'all 0.2s',
+  },
+  activeTab: {
+    color: '#0071e3',
+    borderBottom: '2px solid #0071e3',
+    fontWeight: 600,
+  },
+  searchInput: {
+    width: '100%',
+    padding: '8px 12px',
+    borderRadius: '8px',
+    border: '1px solid #d2d2d7',
+    fontSize: '13px',
+    marginBottom: '12px',
+    outline: 'none',
   },
   tableContainer: {
     border: '1px solid rgba(0, 0, 0, 0.06)',

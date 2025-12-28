@@ -6,6 +6,7 @@ from pathlib import Path
 import glob
 import json
 import traceback
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
@@ -39,6 +40,48 @@ def _get_space_bbox_path(job_id: str) -> Path:
     job_output_dir = OUTPUT_DIR / job_id
     job_output_dir.mkdir(parents=True, exist_ok=True)
     return job_output_dir / "space_bboxes.json"
+
+
+def _clean_text(value: Any) -> str:
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _extract_space_identifiers(space, psets: dict[str, Any]) -> tuple[str, str]:
+    number = ""
+    for _, props in psets.items():
+        if not isinstance(props, dict):
+            continue
+        for key, value in props.items():
+            if key.lower() in ("number", "roomnumber", "space_number", "space number"):
+                number = _clean_text(value)
+                break
+        if number:
+            break
+
+    base_name = _clean_text(getattr(space, "Name", None))
+    long_name = _clean_text(getattr(space, "LongName", None))
+
+    room_no = number
+    room_name = ""
+
+    if not room_no and base_name and long_name:
+        room_no = base_name
+
+    if not room_no and base_name:
+        tokens = base_name.split()
+        if len(tokens) > 1 and any(char.isdigit() for char in tokens[0]):
+            room_no = tokens[0]
+            room_name = " ".join(tokens[1:]).strip()
+
+    if not room_name:
+        if long_name:
+            room_name = long_name
+        elif base_name and base_name != room_no:
+            room_name = base_name
+
+    return room_no, room_name
 
 
 def _space_label(space) -> str:
@@ -120,10 +163,15 @@ def _compute_space_bboxes(model) -> dict:
             if trans and hasattr(trans, "matrix"):
                 matrix = [float(v) for v in trans.matrix]
 
+            psets = ifc_element.get_psets(space) or {}
+            room_no, room_name = _extract_space_identifiers(space, psets)
+
             spaces.append(
                 {
                     "globalId": space.GlobalId,
                     "name": _space_label(space),
+                    "room_name": room_name,
+                    "room_no": room_no,
                     "storey": _space_storey_name(space),
                     "bbox": {
                         "min": [min_x, min_y, min_z],
