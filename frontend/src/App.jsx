@@ -1,28 +1,23 @@
-import React, { useCallback, useState, useRef, useMemo, useEffect } from 'react'
-import * as THREE from 'three'
-import Viewer from './components/Viewer'
-import SelectableModel from './components/SelectableModelWithVisibility'
+import { useCallback, useState } from 'react'
+import AppHeader from './components/AppHeader'
 import PropertyPanel from './components/PropertyPanel'
 import StructureTree from './components/StructureTree'
 import UploadPanel from './components/UploadPanel'
-import ViewerToolbar from './components/ViewerToolbar'
-import AxisViewWidget from './components/AxisViewWidget'
-import SectionModeHint from './components/SectionModeHint'
-import SectionPlanePanel from './components/SectionPlanePanel'
-import SectionPlaneHelper from './components/SectionPlaneHelper'
-import KeyboardHints from './components/KeyboardHints'
-import EcPanel from './components/EcPanel'
-import HvacFmPanel from './components/HvacFmPanel'
-import SpaceBboxOverlay from './components/SpaceBboxOverlay'
-import SpaceNavigator from './components/SpaceNavigator'
+import ViewerShell from './components/ViewerShell'
 import { useToast } from './components/Toast'
+import useKeyboardShortcuts from './hooks/useKeyboardShortcuts'
+import useFloatingPanels from './hooks/useFloatingPanels'
 import useSelection from './hooks/useSelection'
 import useVisibility from './hooks/useVisibility'
 import useSectionMode from './hooks/useSectionMode'
+import useSectionPick from './hooks/useSectionPick'
+import useViewerSelection from './hooks/useViewerSelection'
 import useXRayMode from './hooks/useXRayMode'
 import useCameraFocus from './hooks/useCameraFocus'
 import useViewMode from './hooks/useViewMode'
-import { getEcColor } from './utils/colorUtils'
+import useSpaceOverlay from './hooks/useSpaceOverlay'
+import useViewerScene from './hooks/useViewerScene'
+import appStyles from './constants/appStyles'
 
 /**
  * Main Application Component
@@ -34,110 +29,78 @@ function App() {
   // Model URLs - null until uploaded
   const [modelUrls, setModelUrls] = useState(null)
   const [jobId, setJobId] = useState(null)
-  const [ecPanelOpen, setEcPanelOpen] = useState(false)
-  const [hvacPanelOpen, setHvacPanelOpen] = useState(false)
-  const [spaceOverlayEnabled, setSpaceOverlayEnabled] = useState(false)
-  const [highlightedSpaceIds, setHighlightedSpaceIds] = useState([])
-  const [spaceOverlayStatus, setSpaceOverlayStatus] = useState({ hasSpaces: false, count: 0, error: null, loading: false, checked: false })
-  const [allSpaces, setAllSpaces] = useState([])
-  const [selectedSpaceIndex, setSelectedSpaceIndex] = useState(-1)
-  const lastSpaceToastRef = useRef({ jobId: null, type: null })
-  // Panel stacking counter used to bring panels to front when focused
-  const [panelZCounter, setPanelZCounter] = useState(1000)
-  const [ecPanelZIndex, setEcPanelZIndex] = useState(1000)
-  const [hvacPanelZIndex, setHvacPanelZIndex] = useState(1000)
 
-  // Selection state management
-  const { selectedId, handleSelect, deselect, setScene: setSelectionScene, selectById } = useSelection()
-  
-  // Visibility control
-  const { setScene, isolate, showAll } = useVisibility()
-  
-  // Section mode control
-  const {
-    sectionModeEnabled,
-    sectionPlanePickingEnabled,
-    sectionPlane,
-    activeSectionPlane,
-    setScene: setSectionScene,
-    setCamera: setSectionCamera,
-    setRenderer: setSectionRenderer,
-    setControls: setSectionControls,
-    setSectionMode,
-    toggleSectionMode,
-    clearSectionPlane,
-    createSectionPlane,
-    enableSectionPicking,
-    nudgeSectionPlane,
-    resetPlaneOffset,
-    alignCameraToSection,
-    sectionPlaneVisible,
-    toggleSectionPlaneVisibility,
-    sectionPlaneSize,
-    setSectionPlaneSize
-  } = useSectionMode()
-  
-  // X-Ray mode for isolation effect
-  const {
-    xRayEnabled,
-    setScene: setXRayScene,
-    enableXRay,
-    disableXRay,
-    updateXRaySelection
-  } = useXRayMode()
-  
-  // Camera focus for pan/zoom to selected elements
-  const {
-    setScene: setFocusScene,
-    setCamera: setFocusCamera,
-    setControls: setFocusControls,
-    focusOnElements
-  } = useCameraFocus()
-  
-  // View mode for preset camera positions (Top/Front/Side/Free)
-  const {
-    viewMode,
-    setScene: setViewModeScene,
-    setCamera: setViewModeCamera,
-    setControls: setViewModeControls,
-    setViewMode,
-    getViewMode,
-    resetView,
-    fitToModel,
-    getAvailableViews,
-    getModelBounds,
-    invalidateBoundsCache
-  } = useViewMode()
+  const selection = useSelection()
+  const visibility = useVisibility()
+  const sectionMode = useSectionMode()
+  const xRayMode = useXRayMode()
+  const cameraFocus = useCameraFocus()
+  const viewModeState = useViewMode()
   
   // Toast notifications
-  const { toasts, showToast, removeToast, ToastContainer } = useToast()
-  
-  // Track isolated IDs for X-ray
-  const [isolatedIds, setIsolatedIds] = useState(null)
-  // Lock focus to prevent accidental changes to isolation set
-  const [focusLock, setFocusLock] = useState(true)
+  const { showToast, ToastContainer } = useToast()
 
-  // Viewer Mode: NORMAL | FOCUS | ISOLATE
-  // Derived from state to ensure consistency and avoid duplication
-  const mode = useMemo(() => {
-    if (isolatedIds) return 'ISOLATE'
-    if (selectedId) return 'FOCUS'
-    return 'NORMAL'
-  }, [isolatedIds, selectedId])
+  const floatingPanels = useFloatingPanels(xRayMode.disableXRay)
+  const spaceOverlay = useSpaceOverlay({ jobId, showToast })
 
-  // Log mode changes for debugging
-  useEffect(() => {
-    console.log('Viewer Mode:', mode)
-  }, [mode])
-  
-  // Track last selected IDs for 'F' key focus
-  const lastSelectedIdsRef = useRef(null)
-  
-  // Store references
-  const cameraRef = useRef(null)
-  const glRef = useRef(null)
-  const controlsRef = useRef(null)
-  const pendingFitRef = useRef(false)
+  const {
+    focusLock,
+    setFocusLock,
+    handleClearAll,
+    handleIsolate,
+    handleTreeSelect,
+    handleHvacSelectDetail,
+    focusOnCurrentSelection
+  } = useViewerSelection({
+    selectedId: selection.selectedId,
+    selectById: selection.selectById,
+    deselect: selection.deselect,
+    isolate: visibility.isolate,
+    showAll: visibility.showAll,
+    enableXRay: xRayMode.enableXRay,
+    disableXRay: xRayMode.disableXRay,
+    xRayEnabled: xRayMode.xRayEnabled,
+    updateXRaySelection: xRayMode.updateXRaySelection,
+    focusOnElements: cameraFocus.focusOnElements,
+    showToast,
+    enableSpaceOverlayForSpaces: spaceOverlay.enableSpaceOverlayForSpaces
+  })
+
+  const {
+    cameraRef,
+    controlsRef,
+    requestFitToModel,
+    handleSceneReady,
+    handleRendererReady,
+    handleControlsReady
+  } = useViewerScene({
+    setScene: visibility.setScene,
+    setSectionScene: sectionMode.setScene,
+    setSelectionScene: selection.setScene,
+    setXRayScene: xRayMode.setScene,
+    setFocusScene: cameraFocus.setScene,
+    setViewModeScene: viewModeState.setScene,
+    setSectionCamera: sectionMode.setCamera,
+    setFocusCamera: cameraFocus.setCamera,
+    setViewModeCamera: viewModeState.setCamera,
+    setSectionRenderer: sectionMode.setRenderer,
+    setSectionControls: sectionMode.setControls,
+    setFocusControls: cameraFocus.setControls,
+    setViewModeControls: viewModeState.setControls,
+    fitToModel: viewModeState.fitToModel,
+    getModelBounds: viewModeState.getModelBounds
+  })
+
+  const handleSectionPick = useSectionPick(sectionMode.createSectionPlane)
+
+  useKeyboardShortcuts({
+    onClearSelection: handleClearAll,
+    onFocusSelection: focusOnCurrentSelection,
+    onSetViewMode: viewModeState.setViewMode,
+    showToast,
+    cameraRef,
+    controlsRef
+  })
 
   /**
    * Handle model ready after upload
@@ -147,504 +110,22 @@ function App() {
     setModelUrls(urls)
     setJobId(urls.jobId)
     // Reset section mode when loading a new model
-    setSectionMode(false)
-    setSpaceOverlayEnabled(false)
+    sectionMode.setSectionMode(false)
+    spaceOverlay.disableSpaceOverlay()
     // Invalidate bounds cache for new model
-    invalidateBoundsCache()
+    viewModeState.invalidateBoundsCache()
     // Auto-fit once the model and controls are ready
-    pendingFitRef.current = true
-  }, [setSectionMode, invalidateBoundsCache])
+    requestFitToModel()
+  }, [sectionMode.setSectionMode, viewModeState.invalidateBoundsCache, spaceOverlay.disableSpaceOverlay, requestFitToModel])
 
-  /**
-   * Handle scene ready - register with visibility controller, section mode, selection, X-ray, camera focus, and view mode
-   */
-  const handleSceneReady = useCallback((scene, camera, gl) => {
-    setScene(scene)
-    setSectionScene(scene)
-    setSelectionScene(scene) // Register scene with selection hook for selectById
-    setXRayScene(scene) // Register scene with X-ray mode
-    setFocusScene(scene) // Register scene with camera focus
-    setViewModeScene(scene) // Register scene with view mode
-    if (camera) {
-      setSectionCamera(camera)
-      setFocusCamera(camera)
-      setViewModeCamera(camera)
-      cameraRef.current = camera
-    }
-    if (gl) {
-      setSectionRenderer(gl)
-      glRef.current = gl
-    }
-    if (pendingFitRef.current) {
-      const bounds = getModelBounds(true)
-      if (bounds && cameraRef.current && controlsRef.current) {
-        fitToModel()
-        pendingFitRef.current = false
-      }
-    }
-    console.log('Scene registered with visibility, section, selection, X-ray, focus, and view mode controllers')
-  }, [setScene, setSectionScene, setSelectionScene, setXRayScene, setFocusScene, setViewModeScene, setSectionCamera, setFocusCamera, setViewModeCamera, setSectionRenderer, fitToModel, getModelBounds])
-
-  /**
-   * Handle renderer ready from Viewer
-   */
-  const handleRendererReady = useCallback((gl, camera) => {
-    if (gl) {
-      setSectionRenderer(gl)
-      glRef.current = gl
-    }
-    if (camera) {
-      setSectionCamera(camera)
-      cameraRef.current = camera
-    }
-    console.log('Renderer ready, clipping enabled')
-  }, [setSectionRenderer, setSectionCamera])
-
-  /**
-   * Handle controls ready from Viewer
-   */
-  const handleControlsReady = useCallback((controls) => {
-    setSectionControls(controls)
-    setFocusControls(controls)
-    setViewModeControls(controls)
-    controlsRef.current = controls
-    if (pendingFitRef.current) {
-      const bounds = getModelBounds(true)
-      if (bounds && cameraRef.current && controlsRef.current) {
-        fitToModel()
-        pendingFitRef.current = false
-      }
-    }
-    console.log('Orbit controls ready')
-  }, [setSectionControls, setFocusControls, setViewModeControls, fitToModel, getModelBounds])
-
-  /**
-   * Clear all selection and X-ray mode
-   */
-  const clearAll = useCallback(() => {
-    deselect()
-    disableXRay()
-    showAll()
-    setIsolatedIds(null)
-    lastSelectedIdsRef.current = null
-  }, [deselect, showAll, disableXRay])
-
-  /**
-   * Close Embodied Carbon panel and disable X-ray mode
-   */
-  const handleCloseEcPanel = useCallback(() => {
-    setEcPanelOpen(false)
-    disableXRay()
-  }, [disableXRay])
-
-  /**
-   * Close HVAC/FM panel and disable X-ray mode
-   */
-  const handleCloseHvacPanel = useCallback(() => {
-    setHvacPanelOpen(false)
-    disableXRay()
-  }, [disableXRay])
-
-  /**
-   * Focus on current selection (for 'F' key shortcut)
-   */
-  const focusOnCurrentSelection = useCallback(() => {
-    if (lastSelectedIdsRef.current && lastSelectedIdsRef.current.length > 0) {
-      const result = focusOnElements(lastSelectedIdsRef.current)
-      if (!result.found) {
-        showToast('No geometry found for selected element(s)', 'warning')
-      }
-    } else if (selectedId) {
-      const ids = Array.isArray(selectedId) ? selectedId : [selectedId]
-      const result = focusOnElements(ids)
-      if (!result.found) {
-        showToast('No geometry found for selected element(s)', 'warning')
-      }
-    } else {
-      showToast('No element selected. Select an element first.', 'info')
-    }
-  }, [focusOnElements, selectedId, showToast])
-
-  /**
-   * View mode keyboard shortcut mapping
-   * Uses number keys 1-7 for quick view access
-   */
-  const viewModeShortcuts = useMemo(() => ({
-    '1': 'free',
-    '2': 'top',
-    '3': 'front',
-    '4': 'right',
-    '5': 'left',
-    '6': 'back',
-    '7': 'bottom'
-  }), [])
-
-  /**
-   * Keyboard shortcuts handler
-   */
-  useEffect(() => {
-    const handleKeyDown = (event) => {
-      // Don't trigger shortcuts when typing in input fields
-      if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
-        return
-      }
-      
-      // Check for view mode shortcuts (1-7)
-      const viewMode = viewModeShortcuts[event.key]
-      if (viewMode) {
-        setViewMode(viewMode)
-        const viewLabels = {
-          'free': 'Free Orbit',
-          'top': 'Top',
-          'front': 'Front',
-          'right': 'Right',
-          'left': 'Left',
-          'back': 'Back',
-          'bottom': 'Bottom'
-        }
-        showToast(`${viewLabels[viewMode]} view`, 'info', 1500)
-        return
-      }
-      
-      switch (event.key) {
-        case 'Escape':
-          // Clear selection and X-ray
-          clearAll()
-          showToast('Selection cleared', 'info', 2000)
-          break
-        case 'f':
-        case 'F':
-          // Focus on selected element(s)
-          focusOnCurrentSelection()
-          break
-        case 'c':
-        case 'C':
-          // DEBUG: Capture current camera state
-          if (cameraRef.current && controlsRef.current) {
-            const cam = cameraRef.current
-            const ctrl = controlsRef.current
-            console.log('=== CAMERA STATE ===')
-            console.log(`Position: (${cam.position.x.toFixed(3)}, ${cam.position.y.toFixed(3)}, ${cam.position.z.toFixed(3)})`)
-            console.log(`Target: (${ctrl.target.x.toFixed(3)}, ${ctrl.target.y.toFixed(3)}, ${ctrl.target.z.toFixed(3)})`)
-            console.log(`Up: (${cam.up.x.toFixed(3)}, ${cam.up.y.toFixed(3)}, ${cam.up.z.toFixed(3)})`)
-            // Calculate direction from target to camera
-            const dir = cam.position.clone().sub(ctrl.target).normalize()
-            console.log(`Direction (normalized): (${dir.x.toFixed(3)}, ${dir.y.toFixed(3)}, ${dir.z.toFixed(3)})`)
-            showToast('Camera state logged to console (press F12)', 'info', 3000)
-          }
-          break
-        default:
-          break
-      }
-    }
-    
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [clearAll, focusOnCurrentSelection, showToast, viewModeShortcuts, setViewMode])
-
-  /**
-   * Handle isolation from tree view - also enables X-ray effect
-   * Supports 'FOCUS' (Ghost/X-Ray) and 'ISOLATE' (Hide others) modes
-   */
-  const handleIsolate = useCallback((globalIds, options = {}) => {
-    const { behavior = 'FOCUS' } = options
-
-    if (globalIds === null) {
-      // Show all - disable X-ray and show all elements
-      disableXRay()
-      showAll()
-      setIsolatedIds(null)
-    } else {
-      if (behavior === 'ISOLATE') {
-        // Hide others
-        disableXRay()
-        isolate(globalIds)
-      } else {
-        // FOCUS: Ghost others (X-Ray)
-        showAll() // Ensure everything is visible first
-        enableXRay(globalIds, { mode: 'wireframe' })
-      }
-      setIsolatedIds(globalIds)
-    }
-  }, [isolate, showAll, enableXRay, disableXRay])
-
-  /**
-   * Handle selection from tree view - selects element(s) in the 3D model and focuses camera
-   */
-  const handleTreeSelect = useCallback((globalIdOrIds, ecData) => {
-    console.log('Selected from tree:', globalIdOrIds, ecData)
-    
-    let options = {}
-    const ids = Array.isArray(globalIdOrIds) ? globalIdOrIds : [globalIdOrIds]
-
-    if (ecData) {
-        const { ecValue, minEc, maxEc } = ecData
-        const color = getEcColor(ecValue, minEc, maxEc)
-        options = { color }
-        
-        // Enable X-ray to make others translucent
-        enableXRay(ids, { mode: 'wireframe' })
-    } else {
-        // Only disable X-ray if we're not in isolation mode
-        if (!isolatedIds) {
-            disableXRay()
-        }
-    }
-
-    selectById(globalIdOrIds, options)
-    
-    // Track selected IDs for 'F' key focus
-    lastSelectedIdsRef.current = ids
-    
-    // Focus camera on selected element(s) with feedback
-    const result = focusOnElements(ids)
-    
-    if (!result.found) {
-      showToast(`No geometry found for "${ids.length === 1 ? 'element' : ids.length + ' elements'}"`, 'warning')
-    } else if (result.count > 1) {
-      showToast(`Focused on ${result.count} elements`, 'info', 2000)
-    }
-  }, [selectById, focusOnElements, showToast, enableXRay, disableXRay, isolatedIds])
-
-  const enableSpaceOverlayForSpaces = useCallback((spaceIds) => {
-    const ids = (spaceIds || []).filter(Boolean)
-    if (ids.length === 0) {
-      setHighlightedSpaceIds([])
-      setSpaceOverlayEnabled(false)
-      return
-    }
-    if (!spaceOverlayEnabled) {
-      setSpaceOverlayStatus({ hasSpaces: false, count: 0, error: null, loading: true, checked: false })
-      setSpaceOverlayEnabled(true)
-    }
-    setHighlightedSpaceIds(ids)
-  }, [spaceOverlayEnabled])
-
-  const handleHvacSelectDetail = useCallback((payload) => {
-    if (!payload) return
-    const ids = [payload.equipmentId, ...(payload.terminalIds || [])].filter(Boolean)
-    if (ids.length === 0) return
-
-    showAll()
-    enableXRay(ids, { mode: 'ghost' })
-    selectById(ids)
-
-    enableSpaceOverlayForSpaces(payload.spaceIds)
-
-    lastSelectedIdsRef.current = ids
-    const result = focusOnElements(ids)
-    if (!result.found) {
-      showToast('No geometry found for selected equipment', 'warning')
-    }
-  }, [showAll, enableXRay, selectById, focusOnElements, showToast, enableSpaceOverlayForSpaces])
-
-  const handleSpacesLoaded = useCallback((spaces) => {
-    setAllSpaces(spaces)
-    // Reset selection when new spaces are loaded
-    setSelectedSpaceIndex(-1)
-  }, [])
-
-  const handleNextSpace = useCallback(() => {
-    if (allSpaces.length === 0) return
-    setSelectedSpaceIndex(prev => {
-      const next = prev + 1
-      return next >= allSpaces.length ? 0 : next
-    })
-  }, [allSpaces.length])
-
-  const handlePrevSpace = useCallback(() => {
-    if (allSpaces.length === 0) return
-    setSelectedSpaceIndex(prev => {
-      const next = prev - 1
-      return next < 0 ? allSpaces.length - 1 : next
-    })
-  }, [allSpaces.length])
-
-  // Focus on selected space when cycling
-  useEffect(() => {
-    if (selectedSpaceIndex >= 0 && allSpaces[selectedSpaceIndex]) {
-      const space = allSpaces[selectedSpaceIndex]
-      // Optional: Focus camera on space?
-      // For now, just let the overlay highlight it.
-      // If we want to focus:
-      // if (space.bbox) { ... logic to focus on bbox ... }
-    }
-  }, [selectedSpaceIndex, allSpaces])
-
-  useEffect(() => {
-    if (!spaceOverlayEnabled) {
-      setHighlightedSpaceIds([])
-      setSelectedSpaceIndex(-1)
-    }
-  }, [spaceOverlayEnabled])
-
-  useEffect(() => {
-    if (!spaceOverlayEnabled) return
-    if (!spaceOverlayStatus.checked || spaceOverlayStatus.loading) return
-    if (spaceOverlayStatus.error) {
-      if (lastSpaceToastRef.current.jobId !== jobId || lastSpaceToastRef.current.type !== 'error') {
-        showToast(`Spaces overlay error: ${spaceOverlayStatus.error}`, 'warning')
-        lastSpaceToastRef.current = { jobId, type: 'error' }
-      }
-      return
-    }
-    if (!spaceOverlayStatus.hasSpaces) {
-      if (lastSpaceToastRef.current.jobId !== jobId || lastSpaceToastRef.current.type !== 'empty') {
-        showToast('No spaces found in this model.', 'info', 2500)
-        lastSpaceToastRef.current = { jobId, type: 'empty' }
-      }
-    }
-  }, [spaceOverlayEnabled, spaceOverlayStatus, showToast, jobId])
-
-  useEffect(() => {
-    lastSpaceToastRef.current = { jobId, type: null }
-    setSpaceOverlayStatus(prev => ({ ...prev, checked: false }))
-  }, [jobId])
-
-  useEffect(() => {
-    if (!spaceOverlayEnabled) {
-      lastSpaceToastRef.current = { jobId, type: null }
-      setSpaceOverlayStatus(prev => ({ ...prev, checked: false }))
-    }
-  }, [spaceOverlayEnabled, jobId])
-
-  const spaceElementMapRef = useRef(new Map())
-
-  useEffect(() => {
-    if (!modelUrls?.hierarchyUrl) {
-      spaceElementMapRef.current = new Map()
-      return
-    }
-
-    fetch(modelUrls.hierarchyUrl)
-      .then(res => {
-        if (!res.ok) throw new Error('Failed to load hierarchy')
-        return res.json()
-      })
-      .then(data => {
-        const map = new Map()
-
-        const isSpatialNode = (nodeType) => {
-          return nodeType === 'IfcProject'
-            || nodeType === 'IfcSite'
-            || nodeType === 'IfcBuilding'
-            || nodeType === 'IfcBuildingStorey'
-            || nodeType === 'IfcSpace'
-        }
-
-        const collectElementIds = (node) => {
-          const ids = []
-          const stack = [node]
-          while (stack.length) {
-            const current = stack.pop()
-            if (!current) continue
-            if (current.globalId && !isSpatialNode(current.type) && current.type !== 'Category') {
-              ids.push(current.globalId)
-            }
-            if (current.children) {
-              current.children.forEach(child => stack.push(child))
-            }
-          }
-          return ids
-        }
-
-        const traverse = (node) => {
-          if (!node) return
-          if (node.type === 'IfcSpace' && node.globalId) {
-            map.set(node.globalId, collectElementIds(node))
-          }
-          if (node.children) {
-            node.children.forEach(child => traverse(child))
-          }
-        }
-
-        traverse(data)
-        spaceElementMapRef.current = map
-      })
-      .catch(() => {
-        spaceElementMapRef.current = new Map()
-      })
-  }, [modelUrls])
-
-  const handleSpaceSelect = useCallback((spaceGlobalId) => {
-    if (!spaceGlobalId) return
-    const elementIds = spaceElementMapRef.current.get(spaceGlobalId) || []
-    if (elementIds.length === 0) {
-      showToast('No elements found for this space', 'info')
-      return
-    }
-
-    handleIsolate(elementIds, { behavior: 'FOCUS' })
-    selectById(elementIds)
-    lastSelectedIdsRef.current = elementIds
-  }, [handleIsolate, selectById, showToast])
-
-  /**
-   * Handle section pick from model click
-   */
-  const handleSectionPick = useCallback((intersection, mesh) => {
-    if (!intersection || !intersection.point) return
-    
-    // Get hit point (already in world coordinates from R3F)
-    const hitPointWorld = intersection.point.clone()
-    
-    // Get face normal and transform to world space
-    let faceNormalWorld = new THREE.Vector3(0, 1, 0) // Default up
-    
-    if (intersection.face) {
-      faceNormalWorld.copy(intersection.face.normal)
-      
-      // Transform normal to world space using the mesh's normal matrix
-      const normalMatrix = new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld)
-      faceNormalWorld.applyMatrix3(normalMatrix).normalize()
-    }
-    
-    // Create the section plane
-    createSectionPlane({
-      point: hitPointWorld,
-      normal: faceNormalWorld,
-      mesh: mesh
-    })
-    
-    console.log('Section plane created from pick:', {
-      point: `(${hitPointWorld.x.toFixed(2)}, ${hitPointWorld.y.toFixed(2)}, ${hitPointWorld.z.toFixed(2)})`,
-      normal: `(${faceNormalWorld.x.toFixed(2)}, ${faceNormalWorld.y.toFixed(2)}, ${faceNormalWorld.z.toFixed(2)})`
-    })
-  }, [createSectionPlane])
-
-  // Sync X-Ray "solid set" with selection
-  // If X-Ray is enabled, ensure selected elements are also solid
-  useEffect(() => {
-    if (!xRayEnabled) return
-
-    // Combine isolated IDs and selected ID
-    const solidIds = [...(isolatedIds || [])]
-    if (selectedId) {
-      if (Array.isArray(selectedId)) {
-        solidIds.push(...selectedId)
-      } else {
-        solidIds.push(selectedId)
-      }
-    }
-
-    // Update X-Ray selection
-    updateXRaySelection(solidIds)
-  }, [xRayEnabled, isolatedIds, selectedId, updateXRaySelection])
-
-  // Auto-Focus behavior: If unlocked, selection replaces the focus set
-  useEffect(() => {
-    if (mode === 'FOCUS' && !focusLock && selectedId) {
-      const newIds = Array.isArray(selectedId) ? selectedId : [selectedId]
-      // Only update if different to avoid loops
-      const currentIds = isolatedIds || []
-      const isDifferent = newIds.length !== currentIds.length || 
-                         !newIds.every(id => currentIds.includes(id))
-      
-      if (isDifferent) {
-        setIsolatedIds(newIds)
-      }
-    }
-  }, [mode, focusLock, selectedId, isolatedIds])
+  const handleResetModel = useCallback(() => {
+    setModelUrls(null)
+    setJobId(null)
+    floatingPanels.handleCloseEcPanel()
+    floatingPanels.handleCloseHvacPanel()
+    spaceOverlay.disableSpaceOverlay()
+    handleClearAll()
+  }, [floatingPanels.handleCloseEcPanel, floatingPanels.handleCloseHvacPanel, spaceOverlay.disableSpaceOverlay, handleClearAll])
 
   // Show upload panel if no model loaded
   if (!modelUrls) {
@@ -652,282 +133,122 @@ function App() {
   }
 
   return (
-    <div style={styles.appContainer}>
-      {/* Navigation Header */}
-      <header style={styles.header}>
-        <div style={styles.logo}>
-          <span style={styles.logoIcon}>◈</span>
-          <span style={styles.logoText}>DIGITAL TWIN</span>
-        </div>
+    <div style={appStyles.appContainer}>
+      <AppHeader />
 
-      </header>
-
-      {/* Main Content */}
-      <div style={styles.mainContent}>
-        {/* Structure Tree - Left Panel */}
+      <div style={appStyles.mainContent}>
         <StructureTree 
           hierarchyUrl={modelUrls.hierarchyUrl}
           onIsolate={handleIsolate}
           onSelect={handleTreeSelect}
-          selectedId={selectedId}
+          selectedId={selection.selectedId}
           focusLock={focusLock}
           onToggleFocusLock={() => setFocusLock(prev => !prev)}
         />
 
-        {/* 3D Viewer - Center */}
-        <div style={styles.viewerContainer}>
-          {/* Viewer Toolbar */}
-          <ViewerToolbar 
-            sectionModeEnabled={sectionModeEnabled}
-            onToggleSectionMode={toggleSectionMode}
-            hasSectionPlane={!!activeSectionPlane}
-            onClearSectionPlane={clearSectionPlane}
-            onAlignCamera={alignCameraToSection}
-            viewMode={viewMode}
-            onSetViewMode={setViewMode}
-            availableViews={getAvailableViews()}
-            onResetView={resetView}
-            onFitToModel={fitToModel}
-            // Toggle panel open/close when Carbon button is clicked
-            onOpenEcPanel={() => {
-              // If panel is closed, open and bring to front
-              if (!ecPanelOpen) {
-                setEcPanelOpen(true)
-                setPanelZCounter(prev => {
-                  const next = prev + 1
-                  setEcPanelZIndex(next)
-                  return next
-                })
-                return
-              }
+        <ViewerShell
+          containerStyle={appStyles.viewerContainer}
+          viewerToolbarProps={{
+            sectionModeEnabled: sectionMode.sectionModeEnabled,
+            onToggleSectionMode: sectionMode.toggleSectionMode,
+            hasSectionPlane: !!sectionMode.activeSectionPlane,
+            onClearSectionPlane: sectionMode.clearSectionPlane,
+            onAlignCamera: sectionMode.alignCameraToSection,
+            viewMode: viewModeState.viewMode,
+            onSetViewMode: viewModeState.setViewMode,
+            availableViews: viewModeState.getAvailableViews(),
+            onResetView: viewModeState.resetView,
+            onFitToModel: viewModeState.fitToModel,
+            onOpenEcPanel: floatingPanels.handleToggleEcPanel,
+            onOpenHvacPanel: floatingPanels.handleToggleHvacPanel,
+            onToggleSpaceOverlay: spaceOverlay.toggleSpaceOverlay,
+            spaceOverlayEnabled: spaceOverlay.spaceOverlayEnabled,
+            hasModel: !!modelUrls
+          }}
+          sectionPanelProps={{
+            sectionModeEnabled: sectionMode.sectionModeEnabled,
+            sectionPlanePickingEnabled: sectionMode.sectionPlanePickingEnabled,
+            activeSectionPlane: sectionMode.activeSectionPlane,
+            onToggleSectionMode: sectionMode.toggleSectionMode,
+            onNudge: sectionMode.nudgeSectionPlane,
+            onAlignCamera: sectionMode.alignCameraToSection,
+            onReset: sectionMode.clearSectionPlane,
+            onResetOffset: sectionMode.resetPlaneOffset,
+            onChangePlane: sectionMode.enableSectionPicking,
+            sectionPlaneVisible: sectionMode.sectionPlaneVisible,
+            onTogglePlaneVisibility: sectionMode.toggleSectionPlaneVisibility,
+            sectionPlaneSize: sectionMode.sectionPlaneSize,
+            onSectionPlaneSizeChange: sectionMode.setSectionPlaneSize
+          }}
+          viewerProps={{
+            onMissed: selection.deselect,
+            onRendererReady: handleRendererReady,
+            onControlsReady: handleControlsReady
+          }}
+          sectionPlaneHelperProps={{
+            activeSectionPlane: sectionMode.activeSectionPlane,
+            visible: sectionMode.sectionPlaneVisible,
+            size: sectionMode.sectionPlaneSize
+          }}
+          selectableModelProps={{
+            url: modelUrls.glbUrl,
+            onSelect: selection.handleSelect,
+            onSceneReady: handleSceneReady,
+            sectionModeEnabled: sectionMode.sectionModeEnabled,
+            sectionPlanePickingEnabled: sectionMode.sectionPlanePickingEnabled,
+            onSectionPick: handleSectionPick,
+            position: [0, 0, 0],
+            scale: 1
+          }}
+          spaceOverlayProps={{
+            enabled: spaceOverlay.spaceOverlayEnabled,
+            jobId,
+            onSpaceSelect: spaceOverlay.handleSpaceSelect,
+            highlightedSpaceIds: spaceOverlay.highlightedSpaceIds,
+            onStatus: spaceOverlay.setSpaceOverlayStatus,
+            selectedSpaceId: spaceOverlay.selectedSpaceId,
+            onSpacesLoaded: spaceOverlay.handleSpacesLoaded
+          }}
+          uploadPanelProps={{
+            onModelReady: handleModelReady,
+            hasModel: true,
+            onReset: handleResetModel
+          }}
+          ecPanelProps={{
+            isOpen: floatingPanels.ecPanelOpen,
+            onClose: floatingPanels.handleCloseEcPanel,
+            jobId,
+            selectedId: selection.selectedId,
+            onSelectContributor: handleTreeSelect,
+            focusToken: floatingPanels.ecPanelZIndex,
+            zIndex: floatingPanels.ecPanelZIndex
+          }}
+          hvacPanelProps={{
+            isOpen: floatingPanels.hvacPanelOpen,
+            onClose: floatingPanels.handleCloseHvacPanel,
+            jobId,
+            selectedId: selection.selectedId,
+            onSelectEquipment: handleHvacSelectDetail,
+            focusToken: floatingPanels.hvacPanelZIndex,
+            zIndex: floatingPanels.hvacPanelZIndex,
+            spaceOverlayLoading: spaceOverlay.spaceOverlayStatus.loading
+          }}
+          spaceNavigatorProps={spaceOverlay.spaceNavigatorProps}
+          axisViewProps={{
+            viewMode: viewModeState.viewMode,
+            onSetViewMode: viewModeState.setViewMode
+          }}
+        />
 
-              // If panel is open and already top-most, close it
-              if (ecPanelZIndex === panelZCounter) {
-                handleCloseEcPanel()
-                return
-              }
-
-              // Otherwise bring it to front
-              setPanelZCounter(prev => {
-                const next = prev + 1
-                setEcPanelZIndex(next)
-                return next
-              })
-            }}
-            onOpenHvacPanel={() => {
-              if (!hvacPanelOpen) {
-                setHvacPanelOpen(true)
-                setPanelZCounter(prev => {
-                  const next = prev + 1
-                  setHvacPanelZIndex(next)
-                  return next
-                })
-                return
-              }
-
-              if (hvacPanelZIndex === panelZCounter) {
-                handleCloseHvacPanel()
-                return
-              }
-
-              setPanelZCounter(prev => {
-                const next = prev + 1
-                setHvacPanelZIndex(next)
-                return next
-              })
-            }}
-            onToggleSpaceOverlay={() => {
-              setSpaceOverlayEnabled(prev => {
-                const next = !prev
-                if (next) {
-                  setSpaceOverlayStatus({ hasSpaces: false, count: 0, error: null, loading: true, checked: false })
-                }
-                return next
-              })
-            }}
-            spaceOverlayEnabled={spaceOverlayEnabled}
-            hasModel={!!modelUrls}
-          />
-          
-          {/* Section Plane Controls Panel */}
-          <SectionPlanePanel
-            sectionModeEnabled={sectionModeEnabled}
-            sectionPlanePickingEnabled={sectionPlanePickingEnabled}
-            activeSectionPlane={activeSectionPlane}
-            onToggleSectionMode={toggleSectionMode}
-            onNudge={nudgeSectionPlane}
-            onAlignCamera={alignCameraToSection}
-            onReset={clearSectionPlane}
-            onResetOffset={resetPlaneOffset}
-            onChangePlane={enableSectionPicking}
-            sectionPlaneVisible={sectionPlaneVisible}
-            onTogglePlaneVisibility={toggleSectionPlaneVisibility}
-            sectionPlaneSize={sectionPlaneSize}
-            onSectionPlaneSizeChange={setSectionPlaneSize}
-          />
-          
-          <Viewer 
-            onMissed={deselect}
-            onRendererReady={handleRendererReady}
-            onControlsReady={handleControlsReady}
-          >
-            <SectionPlaneHelper 
-              activeSectionPlane={activeSectionPlane}
-              visible={sectionPlaneVisible}
-              size={sectionPlaneSize}
-            />
-            <SelectableModel 
-              url={modelUrls.glbUrl}
-              onSelect={handleSelect}
-              onSceneReady={handleSceneReady}
-              sectionModeEnabled={sectionModeEnabled}
-              sectionPlanePickingEnabled={sectionPlanePickingEnabled}
-              onSectionPick={handleSectionPick}
-              position={[0, 0, 0]}
-              scale={1}
-            />
-
-          <SpaceBboxOverlay
-              enabled={spaceOverlayEnabled}
-              jobId={jobId}
-              onSpaceSelect={(id) => {
-                console.log('Space selected:', id)
-                // If we are in cycling mode (no highlighted subset), update the index
-                if (highlightedSpaceIds.length === 0 && allSpaces.length > 0) {
-                  const idx = allSpaces.findIndex(s => s.globalId === id)
-                  if (idx !== -1) setSelectedSpaceIndex(idx)
-                }
-              }}
-              highlightedSpaceIds={highlightedSpaceIds}
-              onStatus={setSpaceOverlayStatus}
-              selectedSpaceId={selectedSpaceIndex >= 0 && allSpaces[selectedSpaceIndex] ? allSpaces[selectedSpaceIndex].globalId : null}
-              onSpacesLoaded={handleSpacesLoaded}
-            />
-          </Viewer>
-          
-          {/* Upload new model button */}
-          <UploadPanel 
-            onModelReady={handleModelReady} 
-            hasModel={true} 
-            onReset={() => {
-              setModelUrls(null)
-              setJobId(null)
-              handleCloseEcPanel()
-              handleCloseHvacPanel()
-              setSpaceOverlayEnabled(false)
-              setHighlightedSpaceIds([])
-              clearAll()
-            }}
-          />
-          
-          <EcPanel 
-            isOpen={ecPanelOpen} 
-            onClose={handleCloseEcPanel} 
-            jobId={jobId} 
-            selectedId={selectedId}
-            onSelectContributor={handleTreeSelect}
-            focusToken={ecPanelZIndex}
-            zIndex={ecPanelZIndex}
-          />
-
-          <HvacFmPanel
-            isOpen={hvacPanelOpen}
-            onClose={handleCloseHvacPanel}
-            jobId={jobId}
-            selectedId={selectedId}
-            onSelectEquipment={handleHvacSelectDetail}
-            focusToken={hvacPanelZIndex}
-            zIndex={hvacPanelZIndex}
-            spaceOverlayLoading={spaceOverlayStatus.loading}
-          />
-
-          {spaceOverlayEnabled && highlightedSpaceIds.length === 0 && allSpaces.length > 0 && (
-            <SpaceNavigator
-              currentIndex={selectedSpaceIndex >= 0 ? selectedSpaceIndex + 1 : 0}
-              totalCount={allSpaces.length}
-              currentName={
-                selectedSpaceIndex >= 0 && allSpaces[selectedSpaceIndex]
-                  ? `${allSpaces[selectedSpaceIndex].room_no || ''} ${allSpaces[selectedSpaceIndex].room_name || allSpaces[selectedSpaceIndex].name || ''}`.trim()
-                  : 'Select a space'
-              }
-              onNext={handleNextSpace}
-              onPrev={handlePrevSpace}
-            />
-          )}
-
-          {/* Keyboard shortcuts hints */}
-          <KeyboardHints />
-          
-          {/* Axis View Widget - Bottom right corner */}
-          <AxisViewWidget
-            viewMode={viewMode}
-            onSetViewMode={setViewMode}
-          />
-        </div>
-        
-        {/* Property Panel - Right Panel */}
         <PropertyPanel 
-          selectedId={selectedId}
+          selectedId={selection.selectedId}
           metadataUrl={modelUrls.metadataUrl}
         />
       </div>
-      
-      {/* Toast notifications */}
+
       <ToastContainer />
     </div>
   )
-}
-
-const styles = {
-  appContainer: {
-    width: '100vw',
-    height: '100vh',
-    display: 'flex',
-    flexDirection: 'column',
-    background: '#f5f5f7',
-  },
-  header: {
-    height: '60px',
-    background: '#ffffff',
-    borderBottom: '1px solid #e5e5e7',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '0 24px',
-    zIndex: 100,
-  },
-  logo: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-  },
-  logoIcon: {
-    fontSize: '20px',
-    color: '#1d1d1f',
-  },
-  logoText: {
-    fontSize: '14px',
-    fontWeight: 600,
-    letterSpacing: '1.5px',
-    color: '#1d1d1f',
-  },
-
-  mainContent: {
-    flex: 1,
-    display: 'flex',
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  viewerContainer: {
-    flex: 1,
-    position: 'relative',
-    margin: '16px',
-    marginLeft: '0',
-    marginRight: '0',
-    borderRadius: '12px',
-    overflow: 'hidden',
-    background: '#f0f0f2',
-  },
 }
 
 export default App

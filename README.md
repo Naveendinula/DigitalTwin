@@ -2,6 +2,8 @@
 
 Web BIM viewer and embodied carbon analysis tool (FastAPI backend + React/Three.js frontend).
 
+Web app documentation: `docs/WEB_APP.md`.
+
 ## Demo (videos)
 
 - **View Presets** — Seamlessly switch between Top, Front, Side, and Free Orbit views to navigate the model efficiently.
