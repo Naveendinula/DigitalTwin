@@ -1,10 +1,15 @@
 # Architecture Documentation
 
 > **Status**: Living Document  
-> **Last Updated**: December 15, 2025  
+> **Last Updated**: December 28, 2025  
 > **Owner**: Naveen Panditharatne
 
 ## Recent additions / changes
+
+- **Date:** 2025-12-28
+- **Dual X-Ray modes:** Wireframe X-ray for architecture/tree selections and ghosted solids for HVAC selections.
+- **HVAC/FM enrichment:** Served spaces include room identifiers (`room_no`, `room_name`) and grouped system names.
+- **Space overlays:** Space bbox output now includes a transform for alignment; added Space Navigator UI and no-spaces feedback.
 
 - **Date:** 2025-12-26
 - **HVAC/FM analysis:** Added HVAC/FM core and API endpoints to map equipment -> terminals -> spaces; results cached in `output/{job_id}/hvac_fm.json` with room identifiers.
@@ -64,6 +69,7 @@ The system bridges the gap between complex BIM files and accessible web visualiz
 *   `src/components/EcPanel.jsx`: UI for triggering and displaying EC analysis results.
 *   `src/components/HvacFmPanel.jsx`: UI for HVAC/FM analysis results and filters.
 *   `src/components/SpaceBboxOverlay.jsx`: Renders space bbox overlays in the viewer.
+*   `src/components/SpaceNavigator.jsx`: Cycles and highlights spaces when overlays are enabled.
 *   `src/components/PropertyPanel.jsx`: Displays element-specific metadata.
 *   `src/components/UploadPanel.jsx`: Handles file selection and upload progress.
 
@@ -144,14 +150,15 @@ graph TB
 1.  **Request**: Frontend sends `POST /api/fm/hvac/analyze/{jobId}`.
 2.  **Load**: Backend locates the `.ifc` file in `uploads/`.
 3.  **Traverse**: `fm_hvac_core.py` discovers equipment, traverses ports, and maps terminals to spaces.
-4.  **Cache**: Result JSON is written to `output/{jobId}/hvac_fm.json`.
-5.  **Fetch**: Frontend calls `GET /api/fm/hvac/{jobId}` to render results in `HvacFmPanel`.
+4.  **Enrich**: Served spaces include `room_no`, `room_name`, and grouped system names when available.
+5.  **Cache**: Result JSON is written to `output/{jobId}/hvac_fm.json`.
+6.  **Fetch**: Frontend calls `GET /api/fm/hvac/{jobId}` to render results in `HvacFmPanel`.
 
 ### Data Flow: Space BBox Overlay
 1.  **Request**: Frontend sends `GET /api/spaces/bboxes/{jobId}`.
 2.  **Compute**: Backend computes space bboxes using IfcOpenShell geometry.
-3.  **Cache**: Result JSON is written to `output/{jobId}/space_bboxes.json`.
-4.  **Render**: Frontend overlays translucent boxes in `SpaceBboxOverlay`.
+3.  **Cache**: Result JSON (bbox + transform) is written to `output/{jobId}/space_bboxes.json`.
+4.  **Render**: Frontend applies the transform and overlays translucent boxes in `SpaceBboxOverlay`.
 
 ## 5. Dependencies
 

@@ -48,7 +48,7 @@ graph TD
         JSONMeta[JSON Metadata]
         ECDB["EC Database (CSV)"]
         HVACJson[HVAC/FM JSON]
-        SpaceBBoxJson[Space BBoxes JSON]
+        SpaceBBoxJson[Space BBoxes + Transform JSON]
         
         IFCConv -- Reads --> IFCFiles
         IFCConv -- Writes --> GLBFiles
@@ -102,6 +102,7 @@ graph LR
         Panel[EcPanel.jsx]
         HvacPanel[HvacFmPanel.jsx]
         SpaceOverlay[SpaceBboxOverlay.jsx]
+        SpaceNav[SpaceNavigator.jsx]
         
         FE --> Src
         Src --> Comps
@@ -109,6 +110,7 @@ graph LR
         Comps --> Panel
         Comps --> HvacPanel
         Comps --> SpaceOverlay
+        Comps --> SpaceNav
     end
     
     Root --> Backend
@@ -165,7 +167,7 @@ sequenceDiagram
     User->>UI: Click "Analyze HVAC FM"
     UI->>API: POST /api/fm/hvac/analyze/{job_id}
     API->>Core: Traverse equipment -> terminals -> spaces
-    Core-->>API: Cache hvac_fm.json
+    Core-->>API: Cache hvac_fm.json (rooms, system groups)
     UI->>API: GET /api/fm/hvac/{job_id}
     API-->>UI: JSON Data
     UI->>User: Display served spaces and terminals
@@ -182,7 +184,7 @@ sequenceDiagram
     User->>UI: Toggle "Spaces"
     UI->>API: GET /api/spaces/bboxes/{job_id}
     API->>BBox: Compute bboxes
-    BBox-->>API: Cache space_bboxes.json
+    BBox-->>API: Cache space_bboxes.json (bbox + transform)
     API-->>UI: JSON Data
     UI->>User: Render translucent space boxes
 ```

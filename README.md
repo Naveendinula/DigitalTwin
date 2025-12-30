@@ -45,10 +45,10 @@ https://github.com/user-attachments/assets/13ed555d-da2b-4b52-ab9b-3861132c5abe
 ## Features (code refs)
 - 3D viewer with selection, focus, isolate, section planes, and view presets (`frontend/src/components/Viewer.jsx`, `frontend/src/components/SelectableModelWithVisibility.jsx`).
 - Spatial tree and property inspection (`frontend/src/components/StructureTree.jsx`, `frontend/src/components/PropertyPanel.jsx`).
-- X-Ray/ghost highlighting (`frontend/src/hooks/useXRayMode.js`).
+- X-Ray/ghost highlighting with wireframe and ghosted solid modes (`frontend/src/hooks/useXRayMode.js`, `frontend/src/App.jsx`).
 - Embodied carbon calculation with override UI (`frontend/src/components/EcPanel.jsx`) backed by FastAPI (`backend/ec_api.py`, `backend/ec_core.py`).
-- HVAC/FM analysis panel with served terminals/spaces and filters (`frontend/src/components/HvacFmPanel.jsx`) backed by FastAPI (`backend/fm_api.py`, `backend/fm_hvac_core.py`).
-- Space bbox overlay toggle for translucent room boxes (`frontend/src/components/SpaceBboxOverlay.jsx`, `backend/fm_api.py`).
+- HVAC/FM analysis panel with served terminals/spaces, filters, and selection-driven highlights (`frontend/src/components/HvacFmPanel.jsx`) backed by FastAPI (`backend/fm_api.py`, `backend/fm_hvac_core.py`).
+- Space bbox overlay toggle and navigator for translucent room boxes (`frontend/src/components/SpaceBboxOverlay.jsx`, `frontend/src/components/SpaceNavigator.jsx`, `backend/fm_api.py`).
 
 ## Run locally
 Backend (from `backend/`):
@@ -72,9 +72,13 @@ npm run dev
 - `DELETE /job/{job_id}` — delete a job.
 - `GET /health` — health check.
 - `POST /api/ec/calculate/{job_id}` — compute embodied carbon for an uploaded IFC (supports overrides).
-- `POST /api/fm/hvac/analyze/{job_id}` — run HVAC/FM analysis and cache results.
-- `GET /api/fm/hvac/{job_id}` — fetch cached HVAC/FM analysis JSON.
-- `GET /api/spaces/bboxes/{job_id}` — fetch cached space bounding boxes for overlay rendering.
+- `POST /api/fm/hvac/analyze/{job_id}` – run HVAC/FM analysis and cache results.
+- `GET /api/fm/hvac/{job_id}` – fetch cached HVAC/FM analysis JSON.
+- `GET /api/spaces/bboxes/{job_id}` – fetch cached space bounding boxes for overlay rendering.
+
+Notes:
+- HVAC/FM output includes served spaces with `room_no`, `room_name`, and grouped system names when available.
+- Space bbox output includes local `bbox` plus a `transform` matrix for model-aligned overlays.
 
 ## Media assets
 - Final clips live in `frontend/public/media/mp4/`, posters in `frontend/public/media/posters/`. See `frontend/public/media/README.md` for encoding settings and naming.
