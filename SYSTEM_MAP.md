@@ -40,6 +40,7 @@ graph TD
         Router --> ECCalc
         Router --> HvacCore
         Router --> SpaceBBox
+        Router --> OccSim["Occupancy Simulator"]
     end
 
     subgraph "Data Layer"
@@ -64,6 +65,9 @@ graph TD
 
         SpaceBBox -- Reads --> IFCFiles
         SpaceBBox -- Writes --> SpaceBBoxJson
+
+        OccSim -- Reads --> SpaceBBoxJson
+        OccSim -- Writes --> OccJson[Occupancy JSON]
     end
 ```
 
@@ -89,6 +93,8 @@ graph LR
         BE --> API
         BE --> FmCore
         BE --> FmAPI
+        OccSim2[occupancy_sim.py]
+        BE --> OccSim2
         BE --> DB
         BE --> Uploads
         BE --> Output
@@ -111,6 +117,10 @@ graph LR
         Comps --> HvacPanel
         Comps --> SpaceOverlay
         Comps --> SpaceNav
+        OccLegend[OccupancyLegend.jsx]
+        OccPanel[OccupancyPanel.jsx]
+        Comps --> OccLegend
+        Comps --> OccPanel
     end
     
     Root --> Backend
@@ -187,4 +197,27 @@ sequenceDiagram
     BBox-->>API: Cache space_bboxes.json (bbox + transform)
     API-->>UI: JSON Data
     UI->>User: Render translucent space boxes
+```
+
+### 5. Live Occupancy Simulation
+```mermaid
+sequenceDiagram
+    participant User
+    participant UI as Frontend
+    participant API as Backend API
+    participant Sim as Occupancy Simulator
+
+    User->>UI: Toggle "Occupancy"
+    UI->>API: GET /api/occupancy/{job_id}
+    API->>Sim: Generate snapshot (time-based patterns)
+    Sim-->>API: Cache occupancy_current.json
+    API-->>UI: JSON Data (spaces + totals)
+    UI->>User: Render heatmap overlay + legend
+    loop Every 2 seconds
+        UI->>API: POST /api/occupancy/tick/{job_id}
+        API->>Sim: Random walk with mean reversion
+        Sim-->>API: Updated snapshot
+        API-->>UI: Updated JSON
+        UI->>User: Update colors + counts
+    end
 ```

@@ -56,6 +56,7 @@ https://github.com/user-attachments/assets/13ed555d-da2b-4b52-ab9b-3861132c5abe
 - Embodied carbon calculation with override UI (`frontend/src/components/EcPanel.jsx`) backed by FastAPI (`backend/ec_api.py`, `backend/ec_core.py`).
 - HVAC/FM analysis panel with served terminals/spaces, filters, and selection-driven highlights (`frontend/src/components/HvacFmPanel.jsx`) backed by FastAPI (`backend/fm_api.py`, `backend/fm_hvac_core.py`).
 - Space bbox overlay toggle and navigator for translucent room boxes (`frontend/src/components/SpaceBboxOverlay.jsx`, `frontend/src/components/SpaceNavigator.jsx`, `backend/fm_api.py`).
+- Live occupancy simulation with time-based patterns and heatmap visualization (`frontend/src/components/OccupancyPanel.jsx`, `frontend/src/components/OccupancyLegend.jsx`, `backend/occupancy_sim.py`).
 
 ## Run locally
 Backend (from `backend/`):
@@ -82,10 +83,14 @@ npm run dev
 - `POST /api/fm/hvac/analyze/{job_id}` – run HVAC/FM analysis and cache results.
 - `GET /api/fm/hvac/{job_id}` – fetch cached HVAC/FM analysis JSON.
 - `GET /api/spaces/bboxes/{job_id}` – fetch cached space bounding boxes for overlay rendering.
+- `GET /api/occupancy/{job_id}` – get current occupancy snapshot for all spaces.
+- `POST /api/occupancy/tick/{job_id}` – advance occupancy simulation by one tick.
+- `POST /api/occupancy/reset/{job_id}` – reset occupancy simulation to fresh state.
 
 Notes:
 - HVAC/FM output includes served spaces with `room_no`, `room_name`, and grouped system names when available.
 - Space bbox output includes local `bbox` plus a `transform` matrix for model-aligned overlays.
+- Occupancy simulation uses absolute headcount as canonical data; percentage is derived for UX display.
 
 ## Media assets
 - Final clips live in `frontend/public/media/mp4/`, posters in `frontend/public/media/posters/`. See `frontend/public/media/README.md` for encoding settings and naming.

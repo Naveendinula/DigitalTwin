@@ -1,10 +1,15 @@
 # Architecture Documentation
 
 > **Status**: Living Document  
-> **Last Updated**: December 28, 2025  
+> **Last Updated**: December 31, 2025  
 > **Owner**: Naveen Panditharatne
 
 ## Recent additions / changes
+
+- **Date:** 2025-12-31
+- **Live Occupancy Simulation:** Added synthetic occupancy data generation with time-based patterns (6am–10pm schedule), random walk with mean reversion, and capacity estimation (~10m²/person).
+- **Occupancy Backend:** New `occupancy_sim.py` module and API endpoints in `fm_api.py` for get/tick/reset/demo operations.
+- **Occupancy Frontend:** `useOccupancy` hook for polling, `OccupancyLegend` (floating summary), `OccupancyPanel` (draggable detail view), and heatmap coloring in `SpaceBboxOverlay` (green→yellow→red gradient).
 
 - **Date:** 2025-12-28
 - **Dual X-Ray modes:** Wireframe X-ray for architecture/tree selections and ghosted solids for HVAC selections.
@@ -38,6 +43,7 @@ The system bridges the gap between complex BIM files and accessible web visualiz
 *   **HVAC/FM Analysis**: The user runs HVAC/FM analysis to derive served terminals and served spaces from equipment.
 *   **Spatial Navigation**: Users can isolate parts of the building (e.g., specific floors or rooms) using the spatial hierarchy tree.
 *   **Space Overlay**: Users toggle translucent space bounding boxes for quick room context in the 3D view.
+*   **Live Occupancy**: Users enable occupancy simulation to visualize synthetic headcounts per room with a color-coded heatmap (green→yellow→red) and a real-time legend/panel.
 
 ## 3. Repository Tour
 
@@ -51,8 +57,9 @@ The system bridges the gap between complex BIM files and accessible web visualiz
 *   `config.py`: Centralized configuration (paths, constants).
 *   `ec_api.py`: API router specifically for Embodied Carbon endpoints.
 *   `ec_core.py`: Orchestrator for EC calculations.
-*   `fm_api.py`: API router for HVAC/FM analysis and space bbox endpoints.
+*   `fm_api.py`: API router for HVAC/FM analysis, space bbox, and occupancy simulation endpoints.
 *   `fm_hvac_core.py`: HVAC/FM core logic (equipment -> terminals -> spaces).
+*   `occupancy_sim.py`: Synthetic occupancy data generation with time-based patterns.
 *   `domain/`:
     *   `materials.py`: Material classification and extraction logic.
     *   `geometry.py`: IfcOpenShell geometry processing.
@@ -68,8 +75,11 @@ The system bridges the gap between complex BIM files and accessible web visualiz
 *   `src/components/Viewer.jsx`: The core 3D canvas using `@react-three/fiber`.
 *   `src/components/EcPanel.jsx`: UI for triggering and displaying EC analysis results.
 *   `src/components/HvacFmPanel.jsx`: UI for HVAC/FM analysis results and filters.
-*   `src/components/SpaceBboxOverlay.jsx`: Renders space bbox overlays in the viewer.
+*   `src/components/SpaceBboxOverlay.jsx`: Renders space bbox overlays in the viewer (with optional occupancy heatmap).
 *   `src/components/SpaceNavigator.jsx`: Cycles and highlights spaces when overlays are enabled.
+*   `src/components/OccupancyLegend.jsx`: Floating legend showing live occupancy totals and color scale.
+*   `src/components/OccupancyPanel.jsx`: Draggable panel with sortable/filterable occupancy breakdown.
+*   `src/hooks/useOccupancy.js`: Hook managing occupancy polling and state.
 *   `src/components/PropertyPanel.jsx`: Displays element-specific metadata.
 *   `src/components/UploadPanel.jsx`: Handles file selection and upload progress.
 
@@ -100,6 +110,7 @@ graph TB
         ECCore["EC Calculator"]
         HvacCore["HVAC/FM Core"]
         SpaceBBox["Space BBox Extractor"]
+        OccSim["Occupancy Simulator"]
     end
 
     subgraph Storage
@@ -119,6 +130,7 @@ graph TB
     Server -->|Calls| ECCore
     Server -->|Calls| HvacCore
     Server -->|Calls| SpaceBBox
+    Server -->|Calls| OccSim
 
     Converter -->|Reads| Uploads
     Converter -->|Writes GLB| Outputs
@@ -159,6 +171,14 @@ graph TB
 2.  **Compute**: Backend computes space bboxes using IfcOpenShell geometry.
 3.  **Cache**: Result JSON (bbox + transform) is written to `output/{jobId}/space_bboxes.json`.
 4.  **Render**: Frontend applies the transform and overlays translucent boxes in `SpaceBboxOverlay`.
+
+### Data Flow: Occupancy Simulation
+1.  **Enable**: User toggles "Occupancy" in toolbar; `useOccupancy` hook activates.
+2.  **Initial Fetch**: Frontend sends `GET /api/occupancy/{jobId}` to get current snapshot.
+3.  **Generate**: Backend `occupancy_sim.py` generates synthetic occupancy using time-based multipliers and capacity estimates (~10m²/person).
+4.  **Poll Loop**: Frontend sends `POST /api/occupancy/tick/{jobId}` every 2 seconds.
+5.  **Update**: Backend applies random walk with mean reversion toward time-adjusted targets; returns new snapshot.
+6.  **Render**: `SpaceBboxOverlay` colors spaces green→yellow→red based on occupancy percentage; `OccupancyLegend` shows totals; `OccupancyPanel` shows detail.
 
 ## 5. Dependencies
 
