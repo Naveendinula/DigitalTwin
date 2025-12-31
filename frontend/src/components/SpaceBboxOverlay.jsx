@@ -2,20 +2,54 @@ import React, { useEffect, useMemo, useState } from 'react'
 import * as THREE from 'three'
 import { Text } from '@react-three/drei'
 
-const getSpaceLabel = (space) => {
+/**
+ * Get color for occupancy percentage using green -> yellow -> red gradient
+ */
+const getOccupancyColor = (percent) => {
+  // Clamp percent to 0-100
+  const p = Math.max(0, Math.min(100, percent))
+
+  // Green (0%) -> Yellow (50%) -> Red (100%)
+  let r, g, b
+
+  if (p <= 50) {
+    // Green to Yellow: increase red
+    r = Math.round((p / 50) * 255)
+    g = 200
+    b = 50
+  } else {
+    // Yellow to Red: decrease green
+    r = 255
+    g = Math.round(200 - ((p - 50) / 50) * 200)
+    b = 50
+  }
+
+  return (r << 16) | (g << 8) | b
+}
+
+const getSpaceLabel = (space, occupancyData) => {
   if (!space) return 'Unknown'
   const roomNo = space.room_no || ''
   const roomName = space.room_name || ''
-  const label = `${roomNo} ${roomName}`.trim()
-  return label || space.name || space.globalId || 'Unknown'
+  let label = `${roomNo} ${roomName}`.trim()
+  label = label || space.name || space.globalId || 'Unknown'
+
+  // Add occupancy info if available
+  if (occupancyData && occupancyData.has(space.globalId)) {
+    const occ = occupancyData.get(space.globalId)
+    label += ` (${occ.occupancy}/${occ.capacity})`
+  }
+
+  return label
 }
 
 /**
  * SpaceBboxOverlay
  *
  * Renders translucent bbox overlays for IfcSpace elements.
+ * Supports occupancy visualization with color-coded heatmap.
  */
-function SpaceBboxOverlay({ enabled, jobId, onSpaceSelect, highlightedSpaceIds = [], onStatus, selectedSpaceId, onSpacesLoaded }) {
+function SpaceBboxOverlay({ enabled, jobId, onSpaceSelect, highlightedSpaceIds = [], onStatus, selectedSpaceId, onSpacesLoaded, occupancyData }) {
   const [spaces, setSpaces] = useState([])
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -77,6 +111,25 @@ function SpaceBboxOverlay({ enabled, jobId, onSpaceSelect, highlightedSpaceIds =
     })
   }, [])
 
+  // Create materials for occupancy visualization
+  const occupancyMaterials = useMemo(() => {
+    if (!occupancyData || occupancyData.size === 0) return null
+
+    const materials = new Map()
+    for (const [globalId, occ] of occupancyData) {
+      const color = getOccupancyColor(occ.percent)
+      materials.set(globalId, new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: 0.35,
+        depthWrite: false,
+        depthTest: false,
+        side: THREE.DoubleSide,
+      }))
+    }
+    return materials
+  }, [occupancyData])
+
   const highlightedSet = useMemo(() => new Set(highlightedSpaceIds), [highlightedSpaceIds])
 
   const spaceMeshes = useMemo(() => {
@@ -119,13 +172,22 @@ function SpaceBboxOverlay({ enabled, jobId, onSpaceSelect, highlightedSpaceIds =
       {spaceMeshes.map((entry) => {
         const { space, center, scale, matrix } = entry
         const isHighlighted = (space.globalId && highlightedSet.has(space.globalId)) || (selectedSpaceId && space.globalId === selectedSpaceId)
-        const label = getSpaceLabel(space)
+        const label = getSpaceLabel(space, occupancyData)
+
+        // Determine material: occupancy color > highlight > default
+        let meshMaterial = material
+        if (occupancyMaterials && occupancyMaterials.has(space.globalId)) {
+          meshMaterial = occupancyMaterials.get(space.globalId)
+        }
+        if (isHighlighted) {
+          meshMaterial = highlightMaterial
+        }
 
         const mesh = (
           <mesh
             key={space.globalId || `${center[0]}-${center[1]}-${center[2]}`}
             geometry={geometry}
-            material={isHighlighted ? highlightMaterial : material}
+            material={meshMaterial}
             position={center}
             scale={scale}
             onPointerDown={(e) => {

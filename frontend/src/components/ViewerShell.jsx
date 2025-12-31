@@ -2,6 +2,8 @@ import AxisViewWidget from './AxisViewWidget'
 import EcPanel from './EcPanel'
 import HvacFmPanel from './HvacFmPanel'
 import KeyboardHints from './KeyboardHints'
+import OccupancyLegend from './OccupancyLegend'
+import OccupancyPanel from './OccupancyPanel'
 import SectionPlaneHelper from './SectionPlaneHelper'
 import SectionPlanePanel from './SectionPlanePanel'
 import SelectableModel from './SelectableModelWithVisibility'
@@ -23,7 +25,9 @@ export default function ViewerShell({
   ecPanelProps,
   hvacPanelProps,
   spaceNavigatorProps,
-  axisViewProps
+  axisViewProps,
+  occupancyLegendProps,
+  occupancyPanelProps
 }) {
   const { visible: showSpaceNavigator, ...navigatorProps } = spaceNavigatorProps || {}
 
@@ -43,8 +47,11 @@ export default function ViewerShell({
 
       <EcPanel {...ecPanelProps} />
       <HvacFmPanel {...hvacPanelProps} />
+      <OccupancyPanel {...occupancyPanelProps} />
 
       {showSpaceNavigator && <SpaceNavigator {...navigatorProps} />}
+
+      <OccupancyLegend {...occupancyLegendProps} />
 
       <KeyboardHints />
 

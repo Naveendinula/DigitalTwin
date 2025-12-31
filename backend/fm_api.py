@@ -15,6 +15,12 @@ from ifcopenshell.util import element as ifc_element
 
 from config import UPLOAD_DIR, OUTPUT_DIR
 from fm_hvac_core import analyze_hvac_fm
+from occupancy_sim import (
+    generate_occupancy_snapshot,
+    load_current_occupancy,
+    save_occupancy_snapshot,
+    generate_demo_loop,
+)
 
 router = APIRouter()
 
@@ -273,3 +279,158 @@ async def get_space_bboxes(job_id: str):
         )
 
     return result
+
+
+# ============================================================================
+# Occupancy Simulation Endpoints
+# ============================================================================
+
+
+def _load_spaces_for_job(job_id: str) -> list[dict]:
+    """Load space bboxes for a job, computing if needed."""
+    bbox_path = _get_space_bbox_path(job_id)
+    if bbox_path.exists():
+        with open(bbox_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return data.get("spaces", [])
+
+    # Compute space bboxes if not cached
+    ifc_path = _find_ifc_for_job(job_id)
+    model = ifcopenshell.open(str(ifc_path))
+    result = _compute_space_bboxes(model)
+    with open(bbox_path, "w", encoding="utf-8") as f:
+        json.dump(result, f, indent=2, ensure_ascii=False)
+    return result.get("spaces", [])
+
+
+@router.get("/api/occupancy/{job_id}")
+async def get_occupancy(job_id: str):
+    """
+    Get the current occupancy snapshot for a job.
+    Returns per-space occupancy counts and totals.
+    """
+    # Load existing snapshot
+    snapshot = load_current_occupancy(job_id)
+
+    if snapshot:
+        return snapshot
+
+    # No snapshot exists - generate initial one
+    try:
+        spaces = _load_spaces_for_job(job_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to load spaces: {type(e).__name__}: {e}",
+        )
+
+    if not spaces:
+        return {
+            "spaces": [],
+            "totals": {"totalOccupancy": 0, "totalCapacity": 0},
+            "timestamp": None,
+        }
+
+    snapshot = generate_occupancy_snapshot(spaces)
+    save_occupancy_snapshot(job_id, snapshot)
+    return snapshot
+
+
+@router.post("/api/occupancy/tick/{job_id}")
+async def tick_occupancy(job_id: str):
+    """
+    Advance the occupancy simulation by one tick.
+    Uses random walk with time-based patterns.
+    """
+    try:
+        spaces = _load_spaces_for_job(job_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to load spaces: {type(e).__name__}: {e}",
+        )
+
+    if not spaces:
+        return {
+            "spaces": [],
+            "totals": {"totalOccupancy": 0, "totalCapacity": 0},
+            "timestamp": None,
+        }
+
+    prev_snapshot = load_current_occupancy(job_id)
+    snapshot = generate_occupancy_snapshot(spaces, prev_snapshot)
+    save_occupancy_snapshot(job_id, snapshot)
+    return snapshot
+
+
+@router.post("/api/occupancy/reset/{job_id}")
+async def reset_occupancy(job_id: str):
+    """
+    Reset occupancy simulation to fresh initial state.
+    """
+    try:
+        spaces = _load_spaces_for_job(job_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to load spaces: {type(e).__name__}: {e}",
+        )
+
+    if not spaces:
+        return {
+            "spaces": [],
+            "totals": {"totalOccupancy": 0, "totalCapacity": 0},
+            "timestamp": None,
+        }
+
+    # Generate fresh snapshot without previous state
+    snapshot = generate_occupancy_snapshot(spaces, None)
+    save_occupancy_snapshot(job_id, snapshot)
+    return snapshot
+
+
+@router.post("/api/occupancy/demo/{job_id}")
+async def generate_demo(job_id: str, frames: int = 30):
+    """
+    Generate a demo loop of occupancy frames for playback.
+    """
+    try:
+        spaces = _load_spaces_for_job(job_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to load spaces: {type(e).__name__}: {e}",
+        )
+
+    if not spaces:
+        return {"frames": [], "count": 0}
+
+    frames_data = generate_demo_loop(spaces, frames=frames)
+
+    # Save demo to disk
+    demo_path = OUTPUT_DIR / job_id / "occupancy_demo.json"
+    with open(demo_path, "w", encoding="utf-8") as f:
+        json.dump({"frames": frames_data}, f, indent=2, ensure_ascii=False)
+
+    return {"frames": frames_data, "count": len(frames_data)}
+
+
+@router.get("/api/occupancy/demo/{job_id}")
+async def get_demo(job_id: str):
+    """
+    Get the pre-generated demo loop for playback.
+    """
+    demo_path = OUTPUT_DIR / job_id / "occupancy_demo.json"
+    if not demo_path.exists():
+        raise HTTPException(status_code=404, detail="Demo not generated yet")
+
+    with open(demo_path, "r", encoding="utf-8") as f:
+        return json.load(f)

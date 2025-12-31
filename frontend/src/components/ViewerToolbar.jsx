@@ -32,6 +32,9 @@ function ViewerToolbar({
   onOpenHvacPanel,
   onToggleSpaceOverlay,
   spaceOverlayEnabled,
+  onToggleOccupancy,
+  occupancyEnabled,
+  onOpenOccupancyPanel,
   hasModel
 }) {
   const [viewMenuOpen, setViewMenuOpen] = useState(false)
@@ -175,6 +178,38 @@ function ViewerToolbar({
           }}>
             Spaces
           </span>
+        </button>
+      )}
+
+      {/* Occupancy Toggle */}
+      {hasModel && (
+        <button
+          style={{
+            ...styles.toolButton,
+            ...(occupancyEnabled ? styles.toolButtonActive : {})
+          }}
+          onClick={onToggleOccupancy}
+          title={occupancyEnabled ? 'Stop Occupancy Simulation' : 'Start Occupancy Simulation'}
+        >
+          <PeopleIcon active={occupancyEnabled} />
+          <span style={{
+            ...styles.toolLabel,
+            ...(occupancyEnabled ? styles.toolLabelActive : {})
+          }}>
+            Occupancy
+          </span>
+        </button>
+      )}
+
+      {/* Occupancy Panel Button */}
+      {hasModel && occupancyEnabled && (
+        <button
+          style={styles.toolButton}
+          onClick={onOpenOccupancyPanel}
+          title="Occupancy Details"
+        >
+          <ChartIcon />
+          <span style={styles.toolLabel}>Details</span>
         </button>
       )}
 
@@ -417,6 +452,51 @@ function ClearIcon() {
     >
       <line x1="18" y1="6" x2="6" y2="18" />
       <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  )
+}
+
+/**
+ * People Icon - For occupancy visualization
+ */
+function PeopleIcon({ active }) {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={active ? '#ffffff' : '#1d1d1f'}
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  )
+}
+
+/**
+ * Chart Icon - For occupancy details panel
+ */
+function ChartIcon() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="#1d1d1f"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <line x1="18" y1="20" x2="18" y2="10" />
+      <line x1="12" y1="20" x2="12" y2="4" />
+      <line x1="6" y1="20" x2="6" y2="14" />
     </svg>
   )
 }

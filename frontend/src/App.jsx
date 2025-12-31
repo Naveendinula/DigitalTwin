@@ -16,6 +16,7 @@ import useXRayMode from './hooks/useXRayMode'
 import useCameraFocus from './hooks/useCameraFocus'
 import useViewMode from './hooks/useViewMode'
 import useSpaceOverlay from './hooks/useSpaceOverlay'
+import useOccupancy from './hooks/useOccupancy'
 import useViewerScene from './hooks/useViewerScene'
 import appStyles from './constants/appStyles'
 
@@ -42,6 +43,10 @@ function App() {
 
   const floatingPanels = useFloatingPanels(xRayMode.disableXRay)
   const spaceOverlay = useSpaceOverlay({ jobId, showToast })
+  const occupancy = useOccupancy({ jobId, pollInterval: 2000, showToast })
+
+  // Occupancy panel state
+  const [occupancyPanelOpen, setOccupancyPanelOpen] = useState(false)
 
   const {
     focusLock,
@@ -112,11 +117,13 @@ function App() {
     // Reset section mode when loading a new model
     sectionMode.setSectionMode(false)
     spaceOverlay.disableSpaceOverlay()
+    occupancy.disable()
+    setOccupancyPanelOpen(false)
     // Invalidate bounds cache for new model
     viewModeState.invalidateBoundsCache()
     // Auto-fit once the model and controls are ready
     requestFitToModel()
-  }, [sectionMode.setSectionMode, viewModeState.invalidateBoundsCache, spaceOverlay.disableSpaceOverlay, requestFitToModel])
+  }, [sectionMode.setSectionMode, viewModeState.invalidateBoundsCache, spaceOverlay.disableSpaceOverlay, occupancy.disable, requestFitToModel])
 
   const handleResetModel = useCallback(() => {
     setModelUrls(null)
@@ -124,8 +131,25 @@ function App() {
     floatingPanels.handleCloseEcPanel()
     floatingPanels.handleCloseHvacPanel()
     spaceOverlay.disableSpaceOverlay()
+    occupancy.disable()
+    setOccupancyPanelOpen(false)
     handleClearAll()
-  }, [floatingPanels.handleCloseEcPanel, floatingPanels.handleCloseHvacPanel, spaceOverlay.disableSpaceOverlay, handleClearAll])
+  }, [floatingPanels.handleCloseEcPanel, floatingPanels.handleCloseHvacPanel, spaceOverlay.disableSpaceOverlay, occupancy.disable, handleClearAll])
+
+  /**
+   * Toggle occupancy mode and panel
+   */
+  const handleToggleOccupancy = useCallback(() => {
+    occupancy.toggle()
+    // Also enable space overlay when turning on occupancy
+    if (!occupancy.enabled && !spaceOverlay.spaceOverlayEnabled) {
+      spaceOverlay.toggleSpaceOverlay()
+    }
+  }, [occupancy.enabled, occupancy.toggle, spaceOverlay.spaceOverlayEnabled, spaceOverlay.toggleSpaceOverlay])
+
+  const handleToggleOccupancyPanel = useCallback(() => {
+    setOccupancyPanelOpen(prev => !prev)
+  }, [])
 
   // Show upload panel if no model loaded
   if (!modelUrls) {
@@ -163,6 +187,9 @@ function App() {
             onOpenHvacPanel: floatingPanels.handleToggleHvacPanel,
             onToggleSpaceOverlay: spaceOverlay.toggleSpaceOverlay,
             spaceOverlayEnabled: spaceOverlay.spaceOverlayEnabled,
+            onToggleOccupancy: handleToggleOccupancy,
+            occupancyEnabled: occupancy.enabled,
+            onOpenOccupancyPanel: handleToggleOccupancyPanel,
             hasModel: !!modelUrls
           }}
           sectionPanelProps={{
@@ -207,7 +234,8 @@ function App() {
             highlightedSpaceIds: spaceOverlay.highlightedSpaceIds,
             onStatus: spaceOverlay.setSpaceOverlayStatus,
             selectedSpaceId: spaceOverlay.selectedSpaceId,
-            onSpacesLoaded: spaceOverlay.handleSpacesLoaded
+            onSpacesLoaded: spaceOverlay.handleSpacesLoaded,
+            occupancyData: occupancy.enabled ? occupancy.occupancyMap : null
           }}
           uploadPanelProps={{
             onModelReady: handleModelReady,
@@ -237,6 +265,21 @@ function App() {
           axisViewProps={{
             viewMode: viewModeState.viewMode,
             onSetViewMode: viewModeState.setViewMode
+          }}
+          occupancyLegendProps={{
+            visible: occupancy.enabled,
+            totals: occupancy.totals,
+            timestamp: occupancy.timestamp
+          }}
+          occupancyPanelProps={{
+            isOpen: occupancyPanelOpen,
+            onClose: () => setOccupancyPanelOpen(false),
+            occupancyData: occupancy.occupancyMap,
+            totals: occupancy.totals,
+            timestamp: occupancy.timestamp,
+            onReset: occupancy.reset,
+            onSpaceSelect: spaceOverlay.handleSpaceSelect,
+            zIndex: 210
           }}
         />
 

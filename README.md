@@ -4,6 +4,11 @@ Web BIM viewer and embodied carbon analysis tool (FastAPI backend + React/Three.
 
 Web app documentation: `docs/WEB_APP.md`.
 
+## Refactor Notes (App.jsx)
+- `frontend/src/App.jsx` is now a thin orchestrator that wires hooks and UI shells.
+- Viewer lifecycle, selection/isolation, space overlay, and floating panels are handled by hooks in `frontend/src/hooks/`.
+- Major UI blocks are composed via `frontend/src/components/ViewerShell.jsx` and `frontend/src/components/AppHeader.jsx`.
+
 ## Demo (videos)
 
 - **View Presets** — Seamlessly switch between Top, Front, Side, and Free Orbit views to navigate the model efficiently.
