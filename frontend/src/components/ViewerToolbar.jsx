@@ -35,6 +35,8 @@ function ViewerToolbar({
   onToggleOccupancy,
   occupancyEnabled,
   onOpenOccupancyPanel,
+  geometryHidden,
+  onToggleGeometry,
   hasModel
 }) {
   const [viewMenuOpen, setViewMenuOpen] = useState(false)
@@ -210,6 +212,26 @@ function ViewerToolbar({
         >
           <ChartIcon />
           <span style={styles.toolLabel}>Details</span>
+        </button>
+      )}
+
+      {/* Hide Geometry Toggle - only when occupancy is enabled */}
+      {hasModel && occupancyEnabled && (
+        <button
+          style={{
+            ...styles.toolButton,
+            ...(geometryHidden ? styles.toolButtonActive : {})
+          }}
+          onClick={onToggleGeometry}
+          title={geometryHidden ? 'Show Building Geometry' : 'Hide Building Geometry'}
+        >
+          <EyeIcon active={geometryHidden} hidden={geometryHidden} />
+          <span style={{
+            ...styles.toolLabel,
+            ...(geometryHidden ? styles.toolLabelActive : {})
+          }}>
+            {geometryHidden ? 'Show' : 'Hide'}
+          </span>
         </button>
       )}
 
@@ -497,6 +519,46 @@ function ChartIcon() {
       <line x1="18" y1="20" x2="18" y2="10" />
       <line x1="12" y1="20" x2="12" y2="4" />
       <line x1="6" y1="20" x2="6" y2="14" />
+    </svg>
+  )
+}
+
+/**
+ * Eye Icon - For hiding/showing geometry
+ */
+function EyeIcon({ active, hidden }) {
+  if (hidden) {
+    // Eye with slash (hidden state)
+    return (
+      <svg
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke={active ? '#ffffff' : '#1d1d1f'}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+        <line x1="1" y1="1" x2="23" y2="23" />
+      </svg>
+    )
+  }
+  // Normal eye (visible state)
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={active ? '#ffffff' : '#1d1d1f'}
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
     </svg>
   )
 }

@@ -47,6 +47,7 @@ function App() {
 
   // Occupancy panel state
   const [occupancyPanelOpen, setOccupancyPanelOpen] = useState(false)
+  const [geometryHidden, setGeometryHidden] = useState(false)
 
   const {
     focusLock,
@@ -119,6 +120,7 @@ function App() {
     spaceOverlay.disableSpaceOverlay()
     occupancy.disable()
     setOccupancyPanelOpen(false)
+    setGeometryHidden(false)
     // Invalidate bounds cache for new model
     viewModeState.invalidateBoundsCache()
     // Auto-fit once the model and controls are ready
@@ -133,6 +135,7 @@ function App() {
     spaceOverlay.disableSpaceOverlay()
     occupancy.disable()
     setOccupancyPanelOpen(false)
+    setGeometryHidden(false)
     handleClearAll()
   }, [floatingPanels.handleCloseEcPanel, floatingPanels.handleCloseHvacPanel, spaceOverlay.disableSpaceOverlay, occupancy.disable, handleClearAll])
 
@@ -149,6 +152,10 @@ function App() {
 
   const handleToggleOccupancyPanel = useCallback(() => {
     setOccupancyPanelOpen(prev => !prev)
+  }, [])
+
+  const handleToggleGeometry = useCallback(() => {
+    setGeometryHidden(prev => !prev)
   }, [])
 
   // Show upload panel if no model loaded
@@ -190,6 +197,8 @@ function App() {
             onToggleOccupancy: handleToggleOccupancy,
             occupancyEnabled: occupancy.enabled,
             onOpenOccupancyPanel: handleToggleOccupancyPanel,
+            geometryHidden,
+            onToggleGeometry: handleToggleGeometry,
             hasModel: !!modelUrls
           }}
           sectionPanelProps={{
@@ -225,7 +234,8 @@ function App() {
             sectionPlanePickingEnabled: sectionMode.sectionPlanePickingEnabled,
             onSectionPick: handleSectionPick,
             position: [0, 0, 0],
-            scale: 1
+            scale: 1,
+            visible: !geometryHidden
           }}
           spaceOverlayProps={{
             enabled: spaceOverlay.spaceOverlayEnabled,

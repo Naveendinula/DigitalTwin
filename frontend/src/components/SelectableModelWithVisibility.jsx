@@ -17,6 +17,7 @@ import { useThree } from '@react-three/fiber'
  * @param {boolean} sectionModeEnabled - Whether section mode is active
  * @param {boolean} sectionPlanePickingEnabled - Whether clicking can pick a new plane
  * @param {function} onSectionPick - Callback when a surface is clicked in section mode
+ * @param {boolean} visible - Whether the model is visible (default true)
  * @param {object} props - Additional props passed to the group
  */
 function SelectableModel({ 
@@ -26,6 +27,7 @@ function SelectableModel({
   sectionModeEnabled = false,
   sectionPlanePickingEnabled = false,
   onSectionPick,
+  visible = true,
   ...props 
 }) {
   const { scene } = useGLTF(url)
@@ -169,7 +171,7 @@ function SelectableModel({
   }
 
   return (
-    <group rotation={[Math.PI / 2, 0, 0]}>
+    <group rotation={[Math.PI / 2, 0, 0]} visible={visible}>
       {/* Rotate +90° around X axis to convert Y-up (GLB) to Z-up (BIM) */}
       <primitive
         ref={groupRef}
