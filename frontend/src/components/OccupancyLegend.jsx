@@ -5,6 +5,8 @@ import React from 'react'
  *
  * Compact floating legend showing occupancy color scale and building totals.
  * Always visible when occupancy mode is enabled.
+ * 
+ * Follows the "Arctic Zen" aesthetic - clean, minimal, translucent.
  */
 function OccupancyLegend({ totals, timestamp, visible }) {
   if (!visible) return null
@@ -28,7 +30,6 @@ function OccupancyLegend({ totals, timestamp, visible }) {
       </div>
 
       <div style={styles.totalsRow}>
-        <span style={styles.peopleIcon}>👥</span>
         <span style={styles.totalValue}>{totalOccupancy.toLocaleString()}</span>
         <span style={styles.totalDivider}>/</span>
         <span style={styles.totalCapacity}>{totalCapacity.toLocaleString()}</span>
@@ -38,9 +39,8 @@ function OccupancyLegend({ totals, timestamp, visible }) {
       <div style={styles.gradientContainer}>
         <div style={styles.gradient}></div>
         <div style={styles.gradientLabels}>
-          <span>0%</span>
-          <span>50%</span>
-          <span>100%</span>
+          <span>Empty</span>
+          <span>Full</span>
         </div>
       </div>
     </div>
@@ -52,22 +52,22 @@ const styles = {
     position: 'absolute',
     bottom: '20px',
     left: '20px',
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    backdropFilter: 'blur(10px)',
-    WebkitBackdropFilter: 'blur(10px)',
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    backdropFilter: 'blur(20px)',
+    WebkitBackdropFilter: 'blur(20px)',
     borderRadius: '12px',
-    padding: '12px 16px',
-    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.12)',
-    border: '1px solid rgba(0, 0, 0, 0.08)',
+    padding: '14px 18px',
+    boxShadow: '0 4px 24px rgba(0, 0, 0, 0.08)',
+    border: '1px solid rgba(255, 255, 255, 0.5)',
     zIndex: 100,
-    minWidth: '180px',
+    minWidth: '160px',
     fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
   },
   header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '8px',
+    marginBottom: '10px',
   },
   liveIndicator: {
     display: 'flex',
@@ -75,15 +75,16 @@ const styles = {
     gap: '6px',
   },
   liveDot: {
-    width: '8px',
-    height: '8px',
+    width: '6px',
+    height: '6px',
     borderRadius: '50%',
     backgroundColor: '#34c759',
-    animation: 'pulse 2s infinite',
+    boxShadow: '0 0 6px rgba(52, 199, 89, 0.4)',
+    animation: 'occupancy-pulse 2s ease-in-out infinite',
   },
   liveText: {
-    fontSize: '10px',
-    fontWeight: 700,
+    fontSize: '9px',
+    fontWeight: 600,
     color: '#34c759',
     letterSpacing: '0.5px',
   },
@@ -95,62 +96,65 @@ const styles = {
   totalsRow: {
     display: 'flex',
     alignItems: 'baseline',
-    gap: '4px',
-    marginBottom: '10px',
-  },
-  peopleIcon: {
-    fontSize: '16px',
-    marginRight: '4px',
+    gap: '3px',
+    marginBottom: '12px',
   },
   totalValue: {
-    fontSize: '22px',
+    fontSize: '24px',
     fontWeight: 600,
     color: '#1d1d1f',
     fontVariantNumeric: 'tabular-nums',
+    letterSpacing: '-0.5px',
   },
   totalDivider: {
     fontSize: '16px',
-    color: '#86868b',
+    color: '#c7c7cc',
+    marginLeft: '2px',
+    marginRight: '2px',
   },
   totalCapacity: {
-    fontSize: '16px',
+    fontSize: '14px',
     color: '#86868b',
     fontVariantNumeric: 'tabular-nums',
   },
   percentBadge: {
-    marginLeft: '8px',
-    padding: '2px 8px',
-    borderRadius: '10px',
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    marginLeft: 'auto',
+    padding: '3px 8px',
+    borderRadius: '6px',
+    backgroundColor: 'rgba(0, 0, 0, 0.04)',
     fontSize: '12px',
     fontWeight: 500,
-    color: '#1d1d1f',
+    color: '#424245',
+    fontVariantNumeric: 'tabular-nums',
   },
   gradientContainer: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '4px',
+    gap: '5px',
   },
   gradient: {
-    height: '8px',
-    borderRadius: '4px',
-    background: 'linear-gradient(to right, #00c832, #c8c800, #ff3232)',
+    height: '6px',
+    borderRadius: '3px',
+    background: 'linear-gradient(to right, #4cd964, #ffcc00, #ff3b30)',
+    opacity: 0.85,
   },
   gradientLabels: {
     display: 'flex',
     justifyContent: 'space-between',
     fontSize: '9px',
     color: '#86868b',
+    fontWeight: 500,
   },
 }
 
 // Inject pulse animation
-if (typeof document !== 'undefined') {
+if (typeof document !== 'undefined' && !document.querySelector('#occupancy-legend-styles')) {
   const styleSheet = document.createElement('style')
+  styleSheet.id = 'occupancy-legend-styles'
   styleSheet.textContent = `
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
+    @keyframes occupancy-pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(0.9); }
     }
   `
   document.head.appendChild(styleSheet)

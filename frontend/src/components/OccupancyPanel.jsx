@@ -1,24 +1,34 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react'
 
 /**
- * Get color string for occupancy percentage
+ * Get color string for occupancy percentage using iOS-style gradient
  */
 const getOccupancyColorStr = (percent) => {
   const p = Math.max(0, Math.min(100, percent))
+  
+  // iOS colors: #4cd964 (green) -> #ffcc00 (yellow) -> #ff3b30 (red)
+  let r, g, b
+
   if (p <= 50) {
-    const r = Math.round((p / 50) * 255)
-    return `rgb(${r}, 200, 50)`
+    const t = p / 50
+    r = Math.round(76 + t * (255 - 76))
+    g = Math.round(217 + t * (204 - 217))
+    b = Math.round(100 - t * 100)
   } else {
-    const g = Math.round(200 - ((p - 50) / 50) * 200)
-    return `rgb(255, ${g}, 50)`
+    const t = (p - 50) / 50
+    r = 255
+    g = Math.round(204 - t * (204 - 59))
+    b = Math.round(t * 48)
   }
+
+  return `rgb(${r}, ${g}, ${b})`
 }
 
 /**
  * OccupancyPanel Component
  *
  * Draggable panel showing detailed occupancy breakdown by space.
- * Follows the same pattern as HvacFmPanel.
+ * Follows the "Arctic Zen" aesthetic - clean, minimal, translucent.
  */
 function OccupancyPanel({ isOpen, onClose, occupancyData, totals, timestamp, onReset, onSpaceSelect, zIndex }) {
   const [sortBy, setSortBy] = useState('occupancy') // 'occupancy', 'percent', 'name'
@@ -287,8 +297,8 @@ function OccupancyPanel({ isOpen, onClose, occupancyData, totals, timestamp, onR
                     <td style={{ ...styles.td, ...styles.tdRight }}>
                       <span style={{
                         ...styles.percentBadge,
-                        backgroundColor: `${colorStr}22`,
-                        color: space.percent > 70 ? '#c00' : space.percent > 40 ? '#960' : '#060'
+                        backgroundColor: `${colorStr}18`,
+                        color: '#424245'
                       }}>
                         {space.percent}%
                       </span>
@@ -318,23 +328,27 @@ function OccupancyPanel({ isOpen, onClose, occupancyData, totals, timestamp, onR
 const styles = {
   panel: {
     position: 'fixed',
-    backgroundColor: '#ffffff',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backdropFilter: 'blur(20px)',
+    WebkitBackdropFilter: 'blur(20px)',
     borderRadius: '12px',
-    boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15)',
+    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+    border: '1px solid rgba(255, 255, 255, 0.4)',
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
     fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-    border: '1px solid rgba(0, 0, 0, 0.08)',
+    transition: 'box-shadow 0.2s',
   },
   header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: '12px 16px',
-    borderBottom: '1px solid #e5e5e7',
+    borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
     cursor: 'grab',
-    backgroundColor: '#fafafa',
+    userSelect: 'none',
+    background: 'rgba(255, 255, 255, 0.5)',
   },
   titleContainer: {
     display: 'flex',
@@ -343,8 +357,9 @@ const styles = {
   },
   dragIcon: {
     color: '#86868b',
-    fontSize: '14px',
-    letterSpacing: '1px',
+    fontSize: '12px',
+    letterSpacing: '-1px',
+    cursor: 'grab',
   },
   title: {
     margin: 0,
@@ -355,11 +370,11 @@ const styles = {
   liveBadge: {
     padding: '2px 6px',
     borderRadius: '4px',
-    backgroundColor: '#34c75920',
+    backgroundColor: 'rgba(52, 199, 89, 0.12)',
     color: '#34c759',
     fontSize: '9px',
-    fontWeight: 700,
-    letterSpacing: '0.5px',
+    fontWeight: 600,
+    letterSpacing: '0.3px',
   },
   closeButton: {
     background: 'none',
@@ -371,37 +386,41 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+    transition: 'background 0.15s, color 0.15s',
   },
   content: {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
-    padding: '12px',
-    gap: '12px',
+    padding: '16px',
+    gap: '14px',
   },
   summaryCard: {
-    padding: '12px',
-    backgroundColor: '#f5f5f7',
-    borderRadius: '8px',
+    padding: '14px 16px',
+    backgroundColor: 'rgba(0, 0, 0, 0.03)',
+    borderRadius: '10px',
   },
   summaryMain: {
     display: 'flex',
     alignItems: 'baseline',
-    gap: '4px',
+    gap: '3px',
   },
   summaryValue: {
     fontSize: '28px',
     fontWeight: 600,
     color: '#1d1d1f',
     fontVariantNumeric: 'tabular-nums',
+    letterSpacing: '-0.5px',
   },
   summaryDivider: {
-    fontSize: '20px',
-    color: '#86868b',
+    fontSize: '18px',
+    color: '#c7c7cc',
+    marginLeft: '2px',
+    marginRight: '2px',
   },
   summaryCapacity: {
-    fontSize: '20px',
+    fontSize: '18px',
     color: '#86868b',
     fontVariantNumeric: 'tabular-nums',
   },
@@ -409,56 +428,63 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: '8px',
+    marginTop: '10px',
   },
   summaryPercent: {
     fontSize: '12px',
     color: '#86868b',
   },
   resetButton: {
-    padding: '4px 10px',
+    padding: '5px 12px',
     borderRadius: '6px',
-    border: '1px solid #d2d2d7',
-    backgroundColor: '#ffffff',
+    border: 'none',
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
     fontSize: '11px',
     fontWeight: 500,
-    color: '#1d1d1f',
+    color: '#424245',
     cursor: 'pointer',
+    transition: 'background 0.15s',
   },
   filters: {
     display: 'flex',
     gap: '8px',
   },
   select: {
-    flex: '0 0 140px',
+    flex: '0 0 130px',
     padding: '8px 10px',
-    borderRadius: '6px',
-    border: '1px solid #d2d2d7',
+    borderRadius: '8px',
+    border: '1px solid rgba(0, 0, 0, 0.08)',
     fontSize: '12px',
-    backgroundColor: '#ffffff',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    color: '#1d1d1f',
     cursor: 'pointer',
+    outline: 'none',
+    transition: 'border-color 0.15s',
   },
   searchInput: {
     flex: 1,
-    padding: '8px 10px',
-    borderRadius: '6px',
-    border: '1px solid #d2d2d7',
+    padding: '8px 12px',
+    borderRadius: '8px',
+    border: '1px solid rgba(0, 0, 0, 0.08)',
     fontSize: '12px',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
     outline: 'none',
+    transition: 'border-color 0.15s',
   },
   filteredAggregate: {
-    padding: '6px 10px',
-    backgroundColor: '#e8f4ff',
-    borderRadius: '6px',
-    fontSize: '11px',
+    padding: '8px 12px',
+    backgroundColor: 'rgba(0, 113, 227, 0.08)',
+    borderRadius: '8px',
+    fontSize: '12px',
     color: '#0071e3',
     fontWeight: 500,
   },
   tableContainer: {
     flex: 1,
     overflow: 'auto',
-    borderRadius: '8px',
-    border: '1px solid #e5e5e7',
+    borderRadius: '10px',
+    border: '1px solid rgba(0, 0, 0, 0.06)',
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
   },
   table: {
     width: '100%',
@@ -468,9 +494,9 @@ const styles = {
   th: {
     position: 'sticky',
     top: 0,
-    padding: '8px 10px',
-    backgroundColor: '#fafafa',
-    borderBottom: '1px solid #e5e5e7',
+    padding: '10px 12px',
+    backgroundColor: 'rgba(250, 250, 250, 0.95)',
+    borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
     textAlign: 'left',
     fontWeight: 600,
     color: '#86868b',
@@ -479,17 +505,18 @@ const styles = {
     letterSpacing: '0.5px',
     cursor: 'pointer',
     userSelect: 'none',
+    backdropFilter: 'blur(10px)',
   },
   thRight: {
     textAlign: 'right',
   },
   tr: {
     cursor: 'pointer',
-    transition: 'background-color 0.15s',
+    transition: 'background-color 0.12s',
   },
   td: {
-    padding: '8px 10px',
-    borderBottom: '1px solid #f0f0f0',
+    padding: '10px 12px',
+    borderBottom: '1px solid rgba(0, 0, 0, 0.04)',
     verticalAlign: 'middle',
   },
   tdRight: {
@@ -498,11 +525,11 @@ const styles = {
   spaceCell: {
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
+    gap: '10px',
   },
   colorDot: {
-    width: '10px',
-    height: '10px',
+    width: '8px',
+    height: '8px',
     borderRadius: '50%',
     flexShrink: 0,
   },
@@ -511,6 +538,7 @@ const styles = {
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
     maxWidth: '140px',
+    color: '#1d1d1f',
   },
   countValue: {
     fontWeight: 600,
@@ -523,8 +551,8 @@ const styles = {
   },
   percentBadge: {
     display: 'inline-block',
-    padding: '2px 6px',
-    borderRadius: '4px',
+    padding: '3px 7px',
+    borderRadius: '5px',
     fontSize: '11px',
     fontWeight: 500,
     fontVariantNumeric: 'tabular-nums',
@@ -533,32 +561,35 @@ const styles = {
     fontSize: '11px',
     color: '#86868b',
     textAlign: 'center',
+    paddingTop: '4px',
   },
   resizeHandle: {
     position: 'absolute',
     bottom: 0,
     right: 0,
-    width: '16px',
-    height: '16px',
+    width: '20px',
+    height: '20px',
     cursor: 'nwse-resize',
-    background: 'linear-gradient(135deg, transparent 50%, #d2d2d7 50%)',
-    borderRadius: '0 0 12px 0',
+    background: 'linear-gradient(135deg, transparent 50%, rgba(0,0,0,0.08) 50%)',
+    borderBottomRightRadius: '12px',
+    zIndex: 10,
   },
 }
 
 // Inject hover styles
-if (typeof document !== 'undefined') {
+if (typeof document !== 'undefined' && !document.querySelector('#occupancy-panel-styles')) {
   const styleSheet = document.createElement('style')
+  styleSheet.id = 'occupancy-panel-styles'
   styleSheet.textContent = `
     .occ-row-hover:hover {
-      background-color: rgba(0, 113, 227, 0.06) !important;
+      background-color: rgba(0, 0, 0, 0.03) !important;
     }
     .occ-close-btn:hover {
       background-color: rgba(0, 0, 0, 0.05);
       color: #1d1d1f !important;
     }
     .occ-secondary-btn:hover {
-      background-color: #f0f0f0 !important;
+      background-color: rgba(0, 0, 0, 0.08) !important;
     }
   `
   document.head.appendChild(styleSheet)

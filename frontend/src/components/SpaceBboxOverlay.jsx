@@ -3,25 +3,27 @@ import * as THREE from 'three'
 import { Text } from '@react-three/drei'
 
 /**
- * Get color for occupancy percentage using green -> yellow -> red gradient
+ * Get color for occupancy percentage using iOS-style green -> yellow -> red gradient
  */
 const getOccupancyColor = (percent) => {
   // Clamp percent to 0-100
   const p = Math.max(0, Math.min(100, percent))
 
-  // Green (0%) -> Yellow (50%) -> Red (100%)
+  // iOS colors: #4cd964 (green) -> #ffcc00 (yellow) -> #ff3b30 (red)
   let r, g, b
 
   if (p <= 50) {
-    // Green to Yellow: increase red
-    r = Math.round((p / 50) * 255)
-    g = 200
-    b = 50
+    // Green to Yellow
+    const t = p / 50
+    r = Math.round(76 + t * (255 - 76))   // 76 -> 255
+    g = Math.round(217 + t * (204 - 217)) // 217 -> 204
+    b = Math.round(100 - t * 100)          // 100 -> 0
   } else {
-    // Yellow to Red: decrease green
+    // Yellow to Red
+    const t = (p - 50) / 50
     r = 255
-    g = Math.round(200 - ((p - 50) / 50) * 200)
-    b = 50
+    g = Math.round(204 - t * (204 - 59))  // 204 -> 59
+    b = Math.round(t * 48)                 // 0 -> 48
   }
 
   return (r << 16) | (g << 8) | b
