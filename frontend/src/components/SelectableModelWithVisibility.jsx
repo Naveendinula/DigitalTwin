@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react'
+import React, { useRef, useEffect, useState } from 'react'
 import { useGLTF } from '@react-three/drei'
 import { useThree } from '@react-three/fiber'
 
@@ -9,9 +9,14 @@ import { useThree } from '@react-three/fiber'
  * Registers the scene with the visibility controller.
  * 
  * NOTE: GLB/GLTF files typically use Y-up coordinate system.
- * We rotate the model -90° around X to convert to Z-up (BIM convention).
+ * We rotate the model +90° around X to convert to Z-up (BIM convention).
+ * Additionally, a yaw correction (rotation around Z) is applied based on
+ * the IFC project's WorldCoordinateSystem RefDirection, ensuring view
+ * presets (Front, Back, Left, Right) align correctly regardless of how
+ * the source IFC was authored.
  * 
  * @param {string} url - Path to the GLB file
+ * @param {string} metadataUrl - Path to the metadata JSON file (for orientation)
  * @param {function} onSelect - Callback when a mesh is clicked (normal selection mode)
  * @param {function} onSceneReady - Callback when scene is loaded, receives scene object
  * @param {boolean} sectionModeEnabled - Whether section mode is active
@@ -22,6 +27,7 @@ import { useThree } from '@react-three/fiber'
  */
 function SelectableModel({ 
   url, 
+  metadataUrl,
   onSelect, 
   onSceneReady, 
   sectionModeEnabled = false,
@@ -33,6 +39,44 @@ function SelectableModel({
   const { scene } = useGLTF(url)
   const { scene: threeScene, camera, gl } = useThree()
   const groupRef = useRef()
+  
+  // Yaw correction state (rotation around Z-axis in radians)
+  const [yawCorrectionRad, setYawCorrectionRad] = useState(0)
+
+  // Fetch metadata to extract orientation/yaw correction
+  useEffect(() => {
+    if (!metadataUrl) {
+      setYawCorrectionRad(0)
+      return
+    }
+    
+    fetch(metadataUrl)
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to load metadata')
+        return res.json()
+      })
+      .then(data => {
+        // Handle both schema v2 (wrapped) and v1 (flat) formats
+        const orientation = data.orientation || {}
+        const yawDeg = orientation.modelYawDeg ?? 0
+        const yawRad = (yawDeg * Math.PI) / 180
+        
+        console.log('=== Model Orientation ===')
+        console.log('Schema version:', data.schemaVersion || 1)
+        console.log('Orientation source:', orientation.orientationSource || 'default')
+        console.log(`Yaw correction: ${yawDeg}° (${yawRad.toFixed(4)} rad)`)
+        if (orientation.trueNorthDeg != null) {
+          console.log(`TrueNorth: ${orientation.trueNorthDeg}° from Y-axis`)
+        }
+        console.log('=========================')
+        
+        setYawCorrectionRad(yawRad)
+      })
+      .catch(err => {
+        console.warn('Could not load metadata for orientation:', err)
+        setYawCorrectionRad(0)
+      })
+  }, [metadataUrl])
 
   // Debug: Log scene structure on load
   useEffect(() => {
@@ -171,8 +215,13 @@ function SelectableModel({
   }
 
   return (
-    <group rotation={[Math.PI / 2, 0, 0]} visible={visible}>
-      {/* Rotate +90° around X axis to convert Y-up (GLB) to Z-up (BIM) */}
+    <group rotation={[Math.PI / 2, 0, yawCorrectionRad]} visible={visible}>
+      {/* 
+        Rotation order (applied right-to-left):
+        1. yawCorrectionRad around Z: Align model to project axes based on IFC WorldCoordinateSystem
+        2. +90° around X: Convert Y-up (GLB) to Z-up (BIM convention)
+        This ensures view presets (Front, Back, Left, Right) work correctly for all IFC models.
+      */}
       <primitive
         ref={groupRef}
         object={scene}

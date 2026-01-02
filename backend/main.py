@@ -7,6 +7,7 @@ geometry conversion (GLB) and metadata extraction (JSON).
 
 import os
 import uuid
+import json
 import shutil
 from pathlib import Path
 from typing import Optional
@@ -20,7 +21,7 @@ from enum import Enum
 
 # Import our conversion modules
 from ifc_converter import convert_ifc_to_glb
-from ifc_metadata_extractor import extract_metadata, save_metadata
+from ifc_metadata_extractor import extract_metadata, save_metadata, METADATA_SCHEMA_VERSION
 from ifc_spatial_hierarchy import extract_spatial_hierarchy, save_hierarchy
 from ec_api import router as ec_router
 from fm_api import router as fm_router
@@ -98,6 +99,24 @@ def validate_file(file: UploadFile) -> None:
         )
 
 
+def check_metadata_schema(metadata_path: Path) -> int:
+    """
+    Check the schema version of an existing metadata.json file.
+    
+    Returns:
+        Schema version (1 for legacy flat format, 2+ for wrapped format)
+    """
+    if not metadata_path.exists():
+        return 0
+    
+    try:
+        with open(metadata_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return data.get('schemaVersion', 1)  # Default to 1 for legacy format
+    except Exception:
+        return 0
+
+
 async def process_ifc_file(job_id: str, ifc_path: Path) -> None:
     """
     Background task to process IFC file.
@@ -132,9 +151,9 @@ async def process_ifc_file(job_id: str, ifc_path: Path) -> None:
             str(glb_path)
         )
         
-        # 2. Extract metadata
+        # 2. Extract metadata (always uses latest schema)
         job.stage = JobStage.EXTRACTING_METADATA
-        print(f"[{job_id}] Extracting metadata...")
+        print(f"[{job_id}] Extracting metadata (schema v{METADATA_SCHEMA_VERSION})...")
         metadata = await loop.run_in_executor(
             None,
             extract_metadata,
@@ -265,6 +284,75 @@ async def delete_job(job_id: str):
     del jobs[job_id]
     
     return {"message": f"Job {job_id} deleted"}
+
+
+@app.get("/job/{job_id}/metadata/schema")
+async def get_metadata_schema_info(job_id: str):
+    """
+    Get schema version info for a job's metadata.
+    
+    Returns current schema version and whether upgrade is available.
+    """
+    metadata_path = OUTPUT_DIR / job_id / "metadata.json"
+    
+    if not metadata_path.exists():
+        raise HTTPException(status_code=404, detail="Metadata not found for this job")
+    
+    current_version = check_metadata_schema(metadata_path)
+    
+    return {
+        "job_id": job_id,
+        "currentSchemaVersion": current_version,
+        "latestSchemaVersion": METADATA_SCHEMA_VERSION,
+        "needsUpgrade": current_version < METADATA_SCHEMA_VERSION
+    }
+
+
+@app.post("/job/{job_id}/metadata/upgrade")
+async def upgrade_metadata_schema(job_id: str):
+    """
+    Upgrade metadata to latest schema version.
+    
+    Requires the original IFC file to still be in uploads directory.
+    Re-extracts metadata with orientation info.
+    """
+    metadata_path = OUTPUT_DIR / job_id / "metadata.json"
+    
+    if not metadata_path.exists():
+        raise HTTPException(status_code=404, detail="Metadata not found for this job")
+    
+    current_version = check_metadata_schema(metadata_path)
+    if current_version >= METADATA_SCHEMA_VERSION:
+        return {
+            "job_id": job_id,
+            "message": "Metadata already at latest schema version",
+            "schemaVersion": current_version
+        }
+    
+    # Find the original IFC file
+    ifc_files = list(UPLOAD_DIR.glob(f"{job_id}_*.ifc"))
+    if not ifc_files:
+        raise HTTPException(
+            status_code=404, 
+            detail="Original IFC file not found. Cannot upgrade metadata without source file."
+        )
+    
+    ifc_path = ifc_files[0]
+    
+    # Re-extract metadata with latest schema
+    try:
+        print(f"[{job_id}] Upgrading metadata to schema v{METADATA_SCHEMA_VERSION}...")
+        metadata = extract_metadata(str(ifc_path))
+        save_metadata(metadata, str(metadata_path))
+        
+        return {
+            "job_id": job_id,
+            "message": f"Metadata upgraded to schema v{METADATA_SCHEMA_VERSION}",
+            "schemaVersion": METADATA_SCHEMA_VERSION,
+            "orientation": metadata.get("orientation", {})
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to upgrade metadata: {e}")
 
 
 @app.get("/health")

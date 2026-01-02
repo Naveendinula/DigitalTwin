@@ -228,6 +228,7 @@ function App() {
           }}
           selectableModelProps={{
             url: modelUrls.glbUrl,
+            metadataUrl: modelUrls.metadataUrl,
             onSelect: selection.handleSelect,
             onSceneReady: handleSceneReady,
             sectionModeEnabled: sectionMode.sectionModeEnabled,

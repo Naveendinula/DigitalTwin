@@ -4,14 +4,22 @@ IFC Metadata Extraction Script
 This script extracts BIM metadata from IFC files using ifcopenshell.
 It processes all IfcProduct entities and extracts their properties
 into a JSON format keyed by GlobalId for easy lookup in the viewer.
+
+Schema Version History:
+  v1: Flat dict keyed by GlobalId (legacy)
+  v2: Wrapped structure with schemaVersion, orientation, and elements
 """
 
 import ifcopenshell
 import ifcopenshell.util.element
 import json
+import math
 import sys
 from pathlib import Path
 from typing import Any
+
+# Current metadata schema version
+METADATA_SCHEMA_VERSION = 2
 
 
 def get_property_sets(element) -> dict[str, dict[str, Any]]:
@@ -65,6 +73,100 @@ def convert_value(value: Any) -> Any:
     else:
         # Convert any other type to string
         return str(value)
+
+
+def extract_project_orientation(ifc_file) -> dict:
+    """
+    Extract project orientation from IFC GeometricRepresentationContext.
+    
+    Computes yaw angle (rotation around Z-axis) from WorldCoordinateSystem's
+    RefDirection (X-axis direction). Also extracts TrueNorth if present.
+    
+    IFC Coordinate System:
+      - WorldCoordinateSystem (IfcAxis2Placement3D) defines project origin and axes
+      - Axis = Z direction (default: 0,0,1)
+      - RefDirection = X direction (default: 1,0,0)
+      - Y direction = cross(Z, X)
+      - TrueNorth = geodetic north direction in XY plane (optional)
+    
+    Args:
+        ifc_file: An opened ifcopenshell IFC file
+        
+    Returns:
+        Dictionary with:
+          - modelYawDeg: Rotation around Z from default X=(1,0,0) in degrees
+          - trueNorthDeg: TrueNorth angle from Y-axis in degrees (null if not set)
+          - orientationSource: "explicit" if RefDirection was set, "default" otherwise
+    """
+    orientation = {
+        "modelYawDeg": 0.0,
+        "trueNorthDeg": None,
+        "orientationSource": "default"
+    }
+    
+    try:
+        # Find the Model context (primary 3D representation context)
+        contexts = ifc_file.by_type("IfcGeometricRepresentationContext")
+        model_context = None
+        
+        for ctx in contexts:
+            # Skip sub-contexts, look for top-level Model context
+            if hasattr(ctx, 'ContextType') and ctx.ContextType == "Model":
+                # Prefer contexts that aren't sub-contexts
+                if not hasattr(ctx, 'ParentContext') or ctx.ParentContext is None:
+                    model_context = ctx
+                    break
+        
+        # Fallback: use first context if no explicit Model context
+        if model_context is None and contexts:
+            model_context = contexts[0]
+        
+        if model_context is None:
+            print("  No GeometricRepresentationContext found, using default orientation")
+            return orientation
+        
+        # Extract WorldCoordinateSystem (IfcAxis2Placement3D)
+        wcs = getattr(model_context, 'WorldCoordinateSystem', None)
+        if wcs is None:
+            print("  No WorldCoordinateSystem defined, using default orientation")
+            return orientation
+        
+        # Get RefDirection (X-axis) - defaults to (1,0,0) if not specified
+        ref_direction = getattr(wcs, 'RefDirection', None)
+        if ref_direction is not None and hasattr(ref_direction, 'DirectionRatios'):
+            ratios = ref_direction.DirectionRatios
+            ref_x = float(ratios[0]) if len(ratios) > 0 else 1.0
+            ref_y = float(ratios[1]) if len(ratios) > 1 else 0.0
+            
+            # Compute yaw angle: atan2(y, x) gives angle from positive X-axis
+            # If RefDirection = (1,0,0), yaw = 0
+            # If RefDirection = (0,1,0), yaw = 90 degrees
+            yaw_rad = math.atan2(ref_y, ref_x)
+            orientation["modelYawDeg"] = round(math.degrees(yaw_rad), 4)
+            orientation["orientationSource"] = "explicit"
+            print(f"  RefDirection: ({ref_x:.4f}, {ref_y:.4f}) -> yaw = {orientation['modelYawDeg']}°")
+        else:
+            print("  RefDirection not specified, using default (1,0,0)")
+        
+        # Extract TrueNorth if present
+        true_north = getattr(model_context, 'TrueNorth', None)
+        if true_north is not None and hasattr(true_north, 'DirectionRatios'):
+            ratios = true_north.DirectionRatios
+            tn_x = float(ratios[0]) if len(ratios) > 0 else 0.0
+            tn_y = float(ratios[1]) if len(ratios) > 1 else 1.0
+            
+            # TrueNorth angle: measured from Y-axis (project north) to true north
+            # atan2(x, y) gives angle from Y-axis
+            tn_rad = math.atan2(tn_x, tn_y)
+            orientation["trueNorthDeg"] = round(math.degrees(tn_rad), 4)
+            print(f"  TrueNorth: ({tn_x:.4f}, {tn_y:.4f}) -> {orientation['trueNorthDeg']}° from Y")
+        else:
+            print("  TrueNorth not specified")
+            
+    except Exception as e:
+        print(f"  Error extracting orientation: {e}")
+    
+    return orientation
 
 
 def get_element_location(element) -> dict[str, float] | None:
@@ -151,20 +253,31 @@ def get_containing_storey(element) -> str | None:
     return None
 
 
-def extract_metadata(ifc_path: str) -> dict[str, dict]:
+def extract_metadata(ifc_path: str) -> dict:
     """
     Extract metadata from all IfcProduct entities in an IFC file.
+    
+    Returns a wrapped structure with schema version, orientation, and elements.
     
     Args:
         ifc_path: Path to the IFC file
         
     Returns:
-        Dictionary keyed by GlobalId with element metadata
+        Dictionary with structure:
+        {
+            "schemaVersion": 2,
+            "orientation": { modelYawDeg, trueNorthDeg, orientationSource },
+            "elements": { GlobalId -> element data }
+        }
     """
     print(f"Loading IFC file: {ifc_path}")
     ifc_file = ifcopenshell.open(ifc_path)
     
-    metadata = {}
+    # Extract project orientation first
+    print("Extracting project orientation...")
+    orientation = extract_project_orientation(ifc_file)
+    
+    elements = {}
     products = ifc_file.by_type('IfcProduct')
     total = len(products)
     
@@ -194,13 +307,18 @@ def extract_metadata(ifc_path: str) -> dict[str, dict]:
         element_data = {k: v for k, v in element_data.items() 
                        if v is not None and v != [] and v != {}}
         
-        metadata[global_id] = element_data
+        elements[global_id] = element_data
         
         # Progress indicator
         if i % 100 == 0 or i == total:
             print(f"Processed {i}/{total} elements ({i*100//total}%)")
     
-    return metadata
+    # Return wrapped structure with schema version
+    return {
+        "schemaVersion": METADATA_SCHEMA_VERSION,
+        "orientation": orientation,
+        "elements": elements
+    }
 
 
 def save_metadata(metadata: dict, output_path: str) -> None:
@@ -208,7 +326,7 @@ def save_metadata(metadata: dict, output_path: str) -> None:
     Save metadata dictionary to a JSON file.
     
     Args:
-        metadata: The metadata dictionary
+        metadata: The metadata dictionary (wrapped structure with schemaVersion)
         output_path: Path for the output JSON file
     """
     output_file = Path(output_path)
@@ -217,8 +335,12 @@ def save_metadata(metadata: dict, output_path: str) -> None:
     with open(output_file, 'w', encoding='utf-8') as f:
         json.dump(metadata, f, indent=2, ensure_ascii=False)
     
+    # Count elements (handle both old flat format and new wrapped format)
+    element_count = len(metadata.get("elements", metadata))
+    
     print(f"Metadata saved to: {output_path}")
-    print(f"Total elements: {len(metadata)}")
+    print(f"Schema version: {metadata.get('schemaVersion', 1)}")
+    print(f"Total elements: {element_count}")
     print(f"File size: {output_file.stat().st_size / 1024:.1f} KB")
 
 

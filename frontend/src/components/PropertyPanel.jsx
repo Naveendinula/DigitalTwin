@@ -22,7 +22,11 @@ function PropertyPanel({ selectedId, metadataUrl = '/metadata.json' }) {
         return res.json()
       })
       .then(data => {
-        setMetadata(data)
+        // Handle both schema v2 (wrapped with "elements" key) and v1 (flat dict)
+        // Schema v2: { schemaVersion: 2, orientation: {...}, elements: {...} }
+        // Schema v1: { globalId: {...}, ... }
+        const elements = data.elements || data
+        setMetadata(elements)
         setLoading(false)
       })
       .catch(err => {
