@@ -120,6 +120,166 @@ def _space_storey_name(space) -> str:
     return ""
 
 
+def _extract_floor_footprint(verts: list, faces: list) -> tuple[list, float, float] | None:
+    """
+    Extract the floor footprint polygon from a 3D mesh.
+    
+    Returns a tuple of (footprint_points, min_z, max_z) where footprint_points
+    is a list of [x, y] coordinates forming the floor boundary polygon,
+    or None if extraction fails.
+    """
+    import numpy as np
+    from collections import Counter, defaultdict
+    
+    if not verts or not faces:
+        return None
+    
+    # Group vertices into triangles
+    num_triangles = len(faces) // 3
+    if num_triangles == 0:
+        return None
+    
+    floor_triangles = []
+    all_z = []
+    
+    for i in range(num_triangles):
+        idx0 = faces[i * 3]
+        idx1 = faces[i * 3 + 1]
+        idx2 = faces[i * 3 + 2]
+        
+        p0 = np.array([verts[idx0 * 3], verts[idx0 * 3 + 1], verts[idx0 * 3 + 2]])
+        p1 = np.array([verts[idx1 * 3], verts[idx1 * 3 + 1], verts[idx1 * 3 + 2]])
+        p2 = np.array([verts[idx2 * 3], verts[idx2 * 3 + 1], verts[idx2 * 3 + 2]])
+        
+        all_z.extend([p0[2], p1[2], p2[2]])
+        
+        # Calculate face normal
+        v1 = p1 - p0
+        v2 = p2 - p0
+        normal = np.cross(v1, v2)
+        norm_len = np.linalg.norm(normal)
+        if norm_len < 1e-10:
+            continue
+        normal = normal / norm_len
+        
+        # Check if face is pointing down (floor face) - normal.z < -0.9
+        if normal[2] < -0.9:
+            floor_triangles.append((idx0, idx1, idx2))
+    
+    if not floor_triangles:
+        # Fallback: try faces pointing up (some IFCs have inverted normals)
+        for i in range(num_triangles):
+            idx0 = faces[i * 3]
+            idx1 = faces[i * 3 + 1]
+            idx2 = faces[i * 3 + 2]
+            
+            p0 = np.array([verts[idx0 * 3], verts[idx0 * 3 + 1], verts[idx0 * 3 + 2]])
+            p1 = np.array([verts[idx1 * 3], verts[idx1 * 3 + 1], verts[idx1 * 3 + 2]])
+            p2 = np.array([verts[idx2 * 3], verts[idx2 * 3 + 1], verts[idx2 * 3 + 2]])
+            
+            v1 = p1 - p0
+            v2 = p2 - p0
+            normal = np.cross(v1, v2)
+            norm_len = np.linalg.norm(normal)
+            if norm_len < 1e-10:
+                continue
+            normal = normal / norm_len
+            
+            if normal[2] > 0.9:
+                floor_triangles.append((idx0, idx1, idx2))
+    
+    if not floor_triangles:
+        return None
+    
+    # Collect edges from floor triangles
+    edges = []
+    for tri in floor_triangles:
+        edges.append(tuple(sorted((tri[0], tri[1]))))
+        edges.append(tuple(sorted((tri[1], tri[2]))))
+        edges.append(tuple(sorted((tri[2], tri[0]))))
+    
+    # Boundary edges appear exactly once (interior edges appear twice)
+    edge_counts = Counter(edges)
+    boundary_edges = [e for e, count in edge_counts.items() if count == 1]
+    
+    if not boundary_edges:
+        return None
+    
+    # Build adjacency map for edge chaining
+    adjacency = defaultdict(list)
+    for e in boundary_edges:
+        adjacency[e[0]].append(e[1])
+        adjacency[e[1]].append(e[0])
+    
+    # Chain edges to form ordered polygon
+    visited = set()
+    polygon_indices = []
+    
+    # Start from first boundary edge
+    start = boundary_edges[0][0]
+    current = start
+    
+    while True:
+        if current in visited:
+            break
+        visited.add(current)
+        polygon_indices.append(current)
+        
+        neighbors = adjacency[current]
+        next_vertex = None
+        for n in neighbors:
+            if n not in visited:
+                next_vertex = n
+                break
+        
+        if next_vertex is None:
+            break
+        current = next_vertex
+    
+    if len(polygon_indices) < 3:
+        return None
+    
+    # Extract 2D coordinates (X, Y) for the footprint
+    footprint = []
+    for idx in polygon_indices:
+        x = float(verts[idx * 3])
+        y = float(verts[idx * 3 + 1])
+        footprint.append([x, y])
+    
+    min_z = min(all_z) if all_z else 0.0
+    max_z = max(all_z) if all_z else 0.0
+    
+    return footprint, float(min_z), float(max_z)
+
+
+def _apply_transform_to_footprint(footprint: list, matrix: list, min_z: float, max_z: float) -> tuple[list, float, float]:
+    """
+    Apply a 4x4 transformation matrix to a 2D footprint.
+    Returns transformed footprint and Z bounds in world coordinates.
+    
+    Matrix is column-major (OpenGL style):
+    [m0 m4 m8  m12]
+    [m1 m5 m9  m13]
+    [m2 m6 m10 m14]
+    [m3 m7 m11 m15]
+    """
+    if not matrix or len(matrix) < 16:
+        return footprint, min_z, max_z
+    
+    transformed = []
+    for x, y in footprint:
+        # Transform with Z = min_z (floor level)
+        wx = x * matrix[0] + y * matrix[4] + min_z * matrix[8] + matrix[12]
+        wy = x * matrix[1] + y * matrix[5] + min_z * matrix[9] + matrix[13]
+        transformed.append([float(wx), float(wy)])
+    
+    # Transform Z bounds
+    wz_min = min_z * matrix[10] + matrix[14]
+    wz_max = max_z * matrix[10] + matrix[14]
+    
+    return transformed, float(wz_min), float(wz_max)
+
+
 def _compute_space_bboxes(model) -> dict:
     try:
         import ifcopenshell.geom
@@ -127,8 +287,8 @@ def _compute_space_bboxes(model) -> dict:
         raise RuntimeError(f"IfcOpenShell geometry module not available: {e}")
 
     settings = ifcopenshell.geom.settings()
-    # Compute in local coords, then apply translation only (skip rotation).
-    settings.set(settings.USE_WORLD_COORDS, False)
+    # Use world coordinates directly for proper alignment
+    settings.set(settings.USE_WORLD_COORDS, True)
 
     spaces = []
     failures = 0
@@ -137,10 +297,13 @@ def _compute_space_bboxes(model) -> dict:
         try:
             shape = ifcopenshell.geom.create_shape(settings, space)
             verts = getattr(shape.geometry, "verts", None)
+            faces = getattr(shape.geometry, "faces", None)
+            
             if not verts:
                 failures += 1
                 continue
 
+            # Compute bbox (still useful for fallback and area estimation)
             min_x = min_y = min_z = float("inf")
             max_x = max_y = max_z = float("-inf")
             for i in range(0, len(verts), 3):
@@ -164,29 +327,40 @@ def _compute_space_bboxes(model) -> dict:
                 failures += 1
                 continue
 
-            trans = getattr(shape, "transformation", None)
-            matrix = None
-            if trans and hasattr(trans, "matrix"):
-                matrix = [float(v) for v in trans.matrix]
-
             psets = ifc_element.get_psets(space) or {}
             room_no, room_name = _extract_space_identifiers(space, psets)
 
-            spaces.append(
-                {
-                    "globalId": space.GlobalId,
-                    "name": _space_label(space),
-                    "room_name": room_name,
-                    "room_no": room_no,
-                    "storey": _space_storey_name(space),
-                    "bbox": {
-                        "min": [min_x, min_y, min_z],
-                        "max": [max_x, max_y, max_z],
-                    },
-                    "transform": matrix,
-                }
-            )
-        except Exception:
+            # Extract footprint polygon
+            footprint = None
+            footprint_z_min = min_z
+            footprint_z_max = max_z
+            
+            if faces:
+                result = _extract_floor_footprint(list(verts), list(faces))
+                if result:
+                    footprint, footprint_z_min, footprint_z_max = result
+
+            space_data = {
+                "globalId": space.GlobalId,
+                "name": _space_label(space),
+                "room_name": room_name,
+                "room_no": room_no,
+                "storey": _space_storey_name(space),
+                "bbox": {
+                    "min": [min_x, min_y, min_z],
+                    "max": [max_x, max_y, max_z],
+                },
+                "transform": None,  # World coords, no transform needed
+            }
+            
+            # Add footprint if successfully extracted
+            if footprint and len(footprint) >= 3:
+                space_data["footprint"] = footprint
+                space_data["footprint_z"] = [footprint_z_min, footprint_z_max]
+            
+            spaces.append(space_data)
+        except Exception as e:
+            print(f"Error processing space {getattr(space, 'GlobalId', 'unknown')}: {e}")
             failures += 1
 
     return {"spaces": spaces, "failures": failures}

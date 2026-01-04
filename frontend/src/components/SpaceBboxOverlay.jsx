@@ -46,9 +46,135 @@ const getSpaceLabel = (space, occupancyData) => {
 }
 
 /**
+ * Create a THREE.Shape from a 2D footprint polygon
+ */
+const createShapeFromFootprint = (footprint) => {
+  if (!footprint || footprint.length < 3) return null
+  
+  const shape = new THREE.Shape()
+  shape.moveTo(footprint[0][0], footprint[0][1])
+  for (let i = 1; i < footprint.length; i++) {
+    shape.lineTo(footprint[i][0], footprint[i][1])
+  }
+  shape.closePath()
+  return shape
+}
+
+/**
+ * SpaceFootprintMesh - Renders a single space as an extruded footprint
+ */
+function SpaceFootprintMesh({ space, material, onSelect, occupancyData }) {
+  const geometry = useMemo(() => {
+    // If footprint exists, use it; otherwise fall back to bbox
+    if (space.footprint && space.footprint.length >= 3) {
+      const shape = createShapeFromFootprint(space.footprint)
+      if (!shape) return null
+      
+      // Calculate height from footprint_z or bbox
+      const zRange = space.footprint_z || [space.bbox?.min?.[2] || 0, space.bbox?.max?.[2] || 3]
+      const height = Math.max(0.1, zRange[1] - zRange[0])
+      
+      const extrudeSettings = {
+        steps: 1,
+        depth: height,
+        bevelEnabled: false,
+      }
+      
+      const geom = new THREE.ExtrudeGeometry(shape, extrudeSettings)
+      // Rotate to Z-up (ExtrudeGeometry extrudes along Z by default, but in XY plane)
+      // The shape is in XY, extrusion goes along +Z, which is correct for IFC Z-up
+      return geom
+    }
+    
+    // Fallback to box geometry
+    const min = space.bbox?.min
+    const max = space.bbox?.max
+    if (!min || !max) return null
+    
+    const sizeX = Math.max(0.01, max[0] - min[0])
+    const sizeY = Math.max(0.01, max[1] - min[1])
+    const sizeZ = Math.max(0.01, max[2] - min[2])
+    
+    const geom = new THREE.BoxGeometry(sizeX, sizeY, sizeZ)
+    // Center the geometry at origin, we'll position it later
+    return geom
+  }, [space])
+
+  const position = useMemo(() => {
+    if (space.footprint && space.footprint.length >= 3) {
+      // For footprint, position at Z min
+      const zMin = space.footprint_z?.[0] ?? space.bbox?.min?.[2] ?? 0
+      return [0, 0, zMin]
+    }
+    
+    // For bbox fallback, position at center
+    const min = space.bbox?.min
+    const max = space.bbox?.max
+    if (!min || !max) return [0, 0, 0]
+    
+    const centerX = (min[0] + max[0]) / 2
+    const centerY = (min[1] + max[1]) / 2
+    const centerZ = (min[2] + max[2]) / 2
+    return [centerX, centerY, centerZ]
+  }, [space])
+
+  const labelPosition = useMemo(() => {
+    if (space.footprint && space.footprint.length >= 3) {
+      // Calculate centroid of footprint for label
+      let cx = 0, cy = 0
+      for (const [x, y] of space.footprint) {
+        cx += x
+        cy += y
+      }
+      cx /= space.footprint.length
+      cy /= space.footprint.length
+      const zMax = space.footprint_z?.[1] ?? space.bbox?.max?.[2] ?? 3
+      return [cx, cy, zMax + 0.2]
+    }
+    
+    // For bbox fallback
+    const min = space.bbox?.min
+    const max = space.bbox?.max
+    if (!min || !max) return [0, 0, 0]
+    
+    return [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, max[2] + 0.2]
+  }, [space])
+
+  if (!geometry) return null
+
+  const label = getSpaceLabel(space, occupancyData)
+
+  return (
+    <group>
+      <mesh
+        geometry={geometry}
+        material={material}
+        position={position}
+        onPointerDown={(e) => {
+          e.stopPropagation()
+          onSelect?.(space.globalId)
+        }}
+      />
+      <Text
+        position={labelPosition}
+        fontSize={0.5}
+        color="black"
+        anchorX="center"
+        anchorY="bottom"
+        outlineWidth={0.05}
+        outlineColor="white"
+      >
+        {label}
+      </Text>
+    </group>
+  )
+}
+
+/**
  * SpaceBboxOverlay
  *
- * Renders translucent bbox overlays for IfcSpace elements.
+ * Renders translucent overlays for IfcSpace elements.
+ * Uses footprint polygons when available, falls back to bounding boxes.
  * Supports occupancy visualization with color-coded heatmap.
  */
 function SpaceBboxOverlay({ enabled, jobId, onSpaceSelect, highlightedSpaceIds = [], onStatus, selectedSpaceId, onSpacesLoaded, occupancyData }) {
@@ -91,8 +217,7 @@ function SpaceBboxOverlay({ enabled, jobId, onSpaceSelect, highlightedSpaceIds =
     }
   }, [enabled, jobId, onStatus])
 
-  const geometry = useMemo(() => new THREE.BoxGeometry(1, 1, 1), [])
-  const material = useMemo(() => {
+  const defaultMaterial = useMemo(() => {
     return new THREE.MeshBasicMaterial({
       color: 0x00a4ff,
       transparent: true,
@@ -102,6 +227,7 @@ function SpaceBboxOverlay({ enabled, jobId, onSpaceSelect, highlightedSpaceIds =
       side: THREE.DoubleSide,
     })
   }, [])
+  
   const highlightMaterial = useMemo(() => {
     return new THREE.MeshBasicMaterial({
       color: 0xff5500, // High contrast orange-red
@@ -134,50 +260,23 @@ function SpaceBboxOverlay({ enabled, jobId, onSpaceSelect, highlightedSpaceIds =
 
   const highlightedSet = useMemo(() => new Set(highlightedSpaceIds), [highlightedSpaceIds])
 
-  const spaceMeshes = useMemo(() => {
+  const spacesToRender = useMemo(() => {
     // If highlightedSpaceIds is provided and not empty, filter to show only those spaces.
     // Otherwise, show all spaces.
-    const spacesToShow = highlightedSpaceIds.length > 0
+    return highlightedSpaceIds.length > 0
       ? spaces.filter(s => highlightedSet.has(s.globalId))
       : spaces
-
-    return spacesToShow.map((space) => {
-      const min = space?.bbox?.min
-      const max = space?.bbox?.max
-      if (!min || !max) return null
-
-      const sizeX = Math.max(0.01, max[0] - min[0])
-      const sizeY = Math.max(0.01, max[1] - min[1])
-      const sizeZ = Math.max(0.01, max[2] - min[2])
-      const centerX = min[0] + sizeX / 2
-      const centerY = min[1] + sizeY / 2
-      const centerZ = min[2] + sizeZ / 2
-
-      let matrix = null
-      if (Array.isArray(space.transform) && space.transform.length === 16) {
-        matrix = new THREE.Matrix4().fromArray(space.transform)
-      }
-
-      return {
-        space,
-        center: [centerX, centerY, centerZ],
-        scale: [sizeX, sizeY, sizeZ],
-        matrix,
-      }
-    }).filter(Boolean)
   }, [spaces, highlightedSet, highlightedSpaceIds.length])
 
-  if (!enabled || loading || error || spaceMeshes.length === 0) return null
+  if (!enabled || loading || error || spacesToRender.length === 0) return null
 
   return (
     <group name="SpaceBboxOverlay">
-      {spaceMeshes.map((entry) => {
-        const { space, center, scale, matrix } = entry
+      {spacesToRender.map((space) => {
         const isHighlighted = (space.globalId && highlightedSet.has(space.globalId)) || (selectedSpaceId && space.globalId === selectedSpaceId)
-        const label = getSpaceLabel(space, occupancyData)
 
         // Determine material: occupancy color > highlight > default
-        let meshMaterial = material
+        let meshMaterial = defaultMaterial
         if (occupancyMaterials && occupancyMaterials.has(space.globalId)) {
           meshMaterial = occupancyMaterials.get(space.globalId)
         }
@@ -185,50 +284,14 @@ function SpaceBboxOverlay({ enabled, jobId, onSpaceSelect, highlightedSpaceIds =
           meshMaterial = highlightMaterial
         }
 
-        const mesh = (
-          <mesh
-            key={space.globalId || `${center[0]}-${center[1]}-${center[2]}`}
-            geometry={geometry}
-            material={meshMaterial}
-            position={center}
-            scale={scale}
-            onPointerDown={(e) => {
-              e.stopPropagation()
-              onSpaceSelect?.(space.globalId)
-            }}
-          />
-        )
-
-        const labelElement = (
-          <Text
-            key={`${space.globalId}-label`}
-            position={[center[0], center[1] + scale[1] / 2 + 0.2, center[2]]}
-            fontSize={0.5}
-            color="black"
-            anchorX="center"
-            anchorY="bottom"
-            outlineWidth={0.05}
-            outlineColor="white"
-          >
-            {label}
-          </Text>
-        )
-
-        if (!matrix) {
-          return (
-            <group key={`${space.globalId}-container`}>
-              {mesh}
-              {labelElement}
-            </group>
-          )
-        }
-
         return (
-          <group key={`${space.globalId}-group`} matrix={matrix} matrixAutoUpdate={false}>
-            {mesh}
-            {/* Note: Label is also transformed by matrix, which is usually desired */}
-            {labelElement}
-          </group>
+          <SpaceFootprintMesh
+            key={space.globalId}
+            space={space}
+            material={meshMaterial}
+            onSelect={onSpaceSelect}
+            occupancyData={occupancyData}
+          />
         )
       })}
     </group>

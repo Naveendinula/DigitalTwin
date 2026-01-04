@@ -215,8 +215,8 @@ function ViewerToolbar({
         </button>
       )}
 
-      {/* Hide Geometry Toggle - only when occupancy is enabled */}
-      {hasModel && occupancyEnabled && (
+      {/* Hide Geometry Toggle - when occupancy OR spaces are enabled */}
+      {hasModel && (occupancyEnabled || spaceOverlayEnabled) && (
         <button
           style={{
             ...styles.toolButton,

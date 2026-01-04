@@ -31,6 +31,25 @@ const appStyles = {
     letterSpacing: '1.5px',
     color: '#1d1d1f',
   },
+  fileInfo: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    fontSize: '13px',
+    color: '#86868b',
+  },
+  fileName: {
+    fontWeight: 500,
+    color: '#1d1d1f',
+  },
+  fileSchema: {
+    background: '#f5f5f7',
+    padding: '2px 8px',
+    borderRadius: '4px',
+    fontSize: '11px',
+    fontWeight: 600,
+    letterSpacing: '0.5px',
+  },
   mainContent: {
     flex: 1,
     display: 'flex',

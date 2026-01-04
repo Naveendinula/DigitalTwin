@@ -54,6 +54,28 @@ def _estimate_capacity_from_area(area: float) -> int:
     return max(1, int(area / persons_per_sqm))
 
 
+def _calculate_footprint_area(footprint: list) -> float:
+    """
+    Calculate the area of a polygon using the Shoelace formula.
+    
+    Args:
+        footprint: List of [x, y] coordinates forming a closed polygon.
+        
+    Returns:
+        Area in square units.
+    """
+    if not footprint or len(footprint) < 3:
+        return 0.0
+    
+    n = len(footprint)
+    area = 0.0
+    for i in range(n):
+        j = (i + 1) % n
+        area += footprint[i][0] * footprint[j][1]
+        area -= footprint[j][0] * footprint[i][1]
+    return abs(area) / 2.0
+
+
 def generate_occupancy_snapshot(
     spaces: list[dict[str, Any]],
     previous_snapshot: dict[str, Any] | None = None,
@@ -84,8 +106,14 @@ def generate_occupancy_snapshot(
         if not global_id:
             continue
 
-        # Estimate capacity from area if available, otherwise use bbox volume
+        # Estimate capacity from area - prefer footprint area, then explicit area, then bbox
         area = space.get("area", 0)
+        
+        # Try footprint area first (most accurate)
+        if not area and "footprint" in space:
+            area = _calculate_footprint_area(space["footprint"])
+        
+        # Fallback to bbox area
         if not area and "bbox" in space:
             bbox = space["bbox"]
             min_pt = bbox.get("min", [0, 0, 0])

@@ -65,7 +65,9 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
             glbUrl: `${API_URL}${job.glb_url}`,
             metadataUrl: `${API_URL}${job.metadata_url}`,
             hierarchyUrl: `${API_URL}${job.hierarchy_url}`,
-            jobId: jobId
+            jobId: jobId,
+            filename: job.ifc_filename,
+            ifcSchema: job.ifc_schema
           })
           return
         } else if (job.status === 'failed') {

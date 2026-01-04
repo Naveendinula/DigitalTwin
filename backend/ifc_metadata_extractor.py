@@ -253,7 +253,7 @@ def get_containing_storey(element) -> str | None:
     return None
 
 
-def extract_metadata(ifc_path: str) -> dict:
+def extract_metadata(ifc_path: str, original_filename: str = None) -> dict:
     """
     Extract metadata from all IfcProduct entities in an IFC file.
     
@@ -261,11 +261,14 @@ def extract_metadata(ifc_path: str) -> dict:
     
     Args:
         ifc_path: Path to the IFC file
+        original_filename: Original name of the uploaded file (optional)
         
     Returns:
         Dictionary with structure:
         {
             "schemaVersion": 2,
+            "ifcSchema": "IFC2X3",
+            "fileName": "model.ifc",
             "orientation": { modelYawDeg, trueNorthDeg, orientationSource },
             "elements": { GlobalId -> element data }
         }
@@ -276,6 +279,10 @@ def extract_metadata(ifc_path: str) -> dict:
     # Extract project orientation first
     print("Extracting project orientation...")
     orientation = extract_project_orientation(ifc_file)
+    
+    # Extract schema and filename
+    ifc_schema = ifc_file.schema
+    file_name = original_filename if original_filename else Path(ifc_path).name
     
     elements = {}
     products = ifc_file.by_type('IfcProduct')
@@ -316,6 +323,8 @@ def extract_metadata(ifc_path: str) -> dict:
     # Return wrapped structure with schema version
     return {
         "schemaVersion": METADATA_SCHEMA_VERSION,
+        "ifcSchema": ifc_schema,
+        "fileName": file_name,
         "orientation": orientation,
         "elements": elements
     }

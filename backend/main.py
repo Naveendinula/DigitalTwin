@@ -75,6 +75,7 @@ class ConversionJob(BaseModel):
     job_id: str
     status: JobStatus
     ifc_filename: str
+    ifc_schema: Optional[str] = None
     stage: Optional[JobStage] = None
     glb_url: Optional[str] = None
     metadata_url: Optional[str] = None
@@ -157,8 +158,13 @@ async def process_ifc_file(job_id: str, ifc_path: Path) -> None:
         metadata = await loop.run_in_executor(
             None,
             extract_metadata,
-            str(ifc_path)
+            str(ifc_path),
+            job.ifc_filename
         )
+        
+        if "ifcSchema" in metadata:
+            job.ifc_schema = metadata["ifcSchema"]
+
         await loop.run_in_executor(
             None,
             save_metadata,

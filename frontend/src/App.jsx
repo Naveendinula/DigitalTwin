@@ -165,7 +165,10 @@ function App() {
 
   return (
     <div style={appStyles.appContainer}>
-      <AppHeader />
+      <AppHeader 
+        filename={modelUrls?.filename}
+        ifcSchema={modelUrls?.ifcSchema}
+      />
 
       <div style={appStyles.mainContent}>
         <StructureTree 
