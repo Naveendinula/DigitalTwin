@@ -12,8 +12,8 @@ from ifcopenshell.util import element as ifc_element
 from ifcopenshell.util import system as ifc_system
 
 
-DEFAULT_MAX_DEPTH = 10
-DEFAULT_MAX_NODES = 800
+DEFAULT_MAX_DEPTH = 15
+DEFAULT_MAX_NODES = 1500
 
 # Heuristic keywords for proxy-based HVAC equipment (e.g., HRUs).
 HVAC_KEYWORDS = (
@@ -338,11 +338,65 @@ def _traverse_terminals(
     max_depth: int,
     max_nodes: int,
 ) -> tuple[list[dict[str, Any]], bool]:
+    """
+    Traverse from equipment to find all connected terminals.
+    
+    Uses bidirectional port traversal to ensure all Supply/Return/Exhaust branches are explored.
+    Explicitly seeds the queue with all elements connected to each port of the equipment.
+    """
     visited = {_element_key(equipment)}
-    queue = deque([(equipment, 0)])
+    queue = deque()
     terminals = {}
     visited_count = 0
     hit_max_nodes = False
+
+    # CRITICAL: Seed the queue with ALL elements connected to ALL ports of the equipment
+    # This ensures we start traversal down all 4 ducts (Supply, Return, Exhaust, etc.)
+    initial_neighbors = set()
+    
+    try:
+        connected = ifc_system.get_connected_to(equipment) or []
+        initial_neighbors.update(connected)
+    except Exception:
+        pass
+    
+    try:
+        connected_from = ifc_system.get_connected_from(equipment) or []
+        initial_neighbors.update(connected_from)
+    except Exception:
+        pass
+    
+    try:
+        ports = ifc_system.get_ports(equipment)
+        for port in ports:
+            try:
+                for rel in getattr(port, "ConnectedFrom", []):
+                    related_port = rel.RelatingPort if hasattr(rel, "RelatingPort") else None
+                    if related_port:
+                        owner = ifc_system.get_element(related_port)
+                        if owner:
+                            initial_neighbors.add(owner)
+            except Exception:
+                pass
+            
+            try:
+                for rel in getattr(port, "ConnectedTo", []):
+                    related_port = rel.RelatedPort if hasattr(rel, "RelatedPort") else None
+                    if related_port:
+                        owner = ifc_system.get_element(related_port)
+                        if owner:
+                            initial_neighbors.add(owner)
+            except Exception:
+                pass
+    except Exception:
+        pass
+    
+    # Add all initial neighbors to queue at depth 1
+    for neighbor in _unique_elements(initial_neighbors):
+        key = _element_key(neighbor)
+        if key not in visited:
+            visited.add(key)
+            queue.append((neighbor, 1))
 
     while queue:
         current, depth = queue.popleft()
@@ -351,7 +405,7 @@ def _traverse_terminals(
             hit_max_nodes = True
             break
 
-        if current is not equipment and _is_terminal(current):
+        if _is_terminal(current):
             info = _build_terminal_info(current)
             terminals[info["globalId"]] = info
             continue
@@ -359,12 +413,74 @@ def _traverse_terminals(
         if depth >= max_depth:
             continue
 
-        ports = ifc_system.get_ports(current)
-        if not ports:
-            continue
+        # Collect all neighbors via port connections
+        neighbors = set()
+        
+        # Method 1: Via get_connected_to (follows port relationships)
+        try:
+            connected = ifc_system.get_connected_to(current) or []
+            neighbors.update(connected)
+        except Exception:
+            pass
+        
+        # Method 2: Via get_connected_from (reverse direction)
+        try:
+            connected_from = ifc_system.get_connected_from(current) or []
+            neighbors.update(connected_from)
+        except Exception:
+            pass
+        
+        # Method 3: Explicitly iterate all ports and find their connections
+        try:
+            ports = ifc_system.get_ports(current)
+            for port in ports:
+                # Find ports connected to this port
+                try:
+                    for rel in getattr(port, "ConnectedFrom", []):
+                        related_port = rel.RelatingPort if hasattr(rel, "RelatingPort") else None
+                        if related_port:
+                            owner = ifc_system.get_element(related_port)
+                            if owner:
+                                neighbors.add(owner)
+                except Exception:
+                    pass
+                
+                try:
+                    for rel in getattr(port, "ConnectedTo", []):
+                        related_port = rel.RelatedPort if hasattr(rel, "RelatedPort") else None
+                        if related_port:
+                            owner = ifc_system.get_element(related_port)
+                            if owner:
+                                neighbors.add(owner)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        
+        # Method 4: Fallback for fittings/elbows with incomplete port data
+        # Look for IfcRelConnectsElements and IfcRelConnectsPortToPort that reference this element
+        try:
+            # Check if element is related via IfcRelConnectsElements
+            for inv in getattr(current, "ConnectedFrom", []):
+                try:
+                    relating = inv.RelatingElement if hasattr(inv, "RelatingElement") else None
+                    if relating and relating != current:
+                        neighbors.add(relating)
+                except Exception:
+                    pass
+            
+            for inv in getattr(current, "ConnectedTo", []):
+                try:
+                    related = inv.RelatedElement if hasattr(inv, "RelatedElement") else None
+                    if related and related != current:
+                        neighbors.add(related)
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
-        connected = ifc_system.get_connected_to(current) or []
-        for neighbor in sorted(_unique_elements(connected), key=_element_sort_key):
+        # Add unique neighbors to queue
+        for neighbor in sorted(_unique_elements(neighbors), key=_element_sort_key):
             key = _element_key(neighbor)
             if key in visited:
                 continue
@@ -372,10 +488,60 @@ def _traverse_terminals(
             queue.append((neighbor, depth + 1))
 
     terminal_list = sorted(terminals.values(), key=lambda t: (_clean_text(t.get("name")).lower(), t.get("globalId", "")))
+    
+    # FALLBACK: Find terminals assigned to same IFC Systems as the equipment
+    # This catches terminals that are logically grouped but physically disconnected
+    try:
+        equipment_systems = ifc_system.get_element_systems(equipment) or []
+        if equipment_systems:
+            model = equipment.wrapped_data.file if hasattr(equipment, 'wrapped_data') else None
+            if not model and hasattr(equipment, 'file'):
+                model = equipment.file()
+            
+            if model:
+                # Get all terminals in the model
+                all_terminals = []
+                for ifc_type in TERMINAL_TYPE_HINTS:
+                    try:
+                        all_terminals.extend(model.by_type(ifc_type))
+                    except Exception:
+                        pass
+                
+                # Check which terminals share systems with the equipment
+                for terminal in all_terminals:
+                    terminal_key = _element_key(terminal)
+                    if terminal_key in terminals:
+                        continue  # Already found via port traversal
+                    
+                    try:
+                        terminal_systems = ifc_system.get_element_systems(terminal) or []
+                        # If terminal shares any system with equipment, include it
+                        for eq_sys in equipment_systems:
+                            eq_sys_id = _element_key(eq_sys)
+                            for term_sys in terminal_systems:
+                                if _element_key(term_sys) == eq_sys_id:
+                                    info = _build_terminal_info(terminal)
+                                    terminals[info["globalId"]] = info
+                                    break
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+    
+    terminal_list = sorted(terminals.values(), key=lambda t: (_clean_text(t.get("name")).lower(), t.get("globalId", "")))
     return terminal_list, hit_max_nodes
 
 
 def _collect_equipment(model) -> list:
+    """
+    Collect HVAC equipment from the model.
+    
+    Equipment is identified by:
+    1. IFC type hints (IfcAirHandlingUnit, etc.)
+    2. Keyword matching in names/properties for proxies and distribution elements
+    
+    Terminals (IfcAirTerminal, IfcFlowTerminal) are explicitly excluded.
+    """
     seen = set()
     equipment = []
 
@@ -385,6 +551,9 @@ def _collect_equipment(model) -> list:
         except Exception:
             elements = []
         for element in elements:
+            # Skip if this is actually a terminal
+            if _is_terminal(element):
+                continue
             key = _element_key(element)
             if key in seen:
                 continue
@@ -398,6 +567,9 @@ def _collect_equipment(model) -> list:
     for element in proxy_elements:
         if not _element_matches_keywords(element):
             continue
+        # Skip if this is actually a terminal
+        if _is_terminal(element):
+            continue
         key = _element_key(element)
         if key in seen:
             continue
@@ -410,6 +582,9 @@ def _collect_equipment(model) -> list:
         dist_elements = []
     for element in dist_elements:
         if not _element_matches_keywords(element):
+            continue
+        # Skip if this is actually a terminal
+        if _is_terminal(element):
             continue
         key = _element_key(element)
         if key in seen:

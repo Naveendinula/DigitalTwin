@@ -232,9 +232,9 @@ function SpaceBboxOverlay({ enabled, jobId, onSpaceSelect, highlightedSpaceIds =
     return new THREE.MeshBasicMaterial({
       color: 0xff5500, // High contrast orange-red
       transparent: true,
-      opacity: 0.4,
+      opacity: 0.18,
       depthWrite: false,
-      depthTest: false,
+      depthTest: true,
       side: THREE.DoubleSide,
     })
   }, [])

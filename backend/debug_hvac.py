@@ -1,0 +1,225 @@
+"""
+Debug script to inspect HVAC equipment and terminal detection.
+
+Run from the backend directory:
+    python debug_hvac.py <path_to_ifc_file>
+
+Or use an existing job_id:
+    python debug_hvac.py --job <job_id>
+"""
+
+import sys
+from pathlib import Path
+
+import ifcopenshell
+from ifcopenshell.util import element as ifc_element
+from ifcopenshell.util import system as ifc_system
+
+from fm_hvac_core import (
+    HVAC_KEYWORDS,
+    EQUIPMENT_TYPE_HINTS,
+    TERMINAL_TYPE_HINTS,
+    _clean_text,
+    _element_key,
+    _element_matches_keywords,
+    _is_terminal,
+    _get_psets,
+    _collect_equipment,
+    analyze_hvac_fm,
+)
+
+
+def debug_element(element, reason: str):
+    """Print detailed info about an element."""
+    name = _clean_text(getattr(element, "Name", None))
+    obj_type = _clean_text(getattr(element, "ObjectType", None))
+    ifc_type = element.is_a()
+    global_id = _element_key(element)
+    
+    print(f"\n{'='*60}")
+    print(f"  Name:       {name or '(none)'}")
+    print(f"  IFC Type:   {ifc_type}")
+    print(f"  ObjectType: {obj_type or '(none)'}")
+    print(f"  GlobalId:   {global_id}")
+    print(f"  Reason:     {reason}")
+    print(f"  Is Terminal: {_is_terminal(element)}")
+    
+    # Show systems
+    try:
+        systems = ifc_system.get_element_systems(element) or []
+        if systems:
+            print(f"  Systems:    {[_clean_text(getattr(s, 'Name', '')) for s in systems]}")
+    except Exception:
+        pass
+    
+    # Show space containment
+    try:
+        space = ifc_element.get_container(element, ifc_class="IfcSpace")
+        if space:
+            space_name = _clean_text(getattr(space, "Name", None))
+            print(f"  In Space:   {space_name}")
+    except Exception:
+        pass
+
+
+def debug_all_terminals(model):
+    """List all terminals in the model."""
+    print("\n" + "="*60)
+    print("ALL TERMINALS IN MODEL")
+    print("="*60)
+    
+    terminals = []
+    for ifc_type in TERMINAL_TYPE_HINTS:
+        try:
+            elements = model.by_type(ifc_type)
+            terminals.extend(elements)
+        except Exception:
+            pass
+    
+    print(f"Found {len(terminals)} terminals")
+    for t in terminals:
+        name = _clean_text(getattr(t, "Name", None))
+        ifc_type = t.is_a()
+        global_id = _element_key(t)
+        
+        # Get space
+        space_name = "(no space)"
+        try:
+            space = ifc_element.get_container(t, ifc_class="IfcSpace")
+            if space:
+                space_name = _clean_text(getattr(space, "Name", None))
+        except Exception:
+            pass
+        
+        print(f"  - {name or '(unnamed)'} [{ifc_type}] in {space_name}")
+
+
+def debug_equipment_detection(model):
+    """Show what would be detected as equipment and why."""
+    print("\n" + "="*60)
+    print("EQUIPMENT DETECTION DEBUG")
+    print("="*60)
+    
+    # 1. Type-based detection
+    print("\n--- By IFC Type Hints ---")
+    for ifc_type in EQUIPMENT_TYPE_HINTS:
+        try:
+            elements = model.by_type(ifc_type)
+        except Exception:
+            elements = []
+        
+        non_terminal = [e for e in elements if not _is_terminal(e)]
+        terminal = [e for e in elements if _is_terminal(e)]
+        
+        print(f"\n{ifc_type}: {len(non_terminal)} equipment, {len(terminal)} terminals (excluded)")
+        for element in non_terminal[:5]:  # Limit output
+            debug_element(element, f"Type: {ifc_type}")
+        if len(non_terminal) > 5:
+            print(f"  ... and {len(non_terminal) - 5} more")
+    
+    # 2. Keyword-based detection (Proxies)
+    print("\n--- By Keyword (IfcBuildingElementProxy) ---")
+    try:
+        proxies = model.by_type("IfcBuildingElementProxy")
+    except Exception:
+        proxies = []
+    
+    matched = [e for e in proxies if _element_matches_keywords(e) and not _is_terminal(e)]
+    print(f"Found {len(matched)} matching proxies")
+    for element in matched[:5]:
+        debug_element(element, "Keyword match (Proxy)")
+    
+    # 3. Keyword-based detection (DistributionElements)
+    print("\n--- By Keyword (IfcDistributionElement) ---")
+    try:
+        dist = model.by_type("IfcDistributionElement")
+    except Exception:
+        dist = []
+    
+    matched_dist = [e for e in dist if _element_matches_keywords(e) and not _is_terminal(e)]
+    matched_terminal = [e for e in dist if _element_matches_keywords(e) and _is_terminal(e)]
+    
+    print(f"Found {len(matched_dist)} matching distribution elements")
+    print(f"Excluded {len(matched_terminal)} terminals that matched keywords")
+    
+    for element in matched_dist[:5]:
+        debug_element(element, "Keyword match (Distribution)")
+    
+    if matched_terminal:
+        print("\n  Excluded terminals (keyword matched but are terminals):")
+        for t in matched_terminal[:5]:
+            name = _clean_text(getattr(t, "Name", None))
+            ifc_type = t.is_a()
+            print(f"    - {name} [{ifc_type}]")
+
+
+def debug_analysis_result(model):
+    """Run the full analysis and show results."""
+    print("\n" + "="*60)
+    print("FULL ANALYSIS RESULT")
+    print("="*60)
+    
+    result = analyze_hvac_fm(model)
+    summary = result["summary"]
+    
+    print(f"\nSummary:")
+    print(f"  Equipment Count:        {summary['equipment_count']}")
+    print(f"  With Terminals:         {summary['equipment_with_terminals']}")
+    print(f"  Served Terminal Count:  {summary['served_terminal_count']}")
+    print(f"  Served Space Count:     {summary['served_space_count']}")
+    
+    print(f"\nEquipment Details:")
+    for eq in result["equipment"]:
+        name = eq["name"] or "(unnamed)"
+        terminal_count = len(eq["servedTerminals"])
+        space_count = len(eq["servedSpaces"])
+        storey = eq["storey"] or "(no storey)"
+        
+        print(f"\n  {name}")
+        print(f"    GlobalId:   {eq['globalId']}")
+        print(f"    Storey:     {storey}")
+        print(f"    Terminals:  {terminal_count}")
+        print(f"    Spaces:     {space_count}")
+        
+        if eq["servedSpaces"]:
+            print(f"    Served Spaces:")
+            for space in eq["servedSpaces"][:5]:
+                print(f"      - {space.get('name', '(unnamed)')}")
+
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: python debug_hvac.py <path_to_ifc_file>")
+        print("       python debug_hvac.py --job <job_id>")
+        sys.exit(1)
+    
+    if sys.argv[1] == "--job":
+        job_id = sys.argv[2]
+        ifc_path = Path("uploads") / f"{job_id}.ifc"
+        if not ifc_path.exists():
+            # Try looking in output folder
+            output_dir = Path("output") / job_id
+            if output_dir.exists():
+                # Find the original upload
+                for f in Path("uploads").glob("*.ifc"):
+                    # This is a simplification - you may need to track the mapping
+                    pass
+            print(f"Could not find IFC file for job {job_id}")
+            sys.exit(1)
+    else:
+        ifc_path = Path(sys.argv[1])
+    
+    if not ifc_path.exists():
+        print(f"File not found: {ifc_path}")
+        sys.exit(1)
+    
+    print(f"Loading IFC file: {ifc_path}")
+    model = ifcopenshell.open(str(ifc_path))
+    
+    debug_all_terminals(model)
+    debug_equipment_detection(model)
+    debug_analysis_result(model)
+
+
+if __name__ == "__main__":
+    main()

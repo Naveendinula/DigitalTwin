@@ -76,7 +76,7 @@ export default function useSpaceOverlay({ jobId, showToast }) {
     }
   }, [highlightedSpaceIds.length, allSpaces])
 
-  const showSpaceNavigator = spaceOverlayEnabled && highlightedSpaceIds.length === 0 && allSpaces.length > 0
+  const showSpaceNavigator = spaceOverlayEnabled && allSpaces.length > 0
   const spaceNavigatorName = selectedSpaceIndex >= 0 && allSpaces[selectedSpaceIndex]
     ? `${allSpaces[selectedSpaceIndex].room_no || ''} ${allSpaces[selectedSpaceIndex].room_name || allSpaces[selectedSpaceIndex].name || ''}`.trim()
     : 'Select a space'
@@ -87,7 +87,10 @@ export default function useSpaceOverlay({ jobId, showToast }) {
     totalCount: allSpaces.length,
     currentName: spaceNavigatorName,
     onNext: handleNextSpace,
-    onPrev: handlePrevSpace
+    onPrev: handlePrevSpace,
+    spaces: allSpaces,
+    selectedIds: highlightedSpaceIds,
+    onSelectionChange: enableSpaceOverlayForSpaces
   }
 
   const selectedSpaceId = useMemo(() => {

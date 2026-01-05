@@ -353,7 +353,7 @@ function HvacFmPanel({ isOpen, onClose, jobId, selectedId, onSelectEquipment, fo
                     </select>
                   </div>
                   <div style={styles.filterGroup}>
-                    <span style={styles.filterLabel}>System</span>
+                    <span style={styles.filterLabel}>Duct Network</span>
                     <select
                       style={styles.select}
                       value={systemFilter}
@@ -370,9 +370,8 @@ function HvacFmPanel({ isOpen, onClose, jobId, selectedId, onSelectEquipment, fo
                   <table style={styles.table}>
                     <thead>
                       <tr>
-                        <th style={styles.th}>Mark/Tag</th>
+                        <th style={styles.th}>Equipment</th>
                         <th style={styles.th}>Storey</th>
-                        <th style={styles.th}>Systems</th>
                         <th style={styles.th}>Terminals</th>
                         <th style={styles.th}>Spaces</th>
                       </tr>
@@ -404,7 +403,6 @@ function HvacFmPanel({ isOpen, onClose, jobId, selectedId, onSelectEquipment, fo
                           >
                             <td style={styles.td}>{tagLabel}</td>
                             <td style={styles.td}>{item.storey || '-'}</td>
-                            <td style={styles.td}>{item.systems?.length || 0}</td>
                             <td style={styles.td}>{item.servedTerminals?.length || 0}</td>
                             <td style={styles.td}>{item.servedSpaces?.length || 0}</td>
                           </tr>
