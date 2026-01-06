@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" fill="#f8f9fa" rx="6"/>
+  <g transform="translate(8, 10)">
+    <!-- Building structure -->
+    <path d="M2 12 L8 6 L14 12 L14 18 L2 18 Z" fill="#1d1d1f" stroke="#1d1d1f" stroke-width="0.5" stroke-linejoin="round"/>
+    <!-- Window 1 -->
+    <rect x="4" y="10" width="2" height="2" fill="#f8f9fa"/>
+    <!-- Window 2 -->
+    <rect x="6.5" y="10" width="2" height="2" fill="#f8f9fa"/>
+    <!-- Window 3 -->
+    <rect x="9" y="10" width="2" height="2" fill="#f8f9fa"/>
+    <!-- Window 4 -->
+    <rect x="4" y="13" width="2" height="2" fill="#f8f9fa"/>
+    <!-- Window 5 -->
+    <rect x="6.5" y="13" width="2" height="2" fill="#f8f9fa"/>
+    <!-- Window 6 -->
+    <rect x="9" y="13" width="2" height="2" fill="#f8f9fa"/>
+    <!-- Door -->
+    <rect x="6.5" y="15.5" width="2" height="2.5" fill="#f8f9fa"/>
+    <!-- Accent line (roof edge) -->
+    <path d="M1 12 L8 5 L15 12" stroke="#ff6b35" stroke-width="1" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

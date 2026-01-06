@@ -58,7 +58,7 @@ const appStyles = {
   logoText: {
     fontSize: '14px',
     fontWeight: 600,
-    letterSpacing: '1.5px',
+    letterSpacing: '0.2px',
     color: '#1d1d1f',
   },
   fileInfo: {
@@ -67,10 +67,12 @@ const appStyles = {
     gap: '12px',
     fontSize: '13px',
     color: '#86868b',
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
   },
   fileName: {
     fontWeight: 500,
     color: '#1d1d1f',
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
   },
   fileSchema: {
     background: '#e8e8ec',

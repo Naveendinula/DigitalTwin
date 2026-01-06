@@ -351,14 +351,6 @@ const toolbarStyles = `
     50% { opacity: 1; transform: scale(1); }
   }
   
-  .viewer-tool-button:hover {
-    background: #f5f5f7 !important;
-    border-color: #d1d1d6 !important;
-  }
-  .viewer-tool-button.active:hover {
-    background: #333333 !important;
-    border-color: #333333 !important;
-  }
   /* View menu item hover */
   [data-view-menu-item]:hover {
     background: #f5f5f7 !important;

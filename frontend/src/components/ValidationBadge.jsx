@@ -15,9 +15,10 @@ const SEVERITY_CONFIG = {
     label: 'Valid'
   },
   warn: {
-    color: '#f59e0b',
-    bgColor: 'rgba(245, 158, 11, 0.1)',
-    icon: '⚠',
+    color: '#d97706',
+    bgColor: '#f0f0f2',
+    labelColor: '#6b7280',
+    icon: '!',
     label: 'Warnings'
   },
   fail: {
@@ -77,6 +78,15 @@ function ValidationBadge({ jobId, onOpenReport }) {
                  validationData?.status || 'error'
   
   const config = SEVERITY_CONFIG[status] || SEVERITY_CONFIG.error
+  const iconColor = config.iconColor || config.color
+  const labelColor = config.labelColor || config.color
+  const badgeStyle = {
+    ...styles.badge,
+    ...(status === 'warn' ? { background: config.bgColor } : {}),
+  }
+  const warnCountStyle = status === 'warn'
+    ? { ...styles.warnCount, color: config.color }
+    : styles.warnCount
 
   const handleClick = () => {
     if (!loading && !error && onOpenReport) {
@@ -87,7 +97,7 @@ function ValidationBadge({ jobId, onOpenReport }) {
   return (
     <button 
       style={{
-        ...styles.badge,
+        ...badgeStyle,
         cursor: loading ? 'default' : 'pointer',
         opacity: loading ? 0.7 : 1,
       }}
@@ -95,17 +105,17 @@ function ValidationBadge({ jobId, onOpenReport }) {
       title={loading ? 'Validating model...' : 'Click to view validation report'}
       disabled={loading}
     >
-      <span style={{ ...styles.icon, color: config.color }}>
+      <span style={{ ...styles.icon, color: iconColor }}>
         {config.icon}
       </span>
-      <span style={{ ...styles.label, color: config.color }}>
+      <span style={{ ...styles.label, color: labelColor }}>
         {config.label}
       </span>
       {!loading && validationData?.summary && (
         <span style={styles.counts}>
           <span style={styles.passCount}>{validationData.summary.passCount}</span>
           {validationData.summary.warnCount > 0 && (
-            <span style={styles.warnCount}>/{validationData.summary.warnCount}</span>
+            <span style={warnCountStyle}>/{validationData.summary.warnCount}</span>
           )}
           {validationData.summary.failCount > 0 && (
             <span style={styles.failCount}>/{validationData.summary.failCount}</span>
