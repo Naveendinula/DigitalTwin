@@ -171,6 +171,19 @@ def get_element_material_names(element) -> list[str]:
     return sorted(material_names)
 
 
+def is_placeholder_material(name: str) -> bool:
+    """Check if material name is a generic placeholder."""
+    if not name:
+        return True
+    n = name.lower().strip()
+    placeholders = {
+        "<unnamed>", 
+        "default wall", "default floor", "default roof", "default material",
+        "by category", "by object", 
+    }
+    return n in placeholders or n.startswith("default ")
+
+
 def is_leaf_element(el) -> bool:
     """True if the element has no children in IfcRelAggregates / IfcRelNests."""
     rels = getattr(el, "IsDecomposedBy", None) or []
@@ -178,9 +191,9 @@ def is_leaf_element(el) -> bool:
 
 
 def has_material(el) -> bool:
-    """True if the element (or its type) has any material association."""
-    mats = ifc_element.get_materials(el, should_inherit=True)
-    return bool(mats)
+    """True if the element has any VALID material assignment (not just placeholders)."""
+    names = get_element_material_names(el)
+    return any(not is_placeholder_material(n) for n in names)
 
 
 def get_material_layers_with_shares(el) -> list[Dict[str, Any]]:

@@ -3,6 +3,7 @@ import AppHeader from './components/AppHeader'
 import PropertyPanel from './components/PropertyPanel'
 import StructureTree from './components/StructureTree'
 import UploadPanel from './components/UploadPanel'
+import ValidationReportModal from './components/ValidationReportModal'
 import ViewerShell from './components/ViewerShell'
 import { useToast } from './components/Toast'
 import useKeyboardShortcuts from './hooks/useKeyboardShortcuts'
@@ -30,6 +31,9 @@ function App() {
   // Model URLs - null until uploaded
   const [modelUrls, setModelUrls] = useState(null)
   const [jobId, setJobId] = useState(null)
+
+  // Validation report modal state
+  const [validationModalOpen, setValidationModalOpen] = useState(false)
 
   const selection = useSelection()
   const visibility = useVisibility()
@@ -130,6 +134,7 @@ function App() {
   const handleResetModel = useCallback(() => {
     setModelUrls(null)
     setJobId(null)
+    setValidationModalOpen(false)
     floatingPanels.handleCloseEcPanel()
     floatingPanels.handleCloseHvacPanel()
     spaceOverlay.disableSpaceOverlay()
@@ -138,6 +143,15 @@ function App() {
     setGeometryHidden(false)
     handleClearAll()
   }, [floatingPanels.handleCloseEcPanel, floatingPanels.handleCloseHvacPanel, spaceOverlay.disableSpaceOverlay, occupancy.disable, handleClearAll])
+
+  // Validation modal handlers
+  const handleOpenValidationReport = useCallback(() => {
+    setValidationModalOpen(true)
+  }, [])
+
+  const handleCloseValidationReport = useCallback(() => {
+    setValidationModalOpen(false)
+  }, [])
 
   /**
    * Toggle occupancy mode and panel
@@ -168,6 +182,15 @@ function App() {
       <AppHeader 
         filename={modelUrls?.filename}
         ifcSchema={modelUrls?.ifcSchema}
+        jobId={jobId}
+        onOpenValidationReport={handleOpenValidationReport}
+      />
+
+      {/* Validation Report Modal */}
+      <ValidationReportModal
+        isOpen={validationModalOpen}
+        onClose={handleCloseValidationReport}
+        jobId={jobId}
       />
 
       <div style={appStyles.mainContent}>

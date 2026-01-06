@@ -25,6 +25,7 @@ from ifc_metadata_extractor import extract_metadata, save_metadata, METADATA_SCH
 from ifc_spatial_hierarchy import extract_spatial_hierarchy, save_hierarchy
 from ec_api import router as ec_router
 from fm_api import router as fm_router
+from validation_api import router as validation_router
 from config import UPLOAD_DIR, OUTPUT_DIR, ALLOWED_EXTENSIONS, MAX_FILE_SIZE
 
 
@@ -42,6 +43,7 @@ app = FastAPI(
 # Include EC router
 app.include_router(ec_router)
 app.include_router(fm_router)
+app.include_router(validation_router)
 
 # Enable CORS for frontend
 app.add_middleware(
@@ -67,6 +69,7 @@ class JobStage(str, Enum):
     CONVERTING_GLB = "converting_glb"
     EXTRACTING_METADATA = "extracting_metadata"
     EXTRACTING_HIERARCHY = "extracting_hierarchy"
+    VALIDATING = "validating"
     FINALIZING = "finalizing"
     COMPLETED = "completed"
     FAILED = "failed"
@@ -80,6 +83,8 @@ class ConversionJob(BaseModel):
     glb_url: Optional[str] = None
     metadata_url: Optional[str] = None
     hierarchy_url: Optional[str] = None
+    validation_url: Optional[str] = None
+    validation_status: Optional[str] = None  # 'pass', 'warn', 'fail'
     error: Optional[str] = None
 
 
@@ -186,6 +191,25 @@ async def process_ifc_file(job_id: str, ifc_path: Path) -> None:
             hierarchy,
             str(hierarchy_path)
         )
+        
+        # 4. Run validation
+        job.stage = JobStage.VALIDATING
+        print(f"[{job_id}] Running IFC validation...")
+        validation_path = job_output_dir / "validation.json"
+        try:
+            from ifc_validation import validate_ifc_to_json
+            validation_result = await loop.run_in_executor(
+                None,
+                validate_ifc_to_json,
+                str(ifc_path),
+                str(validation_path)
+            )
+            job.validation_status = validation_result.get("overallStatus", "unknown")
+            job.validation_url = f"/files/{job_id}/validation.json"
+            print(f"[{job_id}] Validation complete: {job.validation_status}")
+        except Exception as val_err:
+            print(f"[{job_id}] Validation warning (non-blocking): {val_err}")
+            job.validation_status = "error"
         
         # Update job with URLs
         job.stage = JobStage.FINALIZING

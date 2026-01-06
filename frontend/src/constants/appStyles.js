@@ -50,6 +50,11 @@ const appStyles = {
     fontWeight: 600,
     letterSpacing: '0.5px',
   },
+  headerRight: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+  },
   mainContent: {
     flex: 1,
     display: 'flex',

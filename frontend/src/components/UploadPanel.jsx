@@ -5,6 +5,7 @@ const STAGE_LABELS = {
   converting_glb: 'Converting geometry to GLB...',
   extracting_metadata: 'Extracting metadata...',
   extracting_hierarchy: 'Building spatial hierarchy...',
+  validating: 'Validating IFC model...',
   finalizing: 'Finalizing outputs...',
   completed: 'Finalizing outputs...'
 }
@@ -14,6 +15,7 @@ const STAGE_HINTS = {
   converting_glb: 'Generating viewable geometry from the IFC file.',
   extracting_metadata: 'Reading BIM properties and attributes.',
   extracting_hierarchy: 'Building the navigation tree.',
+  validating: 'Checking model quality and compatibility.',
   finalizing: 'Writing output files to disk.'
 }
 
