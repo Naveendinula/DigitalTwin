@@ -1,6 +1,8 @@
 import React, { useRef, useEffect, useState } from 'react'
 import { useGLTF } from '@react-three/drei'
 import { useThree } from '@react-three/fiber'
+import { debugLog } from '../utils/logger'
+import { isLikelyGlobalId } from '../utils/sceneIndex'
 
 /**
  * SelectableModel Component with Visibility Support
@@ -61,14 +63,14 @@ function SelectableModel({
         const yawDeg = orientation.modelYawDeg ?? 0
         const yawRad = (yawDeg * Math.PI) / 180
         
-        console.log('=== Model Orientation ===')
-        console.log('Schema version:', data.schemaVersion || 1)
-        console.log('Orientation source:', orientation.orientationSource || 'default')
-        console.log(`Yaw correction: ${yawDeg}° (${yawRad.toFixed(4)} rad)`)
+        debugLog('=== Model Orientation ===')
+        debugLog('Schema version:', data.schemaVersion || 1)
+        debugLog('Orientation source:', orientation.orientationSource || 'default')
+        debugLog(`Yaw correction: ${yawDeg}° (${yawRad.toFixed(4)} rad)`)
         if (orientation.trueNorthDeg != null) {
-          console.log(`TrueNorth: ${orientation.trueNorthDeg}° from Y-axis`)
+          debugLog(`TrueNorth: ${orientation.trueNorthDeg}° from Y-axis`)
         }
-        console.log('=========================')
+        debugLog('=========================')
         
         setYawCorrectionRad(yawRad)
       })
@@ -81,16 +83,16 @@ function SelectableModel({
   // Debug: Log scene structure on load
   useEffect(() => {
     if (scene) {
-      console.log('=== GLB Scene Structure ===')
-      console.log('Scene name:', scene.name)
-      console.log('Scene children:', scene.children.length)
+      debugLog('=== GLB Scene Structure ===')
+      debugLog('Scene name:', scene.name)
+      debugLog('Scene children:', scene.children.length)
       
       // Log hierarchy for first few objects
       let count = 0
       scene.traverse((obj) => {
         if (count < 20) {
           const indent = '  '.repeat(getDepth(obj, scene))
-          console.log(`${indent}${obj.type}: "${obj.name}" (parent: "${obj.parent?.name || 'none'}")`)
+          debugLog(`${indent}${obj.type}: "${obj.name}" (parent: "${obj.parent?.name || 'none'}")`)
           count++
         }
       })
@@ -101,13 +103,13 @@ function SelectableModel({
       scene.traverse((obj) => {
         if (obj.isMesh) meshCount++
         // Count objects that look like they have GlobalIds
-        if (obj.name && obj.name.length >= 20 && !obj.name.includes('-')) {
+        if (isLikelyGlobalId(obj.name)) {
           globalIdCount++
         }
       })
-      console.log(`Total meshes: ${meshCount}`)
-      console.log(`Objects with GlobalId-like names: ${globalIdCount}`)
-      console.log('===========================')
+      debugLog(`Total meshes: ${meshCount}`)
+      debugLog(`Objects with GlobalId-like names: ${globalIdCount}`)
+      debugLog('===========================')
     }
   }, [scene])
 
@@ -166,13 +168,13 @@ function SelectableModel({
     // Check if this is a Shift+Click (always allows section picking when in section mode)
     const isShiftClick = event.nativeEvent?.shiftKey || false
 
-    console.log('=== Click Event ===')
-    console.log('Section Mode:', sectionModeEnabled)
-    console.log('Picking Enabled:', sectionPlanePickingEnabled)
-    console.log('Shift Key:', isShiftClick)
-    console.log('Clicked object type:', clickedMesh.type)
-    console.log('Clicked object name:', clickedMesh.name)
-    console.log('Parent name:', clickedMesh.parent?.name)
+    debugLog('=== Click Event ===')
+    debugLog('Section Mode:', sectionModeEnabled)
+    debugLog('Picking Enabled:', sectionPlanePickingEnabled)
+    debugLog('Shift Key:', isShiftClick)
+    debugLog('Clicked object type:', clickedMesh.type)
+    debugLog('Clicked object name:', clickedMesh.name)
+    debugLog('Parent name:', clickedMesh.parent?.name)
     
     // If section mode is enabled, check if we should pick a new plane
     if (sectionModeEnabled && onSectionPick) {
@@ -184,8 +186,8 @@ function SelectableModel({
       if (!wantsNewPlane) {
         // Section mode is on, but plane is locked and no Shift key
         // Allow the click to pass through for orbit controls / normal interaction
-        console.log('Section plane locked - click passes through (Shift+Click to change)')
-        console.log('==================')
+        debugLog('Section plane locked - click passes through (Shift+Click to change)')
+        debugLog('==================')
         // Don't call onSelect here - let normal orbit controls work
         return
       }
@@ -199,18 +201,18 @@ function SelectableModel({
         nativeEvent: event.nativeEvent
       }
       
-      console.log('Section pick intersection:', {
+      debugLog('Section pick intersection:', {
         point: `(${event.point.x.toFixed(2)}, ${event.point.y.toFixed(2)}, ${event.point.z.toFixed(2)})`,
         faceNormal: event.face ? `(${event.face.normal.x.toFixed(2)}, ${event.face.normal.y.toFixed(2)}, ${event.face.normal.z.toFixed(2)})` : 'N/A'
       })
       
       onSectionPick(intersection, clickedMesh)
-      console.log('==================')
+      debugLog('==================')
       return
     }
     
     // Normal selection mode
-    console.log('==================')
+    debugLog('==================')
     onSelect?.(clickedMesh)
   }
 

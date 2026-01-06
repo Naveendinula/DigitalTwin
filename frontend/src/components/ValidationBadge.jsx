@@ -88,8 +88,6 @@ function ValidationBadge({ jobId, onOpenReport }) {
     <button 
       style={{
         ...styles.badge,
-        backgroundColor: config.bgColor,
-        borderColor: config.color,
         cursor: loading ? 'default' : 'pointer',
         opacity: loading ? 0.7 : 1,
       }}
@@ -128,12 +126,12 @@ const styles = {
     gap: '6px',
     padding: '6px 12px',
     borderRadius: '20px',
-    border: '1px solid',
-    background: 'transparent',
+    border: 'none',
+    background: '#e8e8ec',
     fontSize: '12px',
     fontWeight: 500,
-    transition: 'all 0.2s ease',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.1), 0.5px 0.5px 1px rgba(0,0,0,0.15)',
   },
 
   icon: {

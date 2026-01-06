@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { debugLog } from '../utils/logger'
 
 const createSpaceOverlayStatus = (overrides = {}) => ({
   hasSpaces: false,
@@ -69,7 +70,7 @@ export default function useSpaceOverlay({ jobId, showToast }) {
   }, [allSpaces.length])
 
   const handleSpaceSelect = useCallback((id) => {
-    console.log('Space selected:', id)
+    debugLog('Space selected:', id)
     if (highlightedSpaceIds.length === 0 && allSpaces.length > 0) {
       const idx = allSpaces.findIndex(space => space.globalId === id)
       if (idx !== -1) setSelectedSpaceIndex(idx)

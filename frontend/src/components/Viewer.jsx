@@ -1,6 +1,7 @@
 import React, { Suspense, useRef, useEffect } from 'react'
 import { Canvas, useThree } from '@react-three/fiber'
 import { OrbitControls, Environment } from '@react-three/drei'
+import { debugLog } from '../utils/logger'
 
 /**
  * RendererSetup Component
@@ -16,7 +17,7 @@ function RendererSetup({ onRendererReady, onControlsReady }) {
   useEffect(() => {
     if (gl) {
       gl.localClippingEnabled = true
-      console.log('Renderer local clipping enabled')
+      debugLog('Renderer local clipping enabled')
       onRendererReady?.(gl, camera)
     }
   }, [gl, camera, onRendererReady])
@@ -69,7 +70,7 @@ function Viewer({ children, onMissed, onRendererReady, onControlsReady }) {
       style={{ 
         width: '100%', 
         height: '100%',
-        background: 'linear-gradient(180deg, #f0f0f2 0%, #e8e8ed 100%)'
+        background: '#e8e8ec'
       }}
       onPointerMissed={handlePointerMissed}
       gl={{ 

@@ -587,21 +587,19 @@ function EcPanel({ isOpen, onClose, jobId, selectedId, onSelectContributor, focu
   )
 }
 
+const softShadow = 'rgb(255, 255, 255) 1px 1px 1px 0px inset, rgba(0, 0, 0, 0.15) -1px -1px 1px 0px inset, rgba(0, 0, 0, 0.26) 0.444584px 0.444584px 0.628737px -1px, rgba(0, 0, 0, 0.22) 1.21324px 1.21324px 1.38357px -2px, rgba(0, 0, 0, 0.15) 2.60599px 2.60599px 2.68477px -3px, rgba(0, 0, 0, 0.04) 6px 6px 6px -4px';
+const softShadowPressed = 'inset 0.5px 0.5px 1px #fff, inset -0.5px -0.5px 1px #00000026, inset 0 0 2px #00000026, rgb(255, 255, 255) 1px 1px 1px 0px, rgba(0, 0, 0, 0.07) -1px -1px 1px 0px';
+
 const styles = {
   panel: {
     position: 'absolute',
-    // width: '360px', // Removed fixed width
-    // maxHeight: 'calc(100vh - 100px)', // Removed fixed max height
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    backdropFilter: 'blur(20px)',
+    backgroundColor: '#f4f4f4',
     borderRadius: '12px',
-    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
-    border: '1px solid rgba(255, 255, 255, 0.4)',
+    boxShadow: softShadow,
     display: 'flex',
     flexDirection: 'column',
     zIndex: 1000,
     overflow: 'hidden',
-    transition: 'box-shadow 0.2s',
     fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
   },
   header: {
@@ -632,22 +630,21 @@ const styles = {
     color: '#1d1d1f',
   },
   closeButton: {
-    background: 'none',
+    background: '#e8e8ec',
     border: 'none',
     cursor: 'pointer',
-    // color: '#86868b', // Moved to CSS
-    padding: '4px',
+    padding: '6px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: '4px',
-    // transition: 'background 0.2s, color 0.2s', // Moved to CSS
+    borderRadius: '6px',
+    boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.1), 0.5px 0.5px 1px rgba(0,0,0,0.15)',
   },
   content: {
     padding: '16px',
     overflowY: 'auto',
     flex: 1, // Take remaining space
-    // maxHeight: '600px', // Removed fixed max height
+    background: 'rgba(255, 255, 255, 0.3)',
   },
   resizeHandle: {
     position: 'absolute',
@@ -678,14 +675,14 @@ const styles = {
   primaryButton: {
     width: '100%',
     padding: '10px',
-    // backgroundColor: '#0071e3', // Moved to CSS
-    // color: '#ffffff', // Moved to CSS
     border: 'none',
     borderRadius: '8px',
     fontSize: '13px',
     fontWeight: 500,
     cursor: 'pointer',
-    // transition: 'background 0.2s', // Moved to CSS
+    background: '#e8e8ec',
+    color: '#1d1d1f',
+    boxShadow: softShadow,
   },
   loading: {
     display: 'flex',
@@ -712,13 +709,14 @@ const styles = {
     gap: '16px',
   },
   summaryCard: {
-    backgroundColor: 'rgba(0, 0, 0, 0.03)',
+    backgroundColor: '#e8e8ec',
     padding: '16px',
     borderRadius: '8px',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     gap: '4px',
+    boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.08), 0.5px 0.5px 1px rgba(0,0,0,0.1)',
   },
   label: {
     fontSize: '11px',
@@ -740,14 +738,14 @@ const styles = {
   secondaryButton: {
     width: '100%',
     padding: '8px',
-    // backgroundColor: 'rgba(0, 0, 0, 0.05)', // Moved to CSS
-    // color: '#1d1d1f', // Moved to CSS
     border: 'none',
     borderRadius: '8px',
     fontSize: '12px',
     fontWeight: 500,
     cursor: 'pointer',
-    // transition: 'background 0.2s', // Moved to CSS
+    background: '#e8e8ec',
+    color: '#1d1d1f',
+    boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.08), 0.5px 0.5px 1px rgba(0,0,0,0.1)',
   },
   detailsContainer: {
     display: 'flex',
@@ -756,10 +754,11 @@ const styles = {
     animation: 'fadeIn 0.3s ease-in-out',
   },
   qualityContainer: {
-    backgroundColor: 'rgba(0, 0, 0, 0.03)',
+    backgroundColor: '#e8e8ec',
     padding: '12px',
     borderRadius: '8px',
     marginBottom: '8px',
+    boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.08)',
   },
   qualityBarContainer: {
     height: '6px',
@@ -803,9 +802,10 @@ const styles = {
     color: '#1d1d1f',
   },
   tableContainer: {
-    border: '1px solid rgba(0, 0, 0, 0.06)',
+    background: '#e8e8ec',
     borderRadius: '8px',
     overflow: 'hidden',
+    boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.08)',
   },
   table: {
     width: '100%',
@@ -837,12 +837,13 @@ const styles = {
   },
   retryButton: {
     padding: '6px 12px',
-    // backgroundColor: 'rgba(0, 0, 0, 0.05)', // Moved to CSS
-    // color: '#1d1d1f', // Moved to CSS
+    background: '#e8e8ec',
+    color: '#1d1d1f',
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
     fontSize: '12px',
+    boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.1), 0.5px 0.5px 1px rgba(0,0,0,0.15)',
   },
   linkButton: {
     background: 'none',
@@ -867,12 +868,12 @@ const styles = {
     zIndex: 20,
   },
   modal: {
-    backgroundColor: '#fff',
+    backgroundColor: '#f4f4f4',
     borderRadius: '12px',
     padding: '20px',
     width: '80%',
     maxWidth: '300px',
-    boxShadow: '0 12px 40px rgba(0,0,0,0.2)',
+    boxShadow: softShadow,
   },
   modalTitle: {
     margin: '0 0 8px 0',
@@ -899,10 +900,12 @@ const styles = {
   input: {
     padding: '8px',
     borderRadius: '6px',
-    border: '1px solid #d2d2d7',
+    border: 'none',
+    background: '#e8e8ec',
     fontSize: '13px',
     width: '100%',
     boxSizing: 'border-box',
+    boxShadow: 'inset 1px 1px 2px rgba(0,0,0,0.1), inset -1px -1px 2px rgba(255,255,255,0.5)',
   },
   modalActions: {
     display: 'flex',

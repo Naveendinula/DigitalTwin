@@ -399,11 +399,13 @@ function ValidationReportModal({ isOpen, onClose, jobId }) {
   )
 }
 
+const softShadow = 'rgb(255, 255, 255) 1px 1px 1px 0px inset, rgba(0, 0, 0, 0.15) -1px -1px 1px 0px inset, rgba(0, 0, 0, 0.26) 0.444584px 0.444584px 0.628737px -1px, rgba(0, 0, 0, 0.22) 1.21324px 1.21324px 1.38357px -2px, rgba(0, 0, 0, 0.15) 2.60599px 2.60599px 2.68477px -3px, rgba(0, 0, 0, 0.04) 6px 6px 6px -4px';
+
 const styles = {
   backdrop: {
     position: 'fixed',
     inset: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
     backdropFilter: 'blur(4px)',
     display: 'flex',
     alignItems: 'center',
@@ -416,9 +418,9 @@ const styles = {
     width: '100%',
     maxWidth: '960px',
     maxHeight: '85vh',
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f4f4f4',
     borderRadius: '16px',
-    boxShadow: '0 24px 48px rgba(0, 0, 0, 0.16)',
+    boxShadow: softShadow,
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
@@ -432,6 +434,7 @@ const styles = {
     padding: '20px 24px',
     borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
     flexShrink: 0,
+    background: 'rgba(255, 255, 255, 0.5)',
   },
 
   headerLeft: {
@@ -460,13 +463,13 @@ const styles = {
     height: '36px',
     borderRadius: '8px',
     border: 'none',
-    background: 'rgba(0, 0, 0, 0.04)',
+    background: '#e8e8ec',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     color: '#6b7280',
-    transition: 'all 0.15s ease',
+    boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.1), 0.5px 0.5px 1px rgba(0,0,0,0.15)',
   },
 
   content: {
@@ -474,6 +477,7 @@ const styles = {
     overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column',
+    background: 'rgba(255, 255, 255, 0.3)',
   },
 
   progressSection: {
@@ -527,6 +531,7 @@ const styles = {
     padding: '16px',
     flexShrink: 0,
     overflowY: 'auto',
+    background: 'rgba(255, 255, 255, 0.5)',
   },
 
   sidebarLabel: {
@@ -543,17 +548,17 @@ const styles = {
     width: '100%',
     padding: '12px',
     marginBottom: '8px',
-    background: 'transparent',
+    background: '#e8e8ec',
     border: 'none',
-    borderLeft: '3px solid transparent',
     borderRadius: '8px',
     cursor: 'pointer',
     textAlign: 'left',
-    transition: 'all 0.15s ease',
+    boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.08), 0.5px 0.5px 1px rgba(0,0,0,0.1)',
   },
 
   domainBtnActive: {
-    backgroundColor: 'rgba(0, 0, 0, 0.04)',
+    backgroundColor: '#f4f4f4',
+    boxShadow: softShadow,
   },
 
   domainBtnTop: {
@@ -641,10 +646,10 @@ const styles = {
   ruleCard: {
     marginBottom: '8px',
     borderRadius: '10px',
-    border: '1px solid rgba(0, 0, 0, 0.06)',
     borderLeft: '3px solid',
     overflow: 'hidden',
-    backgroundColor: '#fff',
+    backgroundColor: '#e8e8ec',
+    boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.06)',
   },
 
   ruleHeader: {
@@ -878,6 +883,7 @@ const styles = {
     fontSize: '11px',
     color: '#9ca3af',
     flexShrink: 0,
+    background: 'rgba(255, 255, 255, 0.5)',
   },
 
   footerItem: {

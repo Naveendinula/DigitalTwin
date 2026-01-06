@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { debugLog } from '../utils/logger'
 
 /**
  * StructureTree Component
@@ -134,7 +135,7 @@ function StructureTree({
    */
   const handleIsolate = useCallback((node, nodeId) => {
     const ids = collectGlobalIds(node)
-    console.log(`Isolating ${ids.length} elements from "${node.name || node.type}"`)
+    debugLog(`Isolating ${ids.length} elements from "${node.name || node.type}"`)
     
     // Toggle isolation
     if (isolatedBranch === nodeId) {
@@ -530,26 +531,32 @@ function TreeNode({
 /**
  * Styles
  */
+const softShadow = 'rgb(255, 255, 255) 1px 1px 1px 0px inset, rgba(0, 0, 0, 0.15) -1px -1px 1px 0px inset, rgba(0, 0, 0, 0.26) 0.444584px 0.444584px 0.628737px -1px, rgba(0, 0, 0, 0.22) 1.21324px 1.21324px 1.38357px -2px, rgba(0, 0, 0, 0.15) 2.60599px 2.60599px 2.68477px -3px, rgba(0, 0, 0, 0.04) 6px 6px 6px -4px';
+
 const styles = {
   panel: {
     width: '280px',
     height: '100%',
-    background: '#ffffff',
-    borderRight: '1px solid #e5e5e7',
+    background: '#f4f4f4',
+    borderRadius: '12px',
+    boxShadow: softShadow,
     display: 'flex',
     flexDirection: 'column',
     fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
     color: '#1d1d1f',
     flexShrink: 0,
+    overflow: 'hidden',
+    margin: '8px',
+    marginRight: '0',
   },
   header: {
     padding: '12px 16px',
-    borderBottom: '1px solid #e5e5e7',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    background: '#fafafa',
+    background: 'rgba(255, 255, 255, 0.5)',
     gap: '8px',
+    borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
   },
   title: {
     margin: 0,
@@ -574,23 +581,23 @@ const styles = {
     marginRight: '4px',
   },
   iconBtn: {
-    width: '24px',
-    height: '24px',
+    width: '28px',
+    height: '28px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'transparent',
+    background: '#e8e8ec',
     border: 'none',
-    borderRadius: '4px',
+    borderRadius: '8px',
     color: '#636366',
     cursor: 'pointer',
     padding: 0,
-    transition: 'all 0.15s',
+    boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.1), 0.5px 0.5px 1px rgba(0,0,0,0.15)',
   },
   divider: {
     width: '1px',
     height: '16px',
-    background: '#e5e5e7',
+    background: 'rgba(0, 0, 0, 0.1)',
     margin: '0 4px',
   },
   content: {
@@ -598,6 +605,7 @@ const styles = {
     overflow: 'auto',
     display: 'flex',
     flexDirection: 'column',
+    background: 'rgba(255, 255, 255, 0.3)',
   },
   message: {
     padding: '20px',
@@ -710,29 +718,27 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: '#f0f0f2',
-    borderWidth: '1px',
-    borderStyle: 'solid',
-    borderColor: '#d1d1d6',
+    background: '#e8e8ec',
+    border: 'none',
     borderRadius: '6px',
     color: '#636366',
     cursor: 'pointer',
     padding: 0,
-    transition: 'all 0.15s',
+    boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.1), 0.5px 0.5px 1px rgba(0,0,0,0.15)',
   },
   actionBtnActive: {
     background: '#007AFF',
-    borderColor: '#007AFF',
     color: '#ffffff',
+    boxShadow: 'inset 0.5px 0.5px 1px rgba(255,255,255,0.3), inset -0.5px -0.5px 1px rgba(0,0,0,0.2)',
   },
   children: {
     // Children are indented via paddingLeft on node
   },
   stats: {
     padding: '16px',
-    borderTop: '1px solid #e5e5e7',
-    background: '#fafafa',
+    background: 'rgba(255, 255, 255, 0.5)',
     marginTop: 'auto',
+    borderTop: '1px solid rgba(0, 0, 0, 0.05)',
   },
   statsHeader: {
     display: 'flex',
@@ -755,9 +761,9 @@ const styles = {
     flexDirection: 'column',
     alignItems: 'center',
     padding: '12px 8px',
-    background: '#ffffff',
+    background: '#e8e8ec',
     borderRadius: '8px',
-    border: '1px solid #e5e5e7',
+    boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.08), 0.5px 0.5px 1px rgba(0,0,0,0.1)',
   },
   statValue: {
     fontSize: '18px',

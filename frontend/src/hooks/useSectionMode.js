@@ -1,6 +1,8 @@
 import { useState, useCallback, useRef } from 'react'
 import * as THREE from 'three'
 import { computeSceneBounds } from '../utils/cameraUtils'
+import { findMeshGlobalId } from '../utils/sceneIndex'
+import { debugLog, debugWarn } from '../utils/logger'
 
 /**
  * @typedef {Object} SectionPickResult
@@ -98,7 +100,7 @@ function useSectionMode() {
         // Use max dimension * 1.5 to ensure it covers the model comfortably
         setSectionPlaneSize(bounds.maxDimension * 1.5)
         initialPlaneSizeRef.current = true
-        console.log('Section plane size set to:', bounds.maxDimension * 1.5)
+        debugLog('Section plane size set to:', bounds.maxDimension * 1.5)
       }
     }, 100)
   }, [])
@@ -118,7 +120,7 @@ function useSectionMode() {
     // Enable local clipping on the renderer
     if (renderer) {
       renderer.localClippingEnabled = true
-      console.log('Renderer local clipping enabled')
+      debugLog('Renderer local clipping enabled')
     }
   }, [])
 
@@ -185,7 +187,7 @@ function useSectionMode() {
       }
     })
 
-    console.log(`Clipping plane ${plane ? 'applied' : 'cleared'} on all materials`)
+    debugLog(`Clipping plane ${plane ? 'applied' : 'cleared'} on all materials`)
   }, [])
 
   /**
@@ -199,11 +201,11 @@ function useSectionMode() {
     if (state === null) {
       // Clear clipping planes from materials
       applyClippingPlaneToMaterials(null)
-      console.log('Active section plane cleared')
+      debugLog('Active section plane cleared')
     } else {
       // Apply the clipping plane to all materials
       applyClippingPlaneToMaterials(state.plane)
-      console.log('Active section plane set:', {
+      debugLog('Active section plane set:', {
         origin: `(${state.origin.x.toFixed(2)}, ${state.origin.y.toFixed(2)}, ${state.origin.z.toFixed(2)})`,
         normal: `(${state.normal.x.toFixed(2)}, ${state.normal.y.toFixed(2)}, ${state.normal.z.toFixed(2)})`,
         offset: state.offset,
@@ -249,7 +251,7 @@ function useSectionMode() {
     const newOffset = activeSectionPlane.offset + delta
     updatePlaneOffset(newOffset)
     
-    console.log(`Section plane nudged by ${delta.toFixed(2)}, new offset: ${newOffset.toFixed(2)}`)
+    debugLog(`Section plane nudged by ${delta.toFixed(2)}, new offset: ${newOffset.toFixed(2)}`)
   }, [activeSectionPlane, updatePlaneOffset])
 
   /**
@@ -258,7 +260,7 @@ function useSectionMode() {
   const resetPlaneOffset = useCallback(() => {
     if (!activeSectionPlane) return
     updatePlaneOffset(0)
-    console.log('Section plane offset reset to 0')
+    debugLog('Section plane offset reset to 0')
   }, [activeSectionPlane, updatePlaneOffset])
 
   /**
@@ -310,7 +312,7 @@ function useSectionMode() {
       setSectionPlanePickingEnabledState(true)
     }
     
-    console.log(`Section mode ${enabled ? 'enabled' : 'disabled'}`)
+    debugLog(`Section mode ${enabled ? 'enabled' : 'disabled'}`)
   }, [setActiveSectionPlane])
 
   /**
@@ -327,7 +329,7 @@ function useSectionMode() {
   const enableSectionPicking = useCallback(() => {
     if (!sectionModeEnabled) return
     setSectionPlanePickingEnabledState(true)
-    console.log('Section plane picking enabled')
+    debugLog('Section plane picking enabled')
   }, [sectionModeEnabled])
 
   /**
@@ -335,7 +337,7 @@ function useSectionMode() {
    */
   const disableSectionPicking = useCallback(() => {
     setSectionPlanePickingEnabledState(false)
-    console.log('Section plane picking disabled (locked)')
+    debugLog('Section plane picking disabled (locked)')
   }, [])
 
   /**
@@ -345,7 +347,7 @@ function useSectionMode() {
   const clearSectionPlane = useCallback(() => {
     setActiveSectionPlane(null)
     setSectionPlanePickingEnabledState(true) // Allow picking new plane after clear
-    console.log('Section plane cleared, picking re-enabled')
+    debugLog('Section plane cleared, picking re-enabled')
   }, [setActiveSectionPlane])
 
   /**
@@ -353,41 +355,20 @@ function useSectionMode() {
    */
   const findMeshInfo = useCallback((mesh) => {
     if (!mesh) return { globalId: null, sourceLabel: null }
-    
-    const isLikelyGlobalId = (str) => {
-      if (!str || typeof str !== 'string') return false
-      if (str.includes('-') || str.includes('openings')) return false
-      if (str === 'Scene' || str === 'RootNode') return false
-      return str.length >= 20 && str.length <= 24
-    }
-    
-    let globalId = null
+    const globalId = findMeshGlobalId(mesh, { preferUserData: true })
     let sourceLabel = null
-    
-    // Check mesh itself
-    if (isLikelyGlobalId(mesh.name)) {
-      globalId = mesh.name
-    }
-    if (mesh.userData?.GlobalId) {
-      globalId = mesh.userData.GlobalId
-    }
+
     if (mesh.userData?.type) {
       sourceLabel = mesh.userData.type
     }
     if (mesh.userData?.name && !sourceLabel) {
       sourceLabel = mesh.userData.name
     }
-    
-    // Walk up hierarchy
+
+    // Walk up hierarchy to find a reasonable source label.
     let parent = mesh.parent
     let depth = 0
     while (parent && depth < 10) {
-      if (!globalId && isLikelyGlobalId(parent.name)) {
-        globalId = parent.name
-      }
-      if (!globalId && parent.userData?.GlobalId) {
-        globalId = parent.userData.GlobalId
-      }
       if (!sourceLabel && parent.userData?.type) {
         sourceLabel = parent.userData.type
       }
@@ -397,12 +378,11 @@ function useSectionMode() {
       parent = parent.parent
       depth++
     }
-    
-    // Use mesh name as fallback for source label
+
     if (!sourceLabel && mesh.name && mesh.name.length > 0) {
       sourceLabel = mesh.name
     }
-    
+
     return { globalId, sourceLabel }
   }, [])
 
@@ -415,7 +395,7 @@ function useSectionMode() {
   const createSectionPlane = useCallback((pickResult) => {
     if (!pickResult) return
     if (!cameraRef.current) {
-      console.warn('Camera not set, cannot orient section plane')
+      debugWarn('Camera not set, cannot orient section plane')
       return
     }
 
@@ -432,7 +412,7 @@ function useSectionMode() {
     
     if (normal.dot(cameraDir) > 0) {
       normal.multiplyScalar(-1)
-      console.log('Flipped normal to face camera')
+      debugLog('Flipped normal to face camera')
     }
     
     // Add a small offset to prevent Z-fighting when the plane is exactly on a surface
@@ -463,7 +443,7 @@ function useSectionMode() {
     // This prevents accidental clicks from changing the plane
     setSectionPlanePickingEnabledState(false)
     
-    console.log('Section plane created and locked:', {
+    debugLog('Section plane created and locked:', {
       origin: `(${origin.x.toFixed(2)}, ${origin.y.toFixed(2)}, ${origin.z.toFixed(2)})`,
       normal: `(${normal.x.toFixed(2)}, ${normal.y.toFixed(2)}, ${normal.z.toFixed(2)})`,
       constant: plane.constant.toFixed(2),
@@ -478,11 +458,11 @@ function useSectionMode() {
    */
   const alignCameraToSection = useCallback(() => {
     if (!activeSectionPlane) {
-      console.log('No active section plane to align to')
+      debugLog('No active section plane to align to')
       return
     }
     if (!cameraRef.current) {
-      console.warn('Camera not set, cannot align')
+      debugWarn('Camera not set, cannot align')
       return
     }
 
@@ -512,7 +492,7 @@ function useSectionMode() {
       controlsRef.current.update()
     }
     
-    console.log('Camera aligned to section:', {
+    debugLog('Camera aligned to section:', {
       position: `(${cameraPosition.x.toFixed(2)}, ${cameraPosition.y.toFixed(2)}, ${cameraPosition.z.toFixed(2)})`,
       target: `(${origin.x.toFixed(2)}, ${origin.y.toFixed(2)}, ${origin.z.toFixed(2)})`,
       distance: distance.toFixed(2)
@@ -552,7 +532,7 @@ function useSectionMode() {
     const intersects = raycasterRef.current.intersectObjects(meshes, false)
 
     if (intersects.length === 0) {
-      console.log('Section pick: No intersection')
+      debugLog('Section pick: No intersection')
       return false
     }
 

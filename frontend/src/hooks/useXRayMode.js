@@ -1,5 +1,7 @@
 import { useState, useCallback, useRef } from 'react'
 import * as THREE from 'three'
+import { buildMeshIndex, getMeshesForIds, isMeshMatchingIds } from '../utils/sceneIndex'
+import { debugLog, debugWarn } from '../utils/logger'
 
 /**
  * useXRayMode Hook
@@ -72,67 +74,11 @@ function useXRayMode() {
     return xRayMaterialRef.current
   }, [])
 
-  const buildMeshIndex = useCallback((scene) => {
+  const buildSceneIndex = useCallback((scene) => {
     if (!scene) return
-
-    const index = new Map()
-    const meshes = []
-
-    scene.traverse((object) => {
-      if (!object.isMesh) return
-      meshes.push(object)
-
-      const keys = new Set()
-      if (object.name) keys.add(object.name)
-      if (object.userData?.GlobalId) keys.add(object.userData.GlobalId)
-
-      let ancestor = object.parent
-      let depth = 0
-      while (ancestor && depth < 5) {
-        if (ancestor.name) keys.add(ancestor.name)
-        if (ancestor.userData?.GlobalId) keys.add(ancestor.userData.GlobalId)
-        ancestor = ancestor.parent
-        depth++
-      }
-
-      keys.forEach((key) => {
-        if (!index.has(key)) {
-          index.set(key, new Set())
-        }
-        index.get(key).add(object)
-      })
-    })
-
+    const { index, meshes } = buildMeshIndex(scene, { ancestorDepth: 5 })
     meshIndexRef.current = index
     allMeshesRef.current = meshes
-  }, [])
-
-  /**
-   * Check if a mesh matches any of the selected globalIds
-   * Checks mesh name, userData, and ancestor chain
-   */
-  const isMeshSelected = useCallback((mesh, selectedIds) => {
-    if (!mesh || selectedIds.size === 0) return false
-    
-    // Check direct match on mesh name
-    if (selectedIds.has(mesh.name)) return true
-    
-    // Check userData.GlobalId
-    if (mesh.userData?.GlobalId && selectedIds.has(mesh.userData.GlobalId)) return true
-    
-    // Check ancestor chain (for nested elements like stairs)
-    let ancestor = mesh.parent
-    let depth = 0
-    const maxDepth = 10
-    
-    while (ancestor && depth < maxDepth) {
-      if (selectedIds.has(ancestor.name)) return true
-      if (ancestor.userData?.GlobalId && selectedIds.has(ancestor.userData.GlobalId)) return true
-      ancestor = ancestor.parent
-      depth++
-    }
-    
-    return false
   }, [])
 
   /**
@@ -188,19 +134,8 @@ function useXRayMode() {
    */
   const setScene = useCallback((scene) => {
     sceneRef.current = scene
-    buildMeshIndex(scene)
-  }, [buildMeshIndex])
-
-  const getMeshesForIds = useCallback((idsSet) => {
-    const selectedMeshes = new Set()
-    idsSet.forEach((id) => {
-      const meshes = meshIndexRef.current.get(id)
-      if (meshes) {
-        meshes.forEach(mesh => selectedMeshes.add(mesh))
-      }
-    })
-    return selectedMeshes
-  }, [])
+    buildSceneIndex(scene)
+  }, [buildSceneIndex])
 
   /**
    * Enable X-ray mode with selected elements
@@ -208,7 +143,7 @@ function useXRayMode() {
    */
   const enableXRay = useCallback((selectedIds = [], options = {}) => {
     if (!sceneRef.current) {
-      console.warn('useXRayMode: Scene not set')
+      debugWarn('useXRayMode: Scene not set')
       return
     }
 
@@ -218,13 +153,13 @@ function useXRayMode() {
     const idsSet = new Set(selectedIds)
     selectedIdsRef.current = idsSet
     
-    console.log('Enabling X-ray mode:', resolvedMode, 'selected IDs:', selectedIds)
+    debugLog('Enabling X-ray mode:', resolvedMode, 'selected IDs:', selectedIds)
     
     if (!meshIndexRef.current.size || !allMeshesRef.current.length) {
-      buildMeshIndex(sceneRef.current)
+      buildSceneIndex(sceneRef.current)
     }
 
-    const selectedMeshes = getMeshesForIds(idsSet)
+    const selectedMeshes = getMeshesForIds(idsSet, meshIndexRef.current)
     selectedMeshesRef.current = new Set()
     xrayMeshesRef.current = new Set()
 
@@ -239,13 +174,13 @@ function useXRayMode() {
     })
     
     setXRayEnabled(true)
-  }, [buildMeshIndex, getMeshesForIds, setXRayForMesh])
+  }, [buildSceneIndex, setXRayForMesh])
 
   /**
    * Disable X-ray mode and restore all original materials
    */
   const disableXRay = useCallback(() => {
-    console.log('Disabling X-ray mode, restoring', originalMaterialsRef.current.size, 'materials')
+    debugLog('Disabling X-ray mode, restoring', originalMaterialsRef.current.size, 'materials')
     
     // Restore all original materials
     originalMaterialsRef.current.forEach(({ mesh, material }) => {
@@ -319,14 +254,14 @@ function useXRayMode() {
     selectedIdsRef.current = idsSet
 
     if (!meshIndexRef.current.size || !allMeshesRef.current.length) {
-      buildMeshIndex(sceneRef.current)
+      buildSceneIndex(sceneRef.current)
     }
 
-    let nextSelectedMeshes = getMeshesForIds(idsSet)
+    let nextSelectedMeshes = getMeshesForIds(idsSet, meshIndexRef.current)
     if (selectedIds.length > 0 && nextSelectedMeshes.size === 0) {
       nextSelectedMeshes = new Set()
       allMeshesRef.current.forEach((mesh) => {
-        if (isMeshSelected(mesh, idsSet)) {
+        if (isMeshMatchingIds(mesh, idsSet)) {
           nextSelectedMeshes.add(mesh)
         }
       })
@@ -349,7 +284,7 @@ function useXRayMode() {
         xrayMeshesRef.current.delete(mesh)
       }
     })
-  }, [xRayEnabled, isMeshSelected, setXRayForMesh, buildMeshIndex, getMeshesForIds, getXRayMaterial])
+  }, [xRayEnabled, setXRayForMesh, buildSceneIndex, getXRayMaterial])
 
   /**
    * Toggle X-ray mode

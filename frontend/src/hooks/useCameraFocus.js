@@ -1,5 +1,7 @@
-import { useCallback, useRef, useMemo } from 'react'
+import { useCallback, useRef } from 'react'
 import * as THREE from 'three'
+import { findMeshesByIds } from '../utils/sceneIndex'
+import { debugLog, debugWarn } from '../utils/logger'
 
 /**
  * useCameraFocus Hook
@@ -30,34 +32,6 @@ function useCameraFocus() {
   }, [])
 
   /**
-   * Check if a mesh matches any of the globalIds
-   * Checks mesh name, userData, and ancestor chain (same as useXRayMode)
-   */
-  const isMeshMatchingId = useCallback((mesh, idsSet) => {
-    if (!mesh || idsSet.size === 0) return false
-    
-    // Check direct match on mesh name
-    if (idsSet.has(mesh.name)) return true
-    
-    // Check userData.GlobalId
-    if (mesh.userData?.GlobalId && idsSet.has(mesh.userData.GlobalId)) return true
-    
-    // Check ancestor chain (for nested elements like stairs)
-    let ancestor = mesh.parent
-    let depth = 0
-    const maxDepth = 10
-    
-    while (ancestor && depth < maxDepth) {
-      if (idsSet.has(ancestor.name)) return true
-      if (ancestor.userData?.GlobalId && idsSet.has(ancestor.userData.GlobalId)) return true
-      ancestor = ancestor.parent
-      depth++
-    }
-    
-    return false
-  }, [])
-
-  /**
    * Find all meshes matching the given globalIds
    * @param {string[]} globalIds - Array of element GlobalIds
    * @returns {THREE.Mesh[]} Array of matching meshes
@@ -68,16 +42,8 @@ function useCameraFocus() {
     }
 
     const idsSet = new Set(globalIds)
-    const matchingMeshes = []
-
-    sceneRef.current.traverse((object) => {
-      if (object.isMesh && isMeshMatchingId(object, idsSet)) {
-        matchingMeshes.push(object)
-      }
-    })
-
-    return matchingMeshes
-  }, [isMeshMatchingId])
+    return findMeshesByIds(sceneRef.current, idsSet)
+  }, [])
 
   /**
    * Compute bounding box for all selected meshes
@@ -112,7 +78,7 @@ function useCameraFocus() {
     const controls = controlsRef.current
     
     if (!camera || !controls) {
-      console.warn('useCameraFocus: Camera or controls not set')
+      debugWarn('useCameraFocus: Camera or controls not set')
       return
     }
 
@@ -150,13 +116,13 @@ function useCameraFocus() {
     const result = { found: false, count: 0 }
     
     if (!sceneRef.current || !cameraRef.current || !controlsRef.current) {
-      console.warn('useCameraFocus: Scene, camera, or controls not set')
+      debugWarn('useCameraFocus: Scene, camera, or controls not set')
       onResult?.(result)
       return result
     }
 
     if (!globalIds || globalIds.length === 0) {
-      console.log('useCameraFocus: No globalIds provided')
+      debugLog('useCameraFocus: No globalIds provided')
       onResult?.(result)
       return result
     }
@@ -170,19 +136,19 @@ function useCameraFocus() {
     result.count = meshes.length
     
     if (meshes.length === 0) {
-      console.log('useCameraFocus: No meshes found for globalIds:', ids)
+      debugLog('useCameraFocus: No meshes found for globalIds:', ids)
       onResult?.(result)
       return result
     }
 
     result.found = true
-    console.log(`useCameraFocus: Focusing on ${meshes.length} mesh(es)`)
+    debugLog(`useCameraFocus: Focusing on ${meshes.length} mesh(es)`)
 
     // Compute bounding box
     const boundingBox = computeBoundingBox(meshes)
     
     if (boundingBox.isEmpty()) {
-      console.log('useCameraFocus: Bounding box is empty')
+      debugLog('useCameraFocus: Bounding box is empty')
       result.found = false
       onResult?.(result)
       return result
@@ -226,7 +192,7 @@ function useCameraFocus() {
     // Animate to new position
     animateCamera(startPos, newCameraPos, startTarget, center, 800)
     
-    console.log('Camera focus animation started:', {
+    debugLog('Camera focus animation started:', {
       center: `(${center.x.toFixed(2)}, ${center.y.toFixed(2)}, ${center.z.toFixed(2)})`,
       size: `(${size.x.toFixed(2)}, ${size.y.toFixed(2)}, ${size.z.toFixed(2)})`,
       distance: distance.toFixed(2)

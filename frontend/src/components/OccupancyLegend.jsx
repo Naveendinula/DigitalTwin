@@ -47,18 +47,17 @@ function OccupancyLegend({ totals, timestamp, visible }) {
   )
 }
 
+const softShadow = 'rgb(255, 255, 255) 1px 1px 1px 0px inset, rgba(0, 0, 0, 0.15) -1px -1px 1px 0px inset, rgba(0, 0, 0, 0.26) 0.444584px 0.444584px 0.628737px -1px, rgba(0, 0, 0, 0.22) 1.21324px 1.21324px 1.38357px -2px, rgba(0, 0, 0, 0.15) 2.60599px 2.60599px 2.68477px -3px, rgba(0, 0, 0, 0.04) 6px 6px 6px -4px';
+
 const styles = {
   container: {
     position: 'absolute',
     bottom: '20px',
     left: '20px',
-    backgroundColor: 'rgba(255, 255, 255, 0.92)',
-    backdropFilter: 'blur(20px)',
-    WebkitBackdropFilter: 'blur(20px)',
+    backgroundColor: '#f4f4f4',
     borderRadius: '12px',
     padding: '14px 18px',
-    boxShadow: '0 4px 24px rgba(0, 0, 0, 0.08)',
-    border: '1px solid rgba(255, 255, 255, 0.5)',
+    boxShadow: softShadow,
     zIndex: 100,
     minWidth: '160px',
     fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
@@ -121,11 +120,12 @@ const styles = {
     marginLeft: 'auto',
     padding: '3px 8px',
     borderRadius: '6px',
-    backgroundColor: 'rgba(0, 0, 0, 0.04)',
+    backgroundColor: '#e8e8ec',
     fontSize: '12px',
     fontWeight: 500,
     color: '#424245',
     fontVariantNumeric: 'tabular-nums',
+    boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.08)',
   },
   gradientContainer: {
     display: 'flex',

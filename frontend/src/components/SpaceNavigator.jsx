@@ -182,6 +182,8 @@ function SpaceNavigator({
   )
 }
 
+const softShadow = 'rgb(255, 255, 255) 1px 1px 1px 0px inset, rgba(0, 0, 0, 0.15) -1px -1px 1px 0px inset, rgba(0, 0, 0, 0.26) 0.444584px 0.444584px 0.628737px -1px, rgba(0, 0, 0, 0.22) 1.21324px 1.21324px 1.38357px -2px, rgba(0, 0, 0, 0.15) 2.60599px 2.60599px 2.68477px -3px, rgba(0, 0, 0, 0.04) 6px 6px 6px -4px';
+
 const styles = {
   container: {
     position: 'absolute',
@@ -190,13 +192,12 @@ const styles = {
     transform: 'translateX(-50%)',
     display: 'flex',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f4f4f4',
     padding: '8px 12px',
     borderRadius: '12px',
-    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+    boxShadow: softShadow,
     zIndex: 100,
     gap: '16px',
-    border: '1px solid #e5e5e7',
     fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
   },
   button: {
@@ -206,15 +207,14 @@ const styles = {
     width: '36px',
     height: '36px',
     borderRadius: '8px',
-    border: '1px solid transparent',
-    backgroundColor: '#f5f5f7',
+    border: 'none',
+    backgroundColor: '#e8e8ec',
     cursor: 'pointer',
     color: '#1d1d1f',
-    transition: 'all 0.2s ease',
+    boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.1), 0.5px 0.5px 1px rgba(0,0,0,0.15)',
   },
   buttonHover: {
-    backgroundColor: '#e5e5e7',
-    transform: 'scale(1.05)',
+    backgroundColor: '#e0e0e4',
   },
   info: {
     display: 'flex',
@@ -250,10 +250,9 @@ const styles = {
     left: '0',
     right: '0',
     marginBottom: '8px',
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f4f4f4',
     borderRadius: '12px',
-    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
-    border: '1px solid #e5e5e7',
+    boxShadow: softShadow,
     overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column',
@@ -261,8 +260,8 @@ const styles = {
   },
   dropdownHeader: {
     padding: '8px 12px',
-    borderBottom: '1px solid #f5f5f7',
-    backgroundColor: '#fbfbfd',
+    borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
   },
   dropdownList: {
     overflowY: 'auto',

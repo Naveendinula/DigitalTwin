@@ -1,5 +1,7 @@
 import { useCallback, useRef } from 'react'
 import * as THREE from 'three'
+import { isMeshMatchingIds } from '../utils/sceneIndex'
+import { debugLog } from '../utils/logger'
 
 /**
  * useVisibility Hook
@@ -20,34 +22,6 @@ function useVisibility() {
    */
   const setScene = useCallback((scene) => {
     sceneRef.current = scene
-  }, [])
-
-  /**
-   * Check if a mesh matches any of the selected globalIds
-   * Checks mesh name, userData, and ancestor chain (up to 10 levels)
-   */
-  const isMeshMatchingIds = useCallback((mesh, idsSet) => {
-    if (!mesh || idsSet.size === 0) return false
-    
-    // Check direct match on mesh name
-    if (mesh.name && idsSet.has(mesh.name)) return true
-    
-    // Check userData.GlobalId
-    if (mesh.userData?.GlobalId && idsSet.has(mesh.userData.GlobalId)) return true
-    
-    // Check ancestor chain (for nested elements like windows, stairs, etc.)
-    let ancestor = mesh.parent
-    let depth = 0
-    const maxDepth = 10
-    
-    while (ancestor && depth < maxDepth) {
-      if (ancestor.name && idsSet.has(ancestor.name)) return true
-      if (ancestor.userData?.GlobalId && idsSet.has(ancestor.userData.GlobalId)) return true
-      ancestor = ancestor.parent
-      depth++
-    }
-    
-    return false
   }, [])
 
   /**
@@ -79,7 +53,7 @@ function useVisibility() {
       }
     })
 
-    console.log('Visibility reset: showing all objects')
+    debugLog('Visibility reset: showing all objects')
   }, [])
 
   /**
@@ -116,8 +90,8 @@ function useVisibility() {
       }
     })
 
-    console.log(`Isolated ${shownCount} objects, hidden ${hiddenCount} objects`)
-  }, [showAll, storeOriginalState, isMeshMatchingIds])
+    debugLog(`Isolated ${shownCount} objects, hidden ${hiddenCount} objects`)
+  }, [showAll, storeOriginalState])
 
   /**
    * Hide specific objects by GlobalId
@@ -137,7 +111,7 @@ function useVisibility() {
         object.visible = false
       }
     })
-  }, [storeOriginalState, isMeshMatchingIds])
+  }, [storeOriginalState])
 
   /**
    * Show specific objects by GlobalId
@@ -156,7 +130,7 @@ function useVisibility() {
         object.visible = true
       }
     })
-  }, [isMeshMatchingIds])
+  }, [])
 
   /**
    * Set transparency for specific objects
@@ -179,7 +153,7 @@ function useVisibility() {
         }
       }
     })
-  }, [isMeshMatchingIds])
+  }, [])
 
   /**
    * Get all GlobalIds in the scene

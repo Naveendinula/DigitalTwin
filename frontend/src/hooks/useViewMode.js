@@ -8,6 +8,7 @@ import {
   getAvailableViewModes,
   applyViewMode
 } from '../utils/cameraUtils'
+import { debugLog, debugWarn } from '../utils/logger'
 
 /**
  * View Mode Types
@@ -169,14 +170,14 @@ function useViewMode(defaultOptions = {}) {
     const previousMode = viewMode
     
     if (!camera || !controls) {
-      console.warn('useViewMode: Camera or controls not set')
+      debugWarn('useViewMode: Camera or controls not set')
       return
     }
     
     // If already in free mode and pressing free again, do nothing
     // (don't reset the user's current orbit position)
     if (previousMode === 'free' && mode === 'free' && !options.forceReset) {
-      console.log('Already in free mode, keeping current view')
+      debugLog('Already in free mode, keeping current view')
       return
     }
     
@@ -204,14 +205,14 @@ function useViewMode(defaultOptions = {}) {
         }
       )
       
-      console.log('Restored free mode camera state')
+      debugLog('Restored free mode camera state')
       return
     }
     
     // Get model bounds (use cache if available)
     const bounds = getModelBounds()
     if (!bounds) {
-      console.warn('useViewMode: Cannot compute model bounds')
+      debugWarn('useViewMode: Cannot compute model bounds')
       return
     }
     
@@ -222,7 +223,7 @@ function useViewMode(defaultOptions = {}) {
     const target = calculateViewTarget(mode, bounds, camera, fitOptions)
     
     if (!target) {
-      console.warn(`useViewMode: Failed to calculate view target for mode "${mode}"`)
+      debugWarn(`useViewMode: Failed to calculate view target for mode "${mode}"`)
       return
     }
     
@@ -239,7 +240,7 @@ function useViewMode(defaultOptions = {}) {
       }
     )
     
-    console.log(`View mode set to: ${mode}`, {
+    debugLog(`View mode set to: ${mode}`, {
       center: `(${bounds.center.x.toFixed(2)}, ${bounds.center.y.toFixed(2)}, ${bounds.center.z.toFixed(2)})`,
       radius: bounds.radius.toFixed(2),
       cameraPos: `(${target.position.x.toFixed(2)}, ${target.position.y.toFixed(2)}, ${target.position.z.toFixed(2)})`
@@ -261,14 +262,14 @@ function useViewMode(defaultOptions = {}) {
     const controls = controlsRef.current
     
     if (!camera || !controls) {
-      console.warn('useViewMode: Camera or controls not set')
+      debugWarn('useViewMode: Camera or controls not set')
       return
     }
     
     // Get model bounds (use cache if available)
     const bounds = getModelBounds()
     if (!bounds) {
-      console.warn('useViewMode: Cannot compute model bounds')
+      debugWarn('useViewMode: Cannot compute model bounds')
       return
     }
     
@@ -278,7 +279,7 @@ function useViewMode(defaultOptions = {}) {
     // Apply immediately using shared utility
     applyViewMode(mode, camera, controls, bounds, fitOptions)
     
-    console.log(`View mode set (immediate) to: ${mode}`)
+    debugLog(`View mode set (immediate) to: ${mode}`)
   }, [getModelBounds, defaultFitOptions])
 
   /**
@@ -300,7 +301,7 @@ function useViewMode(defaultOptions = {}) {
     // Clear saved free mode state so we get the default perspective
     savedFreeModeState.current = null
     setViewMode('free', { paddingFactor: 1.5, forceReset: true, ...options })
-    console.log('View reset to default perspective')
+    debugLog('View reset to default perspective')
   }, [setViewMode])
 
   /**
@@ -314,14 +315,14 @@ function useViewMode(defaultOptions = {}) {
     const controls = controlsRef.current
     
     if (!camera || !controls) {
-      console.warn('useViewMode: Camera or controls not set')
+      debugWarn('useViewMode: Camera or controls not set')
       return
     }
     
     // Force recompute bounds for fit
     const bounds = getModelBounds(true)
     if (!bounds) {
-      console.warn('useViewMode: Cannot compute model bounds')
+      debugWarn('useViewMode: Cannot compute model bounds')
       return
     }
     
@@ -359,7 +360,7 @@ function useViewMode(defaultOptions = {}) {
       }
     )
     
-    console.log('Fit to model:', {
+    debugLog('Fit to model:', {
       center: `(${bounds.center.x.toFixed(2)}, ${bounds.center.y.toFixed(2)}, ${bounds.center.z.toFixed(2)})`,
       distance: distance.toFixed(2)
     })

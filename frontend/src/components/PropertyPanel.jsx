@@ -290,24 +290,31 @@ function formatValue(value) {
 }
 
 /**
- * Styles
+ * Styles - Soft-UI / Tactile design
  */
 const styles = {
   panel: {
     width: '320px',
     height: '100%',
-    background: '#ffffff',
-    borderLeft: '1px solid #e5e5e7',
+    background: '#f4f4f4',
+    boxShadow: `rgb(255, 255, 255) 1px 1px 1px 0px inset,
+      rgba(0, 0, 0, 0.12) -1px -1px 1px 0px inset,
+      rgba(0, 0, 0, 0.2) 0.444584px 0.444584px 0.628737px -1px,
+      rgba(0, 0, 0, 0.18) 1.21072px 1.21072px 1.71222px -1.5px,
+      rgba(0, 0, 0, 0.15) 2.6583px 2.6583px 3.75941px -2.25px,
+      rgba(0, 0, 0, 0.1) 5.90083px 5.90083px 8.34503px -3px`,
+    borderRadius: '12px',
     display: 'flex',
     flexDirection: 'column',
     fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
     color: '#1d1d1f',
     flexShrink: 0,
+    overflow: 'hidden',
   },
   header: {
     padding: '16px 20px',
-    borderBottom: '1px solid #e5e5e7',
-    background: '#fafafa',
+    borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+    background: 'rgba(255, 255, 255, 0.5)',
   },
   title: {
     margin: 0,
@@ -321,6 +328,7 @@ const styles = {
     flex: 1,
     overflow: 'auto',
     padding: '16px 0',
+    background: 'rgba(255, 255, 255, 0.3)',
   },
   message: {
     display: 'flex',
@@ -336,11 +344,12 @@ const styles = {
     width: '64px',
     height: '64px',
     borderRadius: '50%',
-    background: '#f5f5f7',
+    background: '#e8e8ec',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: '16px',
+    boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.08)',
   },
   messageTitle: {
     margin: '0 0 4px 0',
@@ -377,8 +386,9 @@ const styles = {
   elementHeader: {
     marginBottom: '20px',
     padding: '16px',
-    background: '#f5f5f7',
+    background: '#e8e8ec',
     borderRadius: '12px',
+    boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.08)',
   },
   typeTag: {
     display: 'inline-block',
@@ -417,21 +427,22 @@ const styles = {
     paddingLeft: '4px',
   },
   propertyList: {
-    background: '#f5f5f7',
+    background: '#e8e8ec',
     borderRadius: '8px',
     overflow: 'hidden',
+    boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.08)',
   },
   propertyRow: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     padding: '10px 12px',
-    borderBottom: '1px solid #e5e5e7',
+    borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
     gap: '12px',
   },
   complexPropertyRow: {
     padding: '10px 12px',
-    borderBottom: '1px solid #e5e5e7',
+    borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
   },
   complexPropertyHeader: {
     display: 'flex',
@@ -442,23 +453,23 @@ const styles = {
   complexTypeTag: {
     fontSize: '10px',
     color: '#86868b',
-    background: '#e5e5e7',
+    background: 'rgba(0, 0, 0, 0.06)',
     padding: '2px 6px',
     borderRadius: '4px',
     textTransform: 'uppercase',
   },
   nestedProperties: {
-    background: '#ffffff',
+    background: '#f4f4f4',
     borderRadius: '6px',
-    border: '1px solid #e5e5e7',
     overflow: 'hidden',
+    boxShadow: 'inset 0.5px 0.5px 1px rgba(0,0,0,0.05)',
   },
   nestedProperty: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: '6px 10px',
-    borderBottom: '1px solid #f0f0f2',
+    borderBottom: '1px solid rgba(0, 0, 0, 0.04)',
     fontSize: '12px',
   },
   nestedLabel: {
@@ -491,17 +502,19 @@ const styles = {
   },
   materialTag: {
     padding: '6px 12px',
-    background: '#f5f5f7',
+    background: '#e8e8ec',
     borderRadius: '16px',
     fontSize: '12px',
     color: '#1d1d1f',
     fontWeight: 500,
+    boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.08)',
   },
   pset: {
     marginBottom: '8px',
-    background: '#f5f5f7',
+    background: '#e8e8ec',
     borderRadius: '8px',
     overflow: 'hidden',
+    boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.08)',
   },
   psetHeader: {
     width: '100%',
@@ -524,13 +537,13 @@ const styles = {
   psetCount: {
     fontSize: '11px',
     color: '#86868b',
-    background: '#e5e5e7',
+    background: 'rgba(0, 0, 0, 0.06)',
     padding: '2px 8px',
     borderRadius: '10px',
   },
   psetContent: {
-    borderTop: '1px solid #e5e5e7',
-    background: '#ffffff',
+    borderTop: '1px solid rgba(0, 0, 0, 0.05)',
+    background: '#f4f4f4',
   },
   debugDetails: {
     marginTop: '12px',
@@ -552,7 +565,7 @@ const styles = {
     display: 'block',
     fontFamily: "'SF Mono', 'Monaco', monospace",
     fontSize: '9px',
-    background: '#f5f5f7',
+    background: '#e8e8ec',
     padding: '2px 4px',
     borderRadius: '2px',
     marginTop: '2px',

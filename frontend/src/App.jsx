@@ -20,6 +20,7 @@ import useSpaceOverlay from './hooks/useSpaceOverlay'
 import useOccupancy from './hooks/useOccupancy'
 import useViewerScene from './hooks/useViewerScene'
 import appStyles from './constants/appStyles'
+import { debugLog } from './utils/logger'
 
 /**
  * Main Application Component
@@ -116,7 +117,7 @@ function App() {
    * Handle model ready after upload
    */
   const handleModelReady = useCallback((urls) => {
-    console.log('Model ready:', urls)
+    debugLog('Model ready:', urls)
     setModelUrls(urls)
     setJobId(urls.jobId)
     // Reset section mode when loading a new model
@@ -177,6 +178,31 @@ function App() {
     return <UploadPanel onModelReady={handleModelReady} hasModel={false} />
   }
 
+  const viewer = {
+    modelUrls,
+    jobId,
+    selection,
+    sectionMode,
+    viewModeState,
+    floatingPanels,
+    spaceOverlay,
+    occupancy,
+    occupancyPanelOpen,
+    setOccupancyPanelOpen,
+    geometryHidden,
+    handleModelReady,
+    handleResetModel,
+    handleSectionPick,
+    handleToggleOccupancy,
+    handleToggleOccupancyPanel,
+    handleToggleGeometry,
+    handleHvacSelectDetail,
+    handleTreeSelect,
+    handleSceneReady,
+    handleRendererReady,
+    handleControlsReady
+  }
+
   return (
     <div style={appStyles.appContainer}>
       <AppHeader 
@@ -205,119 +231,7 @@ function App() {
 
         <ViewerShell
           containerStyle={appStyles.viewerContainer}
-          viewerToolbarProps={{
-            sectionModeEnabled: sectionMode.sectionModeEnabled,
-            onToggleSectionMode: sectionMode.toggleSectionMode,
-            hasSectionPlane: !!sectionMode.activeSectionPlane,
-            onClearSectionPlane: sectionMode.clearSectionPlane,
-            onAlignCamera: sectionMode.alignCameraToSection,
-            viewMode: viewModeState.viewMode,
-            onSetViewMode: viewModeState.setViewMode,
-            availableViews: viewModeState.getAvailableViews(),
-            onResetView: viewModeState.resetView,
-            onFitToModel: viewModeState.fitToModel,
-            onOpenEcPanel: floatingPanels.handleToggleEcPanel,
-            onOpenHvacPanel: floatingPanels.handleToggleHvacPanel,
-            onToggleSpaceOverlay: spaceOverlay.toggleSpaceOverlay,
-            spaceOverlayEnabled: spaceOverlay.spaceOverlayEnabled,
-            onToggleOccupancy: handleToggleOccupancy,
-            occupancyEnabled: occupancy.enabled,
-            onOpenOccupancyPanel: handleToggleOccupancyPanel,
-            geometryHidden,
-            onToggleGeometry: handleToggleGeometry,
-            hasModel: !!modelUrls
-          }}
-          sectionPanelProps={{
-            sectionModeEnabled: sectionMode.sectionModeEnabled,
-            sectionPlanePickingEnabled: sectionMode.sectionPlanePickingEnabled,
-            activeSectionPlane: sectionMode.activeSectionPlane,
-            onToggleSectionMode: sectionMode.toggleSectionMode,
-            onNudge: sectionMode.nudgeSectionPlane,
-            onAlignCamera: sectionMode.alignCameraToSection,
-            onReset: sectionMode.clearSectionPlane,
-            onResetOffset: sectionMode.resetPlaneOffset,
-            onChangePlane: sectionMode.enableSectionPicking,
-            sectionPlaneVisible: sectionMode.sectionPlaneVisible,
-            onTogglePlaneVisibility: sectionMode.toggleSectionPlaneVisibility,
-            sectionPlaneSize: sectionMode.sectionPlaneSize,
-            onSectionPlaneSizeChange: sectionMode.setSectionPlaneSize
-          }}
-          viewerProps={{
-            onMissed: selection.deselect,
-            onRendererReady: handleRendererReady,
-            onControlsReady: handleControlsReady
-          }}
-          sectionPlaneHelperProps={{
-            activeSectionPlane: sectionMode.activeSectionPlane,
-            visible: sectionMode.sectionPlaneVisible,
-            size: sectionMode.sectionPlaneSize
-          }}
-          selectableModelProps={{
-            url: modelUrls.glbUrl,
-            metadataUrl: modelUrls.metadataUrl,
-            onSelect: selection.handleSelect,
-            onSceneReady: handleSceneReady,
-            sectionModeEnabled: sectionMode.sectionModeEnabled,
-            sectionPlanePickingEnabled: sectionMode.sectionPlanePickingEnabled,
-            onSectionPick: handleSectionPick,
-            position: [0, 0, 0],
-            scale: 1,
-            visible: !geometryHidden
-          }}
-          spaceOverlayProps={{
-            enabled: spaceOverlay.spaceOverlayEnabled,
-            jobId,
-            onSpaceSelect: spaceOverlay.handleSpaceSelect,
-            highlightedSpaceIds: spaceOverlay.highlightedSpaceIds,
-            onStatus: spaceOverlay.setSpaceOverlayStatus,
-            selectedSpaceId: spaceOverlay.selectedSpaceId,
-            onSpacesLoaded: spaceOverlay.handleSpacesLoaded,
-            occupancyData: occupancy.enabled ? occupancy.occupancyMap : null
-          }}
-          uploadPanelProps={{
-            onModelReady: handleModelReady,
-            hasModel: true,
-            onReset: handleResetModel
-          }}
-          ecPanelProps={{
-            isOpen: floatingPanels.ecPanelOpen,
-            onClose: floatingPanels.handleCloseEcPanel,
-            jobId,
-            selectedId: selection.selectedId,
-            onSelectContributor: handleTreeSelect,
-            focusToken: floatingPanels.ecPanelZIndex,
-            zIndex: floatingPanels.ecPanelZIndex
-          }}
-          hvacPanelProps={{
-            isOpen: floatingPanels.hvacPanelOpen,
-            onClose: floatingPanels.handleCloseHvacPanel,
-            jobId,
-            selectedId: selection.selectedId,
-            onSelectEquipment: handleHvacSelectDetail,
-            focusToken: floatingPanels.hvacPanelZIndex,
-            zIndex: floatingPanels.hvacPanelZIndex,
-            spaceOverlayLoading: spaceOverlay.spaceOverlayStatus.loading
-          }}
-          spaceNavigatorProps={spaceOverlay.spaceNavigatorProps}
-          axisViewProps={{
-            viewMode: viewModeState.viewMode,
-            onSetViewMode: viewModeState.setViewMode
-          }}
-          occupancyLegendProps={{
-            visible: occupancy.enabled,
-            totals: occupancy.totals,
-            timestamp: occupancy.timestamp
-          }}
-          occupancyPanelProps={{
-            isOpen: occupancyPanelOpen,
-            onClose: () => setOccupancyPanelOpen(false),
-            occupancyData: occupancy.occupancyMap,
-            totals: occupancy.totals,
-            timestamp: occupancy.timestamp,
-            onReset: occupancy.reset,
-            onSpaceSelect: spaceOverlay.handleSpaceSelect,
-            zIndex: 210
-          }}
+          viewer={viewer}
         />
 
         <PropertyPanel 

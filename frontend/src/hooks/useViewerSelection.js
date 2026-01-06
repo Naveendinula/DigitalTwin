@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getEcColor } from '../utils/colorUtils'
 import { normalizeIds } from '../utils/selectionUtils'
+import { debugLog } from '../utils/logger'
 
 export default function useViewerSelection({
   selectedId,
@@ -27,7 +28,7 @@ export default function useViewerSelection({
   }, [isolatedIds, selectedId])
 
   useEffect(() => {
-    console.log('Viewer Mode:', mode)
+    debugLog('Viewer Mode:', mode)
   }, [mode])
 
   const handleClearAll = useCallback(() => {
@@ -73,7 +74,7 @@ export default function useViewerSelection({
   }, [isolate, showAll, enableXRay, disableXRay])
 
   const handleTreeSelect = useCallback((globalIdOrIds, ecData) => {
-    console.log('Selected from tree:', globalIdOrIds, ecData)
+    debugLog('Selected from tree:', globalIdOrIds, ecData)
     
     let options = {}
     const ids = normalizeIds(globalIdOrIds)

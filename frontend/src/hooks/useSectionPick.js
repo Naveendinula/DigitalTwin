@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import * as THREE from 'three'
+import { debugLog } from '../utils/logger'
 
 export default function useSectionPick(createSectionPlane) {
   return useCallback((intersection, mesh) => {
@@ -20,7 +21,7 @@ export default function useSectionPick(createSectionPlane) {
       mesh: mesh
     })
     
-    console.log('Section plane created from pick:', {
+    debugLog('Section plane created from pick:', {
       point: `(${hitPointWorld.x.toFixed(2)}, ${hitPointWorld.y.toFixed(2)}, ${hitPointWorld.z.toFixed(2)})`,
       normal: `(${faceNormalWorld.x.toFixed(2)}, ${faceNormalWorld.y.toFixed(2)}, ${faceNormalWorld.z.toFixed(2)})`
     })

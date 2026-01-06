@@ -1,4 +1,6 @@
 import React, { useEffect, useCallback, useState } from 'react'
+import { SectionIcon } from './ViewerIcons'
+import { ensureStyleInjected } from '../utils/styleInjection'
 
 /**
  * SectionPlanePanel Component
@@ -122,7 +124,7 @@ function SectionPlanePanel({
       {/* Panel Header */}
       <div style={styles.header}>
         <div style={styles.headerLeft}>
-          <SectionIcon />
+          <SectionIcon size={16} stroke="currentColor" strokeWidth={1.5} />
           <span style={styles.title}>Section Plane</span>
           {isLocked && (
             <span style={styles.lockedBadge} title="Plane is locked. Shift+Click to change.">
@@ -131,6 +133,7 @@ function SectionPlanePanel({
           )}
         </div>
         <button
+          className="section-panel-close section-panel-btn"
           style={styles.closeButton}
           onClick={onToggleSectionMode}
           title="Close Section Mode (S)"
@@ -163,6 +166,7 @@ function SectionPlanePanel({
             <span style={styles.controlLabel}>Move Plane</span>
             <div style={styles.nudgeControls}>
               <button
+                className="section-panel-btn"
                 style={styles.nudgeButton}
                 onClick={() => onNudge?.(-customStep)}
                 title={`Move plane backward by ${customStep.toFixed(1)} ([ key)`}
@@ -178,6 +182,7 @@ function SectionPlanePanel({
               </div>
               
               <button
+                className="section-panel-btn"
                 style={styles.nudgeButton}
                 onClick={() => onNudge?.(customStep)}
                 title={`Move plane forward by ${customStep.toFixed(1)} (] key)`}
@@ -208,6 +213,7 @@ function SectionPlanePanel({
             <span style={styles.controlLabel}>Plane Size</span>
             <div style={styles.nudgeControls}>
               <button
+                className="section-panel-btn"
                 style={styles.nudgeButton}
                 onClick={() => onSectionPlaneSizeChange?.(Math.max(10, (sectionPlaneSize || 100) - 10))}
                 title="Decrease plane size"
@@ -223,6 +229,7 @@ function SectionPlanePanel({
               </div>
               
               <button
+                className="section-panel-btn"
                 style={styles.nudgeButton}
                 onClick={() => onSectionPlaneSizeChange?.((sectionPlaneSize || 100) + 10)}
                 title="Increase plane size"
@@ -237,6 +244,7 @@ function SectionPlanePanel({
           {/* Action Buttons - Row 1 */}
           <div style={styles.actions}>
             <button
+              className="section-panel-btn"
               style={styles.actionButton}
               onClick={onResetOffset}
               title="Reset offset to original position"
@@ -250,6 +258,7 @@ function SectionPlanePanel({
           {/* Action Buttons - Row 2 */}
           <div style={styles.actionsSecondary}>
             <button
+              className="section-panel-btn"
               style={sectionPlanePickingEnabled ? styles.actionButtonActive : styles.actionButtonPrimary}
               onClick={onChangePlane}
               title="Pick a new section plane surface (Shift+Click also works)"
@@ -260,6 +269,7 @@ function SectionPlanePanel({
             </button>
             
             <button
+              className="section-panel-btn"
               style={styles.actionButton}
               onClick={onTogglePlaneVisibility}
               title={sectionPlaneVisible ? "Hide plane visualization" : "Show plane visualization"}
@@ -270,6 +280,7 @@ function SectionPlanePanel({
             </button>
 
             <button
+              className="section-panel-btn section-panel-danger"
               style={styles.actionButtonDanger}
               onClick={onReset}
               title="Clear section plane (Esc key)"
@@ -301,17 +312,6 @@ function SectionPlanePanel({
 }
 
 // Icons
-function SectionIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <path d="M12 2L2 7l10 5 10-5-10-5z" />
-      <path d="M2 17l10 5 10-5" />
-      <path d="M2 12l10 5 10-5" />
-      <line x1="4" y1="9.5" x2="20" y2="9.5" strokeWidth="2" strokeDasharray="2 2" />
-    </svg>
-  )
-}
-
 function LockIcon() {
   return (
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -402,16 +402,17 @@ function EyeOffIcon() {
 }
 
 // Styles
+const softShadow = 'rgb(255, 255, 255) 1px 1px 1px 0px inset, rgba(0, 0, 0, 0.15) -1px -1px 1px 0px inset, rgba(0, 0, 0, 0.26) 0.444584px 0.444584px 0.628737px -1px, rgba(0, 0, 0, 0.22) 1.21324px 1.21324px 1.38357px -2px, rgba(0, 0, 0, 0.15) 2.60599px 2.60599px 2.68477px -3px, rgba(0, 0, 0, 0.04) 6px 6px 6px -4px';
+
 const styles = {
   panel: {
     position: 'absolute',
     top: '16px',
     right: '16px',
     width: '260px',
-    background: '#ffffff',
+    background: '#f4f4f4',
     borderRadius: '12px',
-    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.12)',
-    border: '1px solid #e5e5e7',
+    boxShadow: softShadow,
     fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
     zIndex: 20,
     overflow: 'hidden',
@@ -421,8 +422,8 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: '12px 14px',
-    borderBottom: '1px solid #e5e5e7',
-    background: '#fafafa',
+    borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+    background: 'rgba(255, 255, 255, 0.5)',
   },
   headerLeft: {
     display: 'flex',
@@ -446,21 +447,21 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    width: '24px',
-    height: '24px',
-    background: 'transparent',
+    width: '28px',
+    height: '28px',
+    background: '#e8e8ec',
     border: 'none',
-    borderRadius: '4px',
+    borderRadius: '6px',
     cursor: 'pointer',
     color: '#86868b',
-    transition: 'all 0.15s ease',
+    boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.1), 0.5px 0.5px 1px rgba(0,0,0,0.15)',
   },
   status: {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
     padding: '12px 14px',
-    borderBottom: '1px solid #f0f0f2',
+    borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
   },
   statusDot: {
     width: '8px',
@@ -498,7 +499,7 @@ const styles = {
   },
   controlGroup: {
     padding: '12px 14px',
-    borderBottom: '1px solid #f0f0f2',
+    borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
   },
   controlLabel: {
     display: 'block',
@@ -521,13 +522,13 @@ const styles = {
     alignItems: 'center',
     gap: '2px',
     padding: '8px 12px',
-    background: '#f5f5f7',
-    border: '1px solid #e5e5e7',
+    background: '#e8e8ec',
+    border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
     color: '#1d1d1f',
-    transition: 'all 0.15s ease',
     minWidth: '60px',
+    boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.1), 0.5px 0.5px 1px rgba(0,0,0,0.15)',
   },
   nudgeLabel: {
     fontSize: '10px',
@@ -539,9 +540,10 @@ const styles = {
     flexDirection: 'column',
     alignItems: 'center',
     padding: '4px 8px',
-    background: '#f5f5f7',
+    background: '#e8e8ec',
     borderRadius: '4px',
     minWidth: '60px',
+    boxShadow: 'inset 1px 1px 2px rgba(0,0,0,0.05), inset -1px -1px 2px rgba(255,255,255,0.5)',
   },
   offsetValue: {
     fontSize: '14px',
@@ -559,7 +561,7 @@ const styles = {
     alignItems: 'center',
     gap: '8px',
     padding: '8px 14px',
-    borderBottom: '1px solid #f0f0f2',
+    borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
   },
   stepLabel: {
     fontSize: '11px',
@@ -569,10 +571,12 @@ const styles = {
     width: '60px',
     padding: '4px 8px',
     fontSize: '12px',
-    border: '1px solid #e5e5e7',
+    border: 'none',
+    background: '#e8e8ec',
     borderRadius: '4px',
     fontFamily: "'SF Mono', 'Monaco', monospace",
     textAlign: 'center',
+    boxShadow: 'inset 1px 1px 2px rgba(0,0,0,0.1), inset -1px -1px 2px rgba(255,255,255,0.5)',
   },
   actions: {
     display: 'flex',
@@ -583,7 +587,7 @@ const styles = {
     display: 'flex',
     gap: '6px',
     padding: '6px 14px 12px 14px',
-    borderBottom: '1px solid #f0f0f2',
+    borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
   },
   actionButton: {
     flex: 1,
@@ -592,15 +596,15 @@ const styles = {
     justifyContent: 'center',
     gap: '4px',
     padding: '8px 6px',
-    background: '#f5f5f7',
-    border: '1px solid #e5e5e7',
+    background: '#e8e8ec',
+    border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
     fontSize: '11px',
     fontWeight: 500,
     color: '#1d1d1f',
-    transition: 'all 0.15s ease',
     fontFamily: 'inherit',
+    boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.1), 0.5px 0.5px 1px rgba(0,0,0,0.15)',
   },
   actionButtonPrimary: {
     flex: 1,
@@ -609,15 +613,15 @@ const styles = {
     justifyContent: 'center',
     gap: '4px',
     padding: '8px 6px',
-    background: '#e8f4fd',
-    border: '1px solid #90caf9',
+    background: '#e8e8ec',
+    border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
     fontSize: '11px',
     fontWeight: 500,
     color: '#1565c0',
-    transition: 'all 0.15s ease',
     fontFamily: 'inherit',
+    boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.1), 0.5px 0.5px 1px rgba(0,0,0,0.15)',
   },
   actionButtonActive: {
     flex: 1,
@@ -627,14 +631,14 @@ const styles = {
     gap: '4px',
     padding: '8px 6px',
     background: '#1565c0',
-    border: '1px solid #1565c0',
+    border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
     fontSize: '11px',
     fontWeight: 500,
     color: '#ffffff',
-    transition: 'all 0.15s ease',
     fontFamily: 'inherit',
+    boxShadow: 'inset 0.5px 0.5px 1px rgba(255,255,255,0.3), inset -0.5px -0.5px 1px rgba(0,0,0,0.2)',
   },
   actionButtonDanger: {
     flex: 1,
@@ -643,19 +647,19 @@ const styles = {
     justifyContent: 'center',
     gap: '4px',
     padding: '8px 6px',
-    background: '#fff5f5',
-    border: '1px solid #ffcdd2',
+    background: '#e8e8ec',
+    border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
     fontSize: '11px',
     fontWeight: 500,
     color: '#d32f2f',
-    transition: 'all 0.15s ease',
     fontFamily: 'inherit',
+    boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.1), 0.5px 0.5px 1px rgba(0,0,0,0.15)',
   },
   shortcuts: {
     padding: '8px 14px',
-    background: '#fafafa',
+    background: 'rgba(255, 255, 255, 0.5)',
   },
   shortcutHint: {
     fontSize: '10px',
@@ -664,19 +668,19 @@ const styles = {
   kbd: {
     display: 'inline-block',
     padding: '1px 4px',
-    background: '#e5e5e7',
+    background: '#e8e8ec',
     borderRadius: '3px',
     fontSize: '9px',
     fontFamily: "'SF Mono', 'Monaco', monospace",
     fontWeight: 500,
     color: '#1d1d1f',
     marginRight: '2px',
+    boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.08)',
   },
 }
 
 // Add hover styles
-const styleSheet = document.createElement('style')
-styleSheet.textContent = `
+const panelStyles = `
   .section-panel-btn:hover {
     background: #e8e8ed !important;
     border-color: #d1d1d6 !important;
@@ -693,9 +697,6 @@ styleSheet.textContent = `
     border-color: #ef9a9a !important;
   }
 `
-if (typeof document !== 'undefined' && !document.querySelector('#section-panel-styles')) {
-  styleSheet.id = 'section-panel-styles'
-  document.head.appendChild(styleSheet)
-}
+ensureStyleInjected('section-panel-styles', panelStyles)
 
 export default SectionPlanePanel

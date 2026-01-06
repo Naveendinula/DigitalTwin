@@ -10,6 +10,15 @@ const STAGE_LABELS = {
   completed: 'Finalizing outputs...'
 }
 
+const STAGE_ORDER = [
+  'queued',
+  'converting_glb',
+  'extracting_metadata',
+  'extracting_hierarchy',
+  'validating',
+  'finalizing'
+]
+
 const STAGE_HINTS = {
   queued: 'Waiting for a worker to start...',
   converting_glb: 'Generating viewable geometry from the IFC file.',
@@ -127,7 +136,11 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
 
     } catch (err) {
       console.error('Upload error:', err)
-      setError(err.message || 'Upload failed')
+      let msg = err.message || 'Upload failed'
+      if (msg.includes('NetworkError') || msg.includes('Failed to fetch')) {
+        msg += '. Is the backend server running?'
+      }
+      setError(msg)
       setUploadState('error')
       setJobStage(null)
     }
@@ -294,17 +307,86 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
                 </>
               )}
 
-              {(uploadState === 'uploading' || uploadState === 'processing') && (
+              {uploadState === 'uploading' && (
                 <div style={styles.processing}>
                   <div style={styles.spinner}></div>
-                  <p style={styles.progressText}>{progress}</p>
-                  {uploadState === 'processing' && (
-                    <p style={styles.hint}>
-                      {jobStage && STAGE_HINTS[jobStage]
-                        ? STAGE_HINTS[jobStage]
-                        : 'Processing can take several minutes for large models.'}
-                    </p>
-                  )}
+                  <p style={styles.progressText}>Uploading File...</p>
+                  <p style={styles.hint}>{progress}</p>
+                </div>
+              )}
+
+              {uploadState === 'processing' && (
+                <div style={{ ...styles.processing, padding: '32px 24px' }}>
+                  <div style={styles.stageList}>
+                    {STAGE_ORDER.map((stageKey, index) => {
+                      const currentKey = normalizeStage(jobStage) || 'queued'
+                      let currentIndex = STAGE_ORDER.indexOf(currentKey)
+                      
+                      // If stage is 'completed' or unknown but active, mark all as done
+                      if (currentKey === 'completed' || (currentIndex === -1 && currentKey !== 'queued')) {
+                        currentIndex = STAGE_ORDER.length
+                      }
+
+                      const thisIndex = index
+                      
+                      let status = 'pending'
+                      if (thisIndex < currentIndex) status = 'completed'
+                      if (thisIndex === currentIndex) status = 'active'
+                      
+                      const isCompleted = status === 'completed'
+                      const isActive = status === 'active'
+                      const isLast = index === STAGE_ORDER.length - 1
+
+                      return (
+                        <div key={stageKey} style={styles.stageItem}>
+                          <div style={styles.stageIconCol}>
+                            {/* Dot / Indicator */}
+                            <div
+                              style={{
+                                ...styles.stageDot,
+                                background: isCompleted ? '#10B981' : isActive ? '#3B82F6' : '#E5E7EB',
+                                transform: isActive ? 'scale(1.2)' : 'scale(1)',
+                                boxShadow: isActive 
+                                  ? '0 0 0 4px rgba(59, 130, 246, 0.15), inset 1px 1px 2px rgba(255,255,255,0.8)' 
+                                  : styles.stageDot.boxShadow
+                              }}
+                            />
+                            {/* Connecting Line */}
+                            {!isLast && (
+                              <div
+                                style={{
+                                  ...styles.stageLine,
+                                  background: isCompleted ? '#10B981' : '#E5E7EB',
+                                  opacity: isCompleted ? 0.5 : 1
+                                }}
+                              />
+                            )}
+                          </div>
+
+                          <div style={styles.stageContent}>
+                            <div
+                              style={{
+                                ...styles.stageLabel,
+                                color: isCompleted || isActive ? '#1F2937' : '#9CA3AF',
+                              }}
+                            >
+                              {STAGE_LABELS[stageKey]}
+                            </div>
+                            <span
+                              style={{
+                                ...styles.stageSub,
+                                color: isActive ? '#6B7280' : 'transparent',
+                                height: isActive ? 'auto' : '0',
+                                opacity: isActive ? 1 : 0
+                              }}
+                            >
+                              {isActive ? STAGE_HINTS[stageKey] : ''}
+                            </span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
               )}
 
@@ -332,6 +414,9 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
 /**
  * Arctic Zen Minimalist Styles
  */
+const softShadow = 'rgb(255, 255, 255) 1px 1px 1px 0px inset, rgba(0, 0, 0, 0.15) -1px -1px 1px 0px inset, rgba(0, 0, 0, 0.26) 0.444584px 0.444584px 0.628737px -1px, rgba(0, 0, 0, 0.22) 1.21324px 1.21324px 1.38357px -2px, rgba(0, 0, 0, 0.15) 2.60599px 2.60599px 2.68477px -3px, rgba(0, 0, 0, 0.04) 6px 6px 6px -4px';
+const softShadowPressed = 'inset 0.5px 0.5px 1px #fff, inset -0.5px -0.5px 1px #00000026, inset 0 0 2px #00000026, rgb(255, 255, 255) 1px 1px 1px 0px, rgba(0, 0, 0, 0.07) -1px -1px 1px 0px';
+
 const styles = {
   // Page Container
   page: {
@@ -340,7 +425,7 @@ const styles = {
     left: 0,
     right: 0,
     bottom: 0,
-    background: '#F7F8FB',
+    background: '#e8e8ec',
     display: 'flex',
     flexDirection: 'column',
     zIndex: 1000,
@@ -352,8 +437,8 @@ const styles = {
   navbar: {
     position: 'sticky',
     top: 0,
-    background: '#FFFFFF',
-    borderBottom: '1px solid #E5E7EB',
+    background: '#f4f4f4',
+    boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.05), 0 2px 8px rgba(0,0,0,0.08)',
     zIndex: 100,
   },
   navContent: {
@@ -489,11 +574,10 @@ const styles = {
     marginRight: '-20px',
     alignSelf: 'flex-end',
     width: '320px',
-    background: '#FFFFFF',
+    background: '#f4f4f4',
     borderRadius: '16px',
     padding: '24px',
-    border: '1px solid #E5E7EB',
-    boxShadow: '0 10px 40px -10px rgba(0, 0, 0, 0.1), 0 4px 20px -5px rgba(0, 0, 0, 0.05)',
+    boxShadow: softShadow,
     zIndex: 2,
   },
   cardTitle: {
@@ -505,17 +589,17 @@ const styles = {
 
   // Dropzone
   dropzone: {
-    border: '2px dashed #E5E7EB',
+    border: '2px dashed rgba(0, 0, 0, 0.15)',
     borderRadius: '12px',
     padding: '24px 16px',
     textAlign: 'center',
-    transition: 'all 0.2s ease',
-    background: '#FAFAFA',
+    background: '#e8e8ec',
     cursor: 'pointer',
+    boxShadow: 'inset 1px 1px 3px rgba(0,0,0,0.1), inset -1px -1px 3px rgba(255,255,255,0.5)',
   },
   dropzoneActive: {
     borderColor: '#111827',
-    background: '#F3F4F6',
+    background: '#e0e0e4',
   },
   dropIcon: {
     marginBottom: '8px',
@@ -528,14 +612,13 @@ const styles = {
   browseBtn: {
     display: 'inline-block',
     padding: '10px 20px',
-    background: '#111827',
-    color: '#FFFFFF',
+    background: '#e8e8ec',
+    color: '#111827',
     borderRadius: '8px',
     cursor: 'pointer',
     fontSize: '14px',
     fontWeight: 500,
-    boxShadow: '0 2px 8px rgba(17, 24, 39, 0.15)',
-    transition: 'all 0.15s ease',
+    boxShadow: softShadow,
   },
   fileInput: {
     display: 'none',
@@ -545,7 +628,7 @@ const styles = {
   cardFooter: {
     marginTop: '16px',
     paddingTop: '16px',
-    borderTop: '1px solid #F3F4F6',
+    borderTop: '1px solid rgba(0, 0, 0, 0.06)',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -559,17 +642,74 @@ const styles = {
     alignItems: 'center',
     gap: '6px',
     padding: '4px 10px',
-    background: '#F0FDF4',
+    background: '#e8e8ec',
     borderRadius: '100px',
     fontSize: '12px',
     fontWeight: 500,
     color: '#166534',
+    boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.08)',
   },
   statusDot: {
     width: '6px',
     height: '6px',
     borderRadius: '50%',
     background: '#22C55E',
+  },
+
+  // Stage Indicator
+  stageList: {
+    padding: '20px 8px',
+    display: 'flex',
+    flexDirection: 'column',
+    textAlign: 'left',
+    maxWidth: '320px',
+    margin: '0 auto',
+  },
+  stageItem: {
+    display: 'flex',
+    gap: '12px',
+    paddingBottom: '0',
+    position: 'relative',
+    minHeight: '44px',
+  },
+  stageIconCol: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    width: '24px',
+  },
+  stageDot: {
+    width: '12px',
+    height: '12px',
+    borderRadius: '50%',
+    zIndex: 2,
+    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+    boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.1)',
+  },
+  stageLine: {
+    width: '2px',
+    flex: 1,
+    background: '#E5E7EB',
+    margin: '4px 0',
+    borderRadius: '1px',
+    transition: 'background 0.4s ease',
+  },
+  stageContent: {
+    flex: 1,
+    paddingTop: '-2px',
+    paddingBottom: '16px',
+  },
+  stageLabel: {
+    fontSize: '13px',
+    fontWeight: 500,
+    marginBottom: '2px',
+    transition: 'color 0.3s ease',
+  },
+  stageSub: {
+    fontSize: '11px',
+    lineHeight: '1.4',
+    transition: 'color 0.3s ease',
+    display: 'block',
   },
 
   // Processing State
@@ -613,14 +753,14 @@ const styles = {
   },
   retryBtn: {
     padding: '10px 20px',
-    background: '#FFFFFF',
-    border: '1px solid #E5E7EB',
+    background: '#e8e8ec',
+    border: 'none',
     borderRadius: '8px',
     color: '#111827',
     cursor: 'pointer',
     fontSize: '13px',
     fontWeight: 500,
-    transition: 'all 0.15s ease',
+    boxShadow: softShadow,
   },
 
   // Mini Panel (when model is loaded)
@@ -636,15 +776,14 @@ const styles = {
     alignItems: 'center',
     gap: '8px',
     padding: '10px 16px',
-    background: '#FFFFFF',
-    border: '1px solid #E5E7EB',
+    background: '#f4f4f4',
+    border: 'none',
     borderRadius: '8px',
     color: '#111827',
     cursor: 'pointer',
     fontSize: '13px',
     fontWeight: 500,
-    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
-    transition: 'all 0.15s ease',
+    boxShadow: softShadow,
   },
 }
 

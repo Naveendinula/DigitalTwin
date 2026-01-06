@@ -1,4 +1,5 @@
 import { useCallback, useRef } from 'react'
+import { debugLog } from '../utils/logger'
 
 export default function useViewerScene({
   setScene,
@@ -51,7 +52,7 @@ export default function useViewerScene({
       setSectionRenderer(gl)
     }
     maybeFitToModel()
-    console.log('Scene registered with visibility, section, selection, X-ray, focus, and view mode controllers')
+    debugLog('Scene registered with visibility, section, selection, X-ray, focus, and view mode controllers')
   }, [setScene, setSectionScene, setSelectionScene, setXRayScene, setFocusScene, setViewModeScene, setSectionCamera, setFocusCamera, setViewModeCamera, setSectionRenderer, maybeFitToModel])
 
   const handleRendererReady = useCallback((gl, camera) => {
@@ -62,7 +63,7 @@ export default function useViewerScene({
       setSectionCamera(camera)
       cameraRef.current = camera
     }
-    console.log('Renderer ready, clipping enabled')
+    debugLog('Renderer ready, clipping enabled')
   }, [setSectionRenderer, setSectionCamera])
 
   const handleControlsReady = useCallback((controls) => {
@@ -71,7 +72,7 @@ export default function useViewerScene({
     setViewModeControls(controls)
     controlsRef.current = controls
     maybeFitToModel()
-    console.log('Orbit controls ready')
+    debugLog('Orbit controls ready')
   }, [setSectionControls, setFocusControls, setViewModeControls, maybeFitToModel])
 
   return {
