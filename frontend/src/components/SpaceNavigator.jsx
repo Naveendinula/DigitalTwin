@@ -28,7 +28,9 @@ function SpaceNavigator({
   const [hoverPrev, setHoverPrev] = useState(false)
   const [hoverNext, setHoverNext] = useState(false)
   const [showDropdown, setShowDropdown] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
   const dropdownRef = useRef(null)
+  const hasSearch = searchQuery.trim().length > 0
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -45,6 +47,14 @@ function SpaceNavigator({
     }
   }, [showDropdown])
 
+  // Filter spaces based on search query
+  const filteredSpaces = spaces.filter(space => {
+    if (!searchQuery.trim()) return true
+    const query = searchQuery.toLowerCase()
+    const label = `${space.room_no || ''} ${space.room_name || space.name || ''} ${space.globalId}`.toLowerCase()
+    return label.includes(query)
+  })
+
   // Determine selection state
   // If selectedIds is empty, it means ALL are selected (default behavior of SpaceBboxOverlay)
   // If selectedIds has '__NONE__', it means NONE are selected
@@ -58,17 +68,45 @@ function SpaceNavigator({
       : new Set(selectedIds)
 
   const handleToggleAll = () => {
-    if (effectiveSelection.size === spaces.length) {
-      // Deselect all
-      onSelectionChange?.(['__NONE__'])
+    const filteredIds = new Set(filteredSpaces.map(s => s.globalId))
+    const allFilteredSelected = filteredSpaces.length > 0 && filteredSpaces.every(s => effectiveSelection.has(s.globalId))
+    
+    if (hasSearch && isAllSelected) {
+      if (filteredIds.size === 0) return
+      const newSelection = new Set(filteredIds)
+      if (newSelection.size === spaces.length) {
+        onSelectionChange?.([])
+      } else {
+        onSelectionChange?.(Array.from(newSelection))
+      }
+      return
+    }
+
+    if (allFilteredSelected) {
+      // Deselect all filtered spaces
+      const newSelection = new Set(effectiveSelection)
+      filteredIds.forEach(id => newSelection.delete(id))
+      
+      if (newSelection.size === 0) {
+        onSelectionChange?.(['__NONE__'])
+      } else {
+        onSelectionChange?.(Array.from(newSelection))
+      }
     } else {
-      // Select all
-      onSelectionChange?.([])
+      // Select all filtered spaces
+      const newSelection = new Set(effectiveSelection)
+      filteredIds.forEach(id => newSelection.add(id))
+      
+      if (newSelection.size === spaces.length) {
+        onSelectionChange?.([])
+      } else {
+        onSelectionChange?.(Array.from(newSelection))
+      }
     }
   }
 
   const handleToggleSpace = (id) => {
-    const newSelection = new Set(effectiveSelection)
+    const newSelection = new Set(hasSearch && isAllSelected ? [] : effectiveSelection)
     if (newSelection.has(id)) {
       newSelection.delete(id)
     } else {
@@ -106,31 +144,42 @@ function SpaceNavigator({
       {showDropdown && (
         <div style={styles.dropdown}>
           <div style={styles.dropdownHeader}>
+            <input
+              type="text"
+              placeholder="Search spaces..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={styles.searchInput}
+            />
             <label style={styles.checkboxRow}>
               <input 
                 type="checkbox" 
-                checked={effectiveSelection.size === spaces.length}
+                checked={filteredSpaces.length > 0 && filteredSpaces.every(s => effectiveSelection.has(s.globalId))}
                 onChange={handleToggleAll}
                 style={styles.checkbox}
               />
-              <span style={styles.checkboxLabel}>Select All</span>
+              <span style={styles.checkboxLabel}>Select All{searchQuery.trim() ? ' (filtered)' : ''}</span>
             </label>
           </div>
           <div style={styles.dropdownList}>
-            {spaces.map(space => {
+            {filteredSpaces.length === 0 ? (
+              <div style={styles.noResults}>No spaces match your search</div>
+            ) : (
+              filteredSpaces.map(space => {
                const label = `${space.room_no || ''} ${space.room_name || space.name || ''}`.trim() || space.globalId
-               return (
-                <label key={space.globalId} style={styles.checkboxRow}>
-                  <input 
-                    type="checkbox" 
-                    checked={effectiveSelection.has(space.globalId)}
-                    onChange={() => handleToggleSpace(space.globalId)}
-                    style={styles.checkbox}
-                  />
-                  <span style={styles.checkboxLabel} title={label}>{label}</span>
-                </label>
-               )
-            })}
+                 return (
+                  <label key={space.globalId} style={styles.checkboxRow}>
+                    <input 
+                      type="checkbox" 
+                      checked={effectiveSelection.has(space.globalId)}
+                      onChange={() => handleToggleSpace(space.globalId)}
+                      style={styles.checkbox}
+                    />
+                    <span style={styles.checkboxLabel} title={label}>{label}</span>
+                  </label>
+                 )
+              })
+            )}
           </div>
         </div>
       )}
@@ -152,7 +201,10 @@ function SpaceNavigator({
       
       <div 
         style={{...styles.info, cursor: 'pointer'}} 
-        onClick={() => setShowDropdown(!showDropdown)}
+        onClick={() => {
+          setShowDropdown(!showDropdown)
+          if (showDropdown) setSearchQuery('')
+        }}
         title="Click to select spaces"
       >
         <div style={styles.counter}>{subText}</div>
@@ -287,6 +339,26 @@ const styles = {
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     flex: 1,
+  },
+  searchInput: {
+    width: '100%',
+    padding: '8px 12px',
+    marginBottom: '8px',
+    border: '1px solid rgba(0, 0, 0, 0.1)',
+    borderRadius: '8px',
+    fontSize: '12px',
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    color: '#1d1d1f',
+    outline: 'none',
+    transition: 'border-color 0.2s ease, background-color 0.2s ease',
+  },
+  noResults: {
+    padding: '16px 12px',
+    textAlign: 'center',
+    fontSize: '12px',
+    color: '#86868b',
+    fontStyle: 'italic',
   }
 }
 

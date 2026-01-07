@@ -13,7 +13,6 @@ from pydantic import BaseModel
 
 from config import UPLOAD_DIR, OUTPUT_DIR
 from ifc_validation import (
-    validate_ifc,
     validate_ifc_to_json,
     get_validation_summary,
     ValidationReport,

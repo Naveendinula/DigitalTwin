@@ -33,6 +33,10 @@ function App() {
   const [modelUrls, setModelUrls] = useState(null)
   const [jobId, setJobId] = useState(null)
 
+  // Panel visibility state
+  const [structureTreeVisible, setStructureTreeVisible] = useState(true)
+  const [propertiesPanelVisible, setPropertiesPanelVisible] = useState(true)
+
   // Validation report modal state
   const [validationModalOpen, setValidationModalOpen] = useState(false)
 
@@ -220,24 +224,70 @@ function App() {
       />
 
       <div style={appStyles.mainContent}>
-        <StructureTree 
-          hierarchyUrl={modelUrls.hierarchyUrl}
-          onIsolate={handleIsolate}
-          onSelect={handleTreeSelect}
-          selectedId={selection.selectedId}
-          focusLock={focusLock}
-          onToggleFocusLock={() => setFocusLock(prev => !prev)}
-        />
+        {/* Subtle Panel Toggle Buttons */}
+        {modelUrls && (
+          <>
+            <button
+              data-panel-toggle
+              onClick={() => setStructureTreeVisible(prev => !prev)}
+              title={structureTreeVisible ? 'Hide Structure Tree' : 'Show Structure Tree'}
+              style={{
+                ...appStyles.panelToggle,
+                ...appStyles.panelToggleLeft,
+                ...(structureTreeVisible ? {} : appStyles.panelToggleHidden)
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                {structureTreeVisible ? (
+                  <polyline points="15 18 9 12 15 6" />
+                ) : (
+                  <polyline points="9 18 15 12 9 6" />
+                )}
+              </svg>
+            </button>
+            <button
+              data-panel-toggle
+              onClick={() => setPropertiesPanelVisible(prev => !prev)}
+              title={propertiesPanelVisible ? 'Hide Properties Panel' : 'Show Properties Panel'}
+              style={{
+                ...appStyles.panelToggle,
+                ...appStyles.panelToggleRight,
+                ...(propertiesPanelVisible ? {} : appStyles.panelToggleHidden)
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                {propertiesPanelVisible ? (
+                  <polyline points="9 18 15 12 9 6" />
+                ) : (
+                  <polyline points="15 18 9 12 15 6" />
+                )}
+              </svg>
+            </button>
+          </>
+        )}
+
+        {structureTreeVisible && (
+          <StructureTree 
+            hierarchyUrl={modelUrls.hierarchyUrl}
+            onIsolate={handleIsolate}
+            onSelect={handleTreeSelect}
+            selectedId={selection.selectedId}
+            focusLock={focusLock}
+            onToggleFocusLock={() => setFocusLock(prev => !prev)}
+          />
+        )}
 
         <ViewerShell
           containerStyle={appStyles.viewerContainer}
           viewer={viewer}
         />
 
-        <PropertyPanel 
-          selectedId={selection.selectedId}
-          metadataUrl={modelUrls.metadataUrl}
-        />
+        {propertiesPanelVisible && (
+          <PropertyPanel 
+            selectedId={selection.selectedId}
+            metadataUrl={modelUrls.metadataUrl}
+          />
+        )}
       </div>
 
       <ToastContainer />

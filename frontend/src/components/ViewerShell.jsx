@@ -13,7 +13,14 @@ import UploadPanel from './UploadPanel'
 import Viewer from './Viewer'
 import ViewerToolbar from './ViewerToolbar'
 
-export default function ViewerShell({ containerStyle, viewer }) {
+export default function ViewerShell({ 
+  containerStyle, 
+  viewer, 
+  structureTreeVisible,
+  propertiesPanelVisible,
+  onToggleStructureTree,
+  onTogglePropertiesPanel
+}) {
   const {
     modelUrls,
     jobId,

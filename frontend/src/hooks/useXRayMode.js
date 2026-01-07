@@ -112,6 +112,11 @@ function useXRayMode() {
       })
     }
     
+    if (!isSelected && mesh.material.userData?.isHighlight) {
+      // Preserve selection highlight even if ID matching fails while X-ray is active.
+      return
+    }
+
     if (isSelected) {
       // Keep original material for selected meshes
       // If it's already highlighted, don't overwrite it

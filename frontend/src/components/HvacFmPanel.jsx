@@ -2,6 +2,10 @@ import React, { useState, useRef, useEffect, useMemo } from 'react'
 
 const getSpaceLabel = (space) => {
   if (!space) return 'Unknown'
+  if (!space.globalId && (space.storey || space.name)) {
+    const storeyLabel = space.storey || space.name
+    return storeyLabel ? `Storey: ${storeyLabel}` : 'Storey'
+  }
   const roomNo = space.room_no || ''
   const roomName = space.room_name || ''
   const label = `${roomNo} ${roomName}`.trim()

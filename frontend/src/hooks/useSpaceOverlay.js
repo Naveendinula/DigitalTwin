@@ -36,11 +36,7 @@ export default function useSpaceOverlay({ jobId, showToast }) {
 
   const enableSpaceOverlayForSpaces = useCallback((spaceIds) => {
     const ids = (spaceIds || []).filter(Boolean)
-    if (ids.length === 0) {
-      setHighlightedSpaceIds([])
-      setSpaceOverlayEnabled(false)
-      return
-    }
+    
     if (!spaceOverlayEnabled) {
       setSpaceOverlayStatus(createSpaceOverlayStatus({ loading: true }))
       setSpaceOverlayEnabled(true)

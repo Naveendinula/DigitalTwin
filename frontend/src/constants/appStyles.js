@@ -32,12 +32,12 @@ const appStyles = {
     height: '100vh',
     display: 'flex',
     flexDirection: 'column',
-    background: '#e8e8ec',
+    background: '#f5f5f5',
   },
   header: {
     height: '60px',
-    background: '#f4f4f4',
-    boxShadow: softShadow,
+    background: '#ffffff',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -45,6 +45,7 @@ const appStyles = {
     zIndex: 100,
     margin: '12px 16px 0 16px',
     borderRadius: '12px',
+    border: '1px solid rgba(0, 0, 0, 0.04)',
   },
   logo: {
     display: 'flex',
@@ -101,13 +102,14 @@ const appStyles = {
     position: 'relative',
     borderRadius: '12px',
     overflow: 'hidden',
-    background: '#f4f4f4',
-    boxShadow: softShadowPressed,
+    background: '#ffffff',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06)',
+    border: '1px solid rgba(0, 0, 0, 0.04)',
   },
   // Shared panel styles
   panel: {
-    background: '#f4f4f4',
-    boxShadow: softShadow,
+    background: '#ffffff',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06)',
     borderRadius: '12px',
     display: 'flex',
     flexDirection: 'column',
@@ -115,6 +117,7 @@ const appStyles = {
     color: '#1d1d1f',
     flexShrink: 0,
     overflow: 'hidden',
+    border: '1px solid rgba(0, 0, 0, 0.04)',
   },
   panelHeader: {
     padding: '16px 20px',
@@ -135,10 +138,11 @@ const appStyles = {
   },
   // Card styles for nested content
   card: {
-    background: '#e8e8ec',
+    background: '#f9f9f9',
     borderRadius: '10px',
     padding: '12px',
-    boxShadow: softShadowPressed,
+    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
+    border: '1px solid rgba(0, 0, 0, 0.04)',
   },
   // Tag/badge styles
   tag: {
@@ -154,6 +158,40 @@ const appStyles = {
   tagActive: {
     background: '#ff6b35',
     color: '#ffffff',
+  },
+  // Subtle panel toggle buttons
+  panelToggle: {
+    position: 'absolute',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    width: '24px',
+    height: '48px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: '#ffffff',
+    border: '1px solid rgba(0, 0, 0, 0.08)',
+    borderRadius: '0 8px 8px 0',
+    cursor: 'pointer',
+    color: '#86868b',
+    zIndex: 50,
+    transition: 'all 0.2s ease',
+    boxShadow: '2px 0 8px rgba(0, 0, 0, 0.06)',
+    opacity: 0.4,
+  },
+  panelToggleLeft: {
+    left: 0,
+    borderRadius: '0 8px 8px 0',
+  },
+  panelToggleRight: {
+    right: 0,
+    borderRadius: '8px 0 0 8px',
+    boxShadow: '-2px 0 8px rgba(0, 0, 0, 0.06)',
+    borderLeft: '1px solid rgba(0, 0, 0, 0.08)',
+    borderRight: 'none',
+  },
+  panelToggleHidden: {
+    opacity: 0.6,
   },
 }
 
@@ -190,6 +228,23 @@ if (typeof document !== 'undefined' && !document.querySelector('#soft-ui-global-
     /* Spin animation */
     @keyframes spin {
       to { transform: rotate(360deg); }
+    }
+  `
+  document.head.appendChild(styleSheet)
+}
+
+// Inject panel toggle hover styles
+if (typeof document !== 'undefined' && !document.querySelector('#panel-toggle-hover-styles')) {
+  const styleSheet = document.createElement('style')
+  styleSheet.id = 'panel-toggle-hover-styles'
+  styleSheet.textContent = `
+    button[data-panel-toggle]:hover {
+      opacity: 1 !important;
+      color: #1d1d1f;
+      transform: translateY(-50%) scale(1.05);
+    }
+    button[data-panel-toggle]:active {
+      transform: translateY(-50%) scale(0.95);
     }
   `
   document.head.appendChild(styleSheet)

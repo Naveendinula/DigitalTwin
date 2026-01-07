@@ -399,7 +399,7 @@ function ValidationReportModal({ isOpen, onClose, jobId }) {
   )
 }
 
-const softShadow = 'rgb(255, 255, 255) 1px 1px 1px 0px inset, rgba(0, 0, 0, 0.15) -1px -1px 1px 0px inset, rgba(0, 0, 0, 0.26) 0.444584px 0.444584px 0.628737px -1px, rgba(0, 0, 0, 0.22) 1.21324px 1.21324px 1.38357px -2px, rgba(0, 0, 0, 0.15) 2.60599px 2.60599px 2.68477px -3px, rgba(0, 0, 0, 0.04) 6px 6px 6px -4px';
+const softShadow = '0 4px 24px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08)';
 
 const styles = {
   backdrop: {
@@ -418,13 +418,14 @@ const styles = {
     width: '100%',
     maxWidth: '960px',
     maxHeight: '85vh',
-    backgroundColor: '#f4f4f4',
+    backgroundColor: '#ffffff',
     borderRadius: '16px',
-    boxShadow: softShadow,
+    boxShadow: '0 4px 24px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08)',
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    border: '1px solid rgba(0, 0, 0, 0.04)',
   },
 
   header: {
@@ -434,7 +435,7 @@ const styles = {
     padding: '20px 24px',
     borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
     flexShrink: 0,
-    background: 'rgba(255, 255, 255, 0.5)',
+    background: '#ffffff',
   },
 
   headerLeft: {
@@ -462,14 +463,15 @@ const styles = {
     width: '36px',
     height: '36px',
     borderRadius: '8px',
-    border: 'none',
-    background: '#e8e8ec',
+    border: '1px solid rgba(0, 0, 0, 0.06)',
+    background: '#ffffff',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     color: '#6b7280',
-    boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.1), 0.5px 0.5px 1px rgba(0,0,0,0.15)',
+    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
+    transition: 'all 0.2s ease',
   },
 
   content: {
@@ -477,7 +479,7 @@ const styles = {
     overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column',
-    background: 'rgba(255, 255, 255, 0.3)',
+    background: '#fafafa',
   },
 
   progressSection: {
@@ -531,7 +533,7 @@ const styles = {
     padding: '16px',
     flexShrink: 0,
     overflowY: 'auto',
-    background: 'rgba(255, 255, 255, 0.5)',
+    background: '#ffffff',
   },
 
   sidebarLabel: {
@@ -548,17 +550,19 @@ const styles = {
     width: '100%',
     padding: '12px',
     marginBottom: '8px',
-    background: '#e8e8ec',
-    border: 'none',
+    background: '#f9f9f9',
+    border: '1px solid rgba(0, 0, 0, 0.04)',
     borderRadius: '8px',
     cursor: 'pointer',
     textAlign: 'left',
-    boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.08), 0.5px 0.5px 1px rgba(0,0,0,0.1)',
+    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
+    transition: 'all 0.2s ease',
   },
 
   domainBtnActive: {
-    backgroundColor: '#f4f4f4',
-    boxShadow: softShadow,
+    backgroundColor: '#ffffff',
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.08)',
+    borderColor: 'rgba(0, 0, 0, 0.08)',
   },
 
   domainBtnTop: {
@@ -648,8 +652,10 @@ const styles = {
     borderRadius: '10px',
     borderLeft: '3px solid',
     overflow: 'hidden',
-    backgroundColor: '#e8e8ec',
-    boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.06)',
+    backgroundColor: '#ffffff',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.06)',
+    border: '1px solid rgba(0, 0, 0, 0.04)',
+    transition: 'all 0.2s ease',
   },
 
   ruleHeader: {
@@ -883,7 +889,7 @@ const styles = {
     fontSize: '11px',
     color: '#9ca3af',
     flexShrink: 0,
-    background: 'rgba(255, 255, 255, 0.5)',
+    background: '#ffffff',
   },
 
   footerItem: {

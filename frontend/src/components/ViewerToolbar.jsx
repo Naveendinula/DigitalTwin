@@ -12,7 +12,9 @@ import {
   ResetIcon,
   SectionIcon,
   ViewCubeIcon,
-  EyeIcon
+  EyeIcon,
+  SidebarLeftIcon,
+  SidebarRightIcon
 } from './ViewerIcons'
 import { ensureStyleInjected } from '../utils/styleInjection'
 
