@@ -44,7 +44,7 @@ const SEVERITY_CONFIG = {
 function ValidationBadge({ jobId, onOpenReport }) {
   const [validationData, setValidationData] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [hasError, setHasError] = useState(false)
 
   const API_URL = 'http://localhost:8000'
 
@@ -53,7 +53,7 @@ function ValidationBadge({ jobId, onOpenReport }) {
 
     const fetchValidation = async () => {
       setLoading(true)
-      setError(null)
+      setHasError(false)
       
       try {
         const response = await fetch(`${API_URL}/validation/${jobId}/summary`)
@@ -64,7 +64,7 @@ function ValidationBadge({ jobId, onOpenReport }) {
         setValidationData(data)
       } catch (err) {
         console.warn('Validation fetch error:', err)
-        setError(err.message)
+        setHasError(true)
       } finally {
         setLoading(false)
       }
@@ -74,7 +74,7 @@ function ValidationBadge({ jobId, onOpenReport }) {
   }, [jobId])
 
   const status = loading ? 'loading' : 
-                 error ? 'error' : 
+                 hasError ? 'error' : 
                  validationData?.status || 'error'
   
   const config = SEVERITY_CONFIG[status] || SEVERITY_CONFIG.error
@@ -89,7 +89,7 @@ function ValidationBadge({ jobId, onOpenReport }) {
     : styles.warnCount
 
   const handleClick = () => {
-    if (!loading && !error && onOpenReport) {
+    if (!loading && !hasError && onOpenReport) {
       onOpenReport()
     }
   }

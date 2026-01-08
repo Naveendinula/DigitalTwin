@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect } from 'react'
 
 /**
  * ValidationReportModal - Detailed validation report viewer
@@ -73,22 +73,18 @@ function ValidationReportModal({ isOpen, onClose, jobId }) {
     fetchReport()
   }, [isOpen, jobId])
 
-  const domainRules = useMemo(() => {
-    if (!report?.results) return []
-    return report.results.filter(r => r.domain === selectedDomain)
-  }, [report, selectedDomain])
-
-  const overallProgress = useMemo(() => {
-    if (!report?.summary) return { pass: 0, warn: 0, fail: 0, total: 0 }
-    const { passCount, warnCount, failCount } = report.summary
-    const total = passCount + warnCount + failCount
-    return {
-      pass: total > 0 ? (passCount / total) * 100 : 0,
-      warn: total > 0 ? (warnCount / total) * 100 : 0,
-      fail: total > 0 ? (failCount / total) * 100 : 0,
-      total
-    }
-  }, [report])
+  const domainSummaries = report?.domainSummaries || {}
+  const domainEntries = Object.entries(domainSummaries)
+  const selectedSummary = domainSummaries[selectedDomain]
+  const domainRules = report?.results?.filter(r => r.domain === selectedDomain) || []
+  const summary = report?.summary
+  const totalCount = summary ? summary.passCount + summary.warnCount + summary.failCount : 0
+  const overallProgress = summary ? {
+    pass: totalCount > 0 ? (summary.passCount / totalCount) * 100 : 0,
+    warn: totalCount > 0 ? (summary.warnCount / totalCount) * 100 : 0,
+    fail: totalCount > 0 ? (summary.failCount / totalCount) * 100 : 0
+  } : { pass: 0, warn: 0, fail: 0 }
+  const overallStyle = report ? SEVERITY_STYLES[report.overallStatus] : null
 
   if (!isOpen) return null
 
@@ -97,7 +93,7 @@ function ValidationReportModal({ isOpen, onClose, jobId }) {
   }
 
   const toggleRule = (ruleId) => {
-    setExpandedRule(expandedRule === ruleId ? null : ruleId)
+    setExpandedRule(currentRule => (currentRule === ruleId ? null : ruleId))
   }
 
   return (
@@ -110,8 +106,8 @@ function ValidationReportModal({ isOpen, onClose, jobId }) {
             {report && (
               <span style={{
                 ...styles.statusBadge,
-                color: SEVERITY_STYLES[report.overallStatus]?.color,
-                backgroundColor: SEVERITY_STYLES[report.overallStatus]?.bg
+                color: overallStyle?.color,
+                backgroundColor: overallStyle?.bg
               }}>
                 {report.overallStatus === 'pass' ? '✓ Valid' : 
                  report.overallStatus === 'warn' ? '⚠ Warnings' : '✗ Issues Found'}
@@ -168,10 +164,12 @@ function ValidationReportModal({ isOpen, onClose, jobId }) {
               {/* Domain Sidebar */}
               <div style={styles.sidebar}>
                 <div style={styles.sidebarLabel}>Validation Domains</div>
-                {Object.entries(report.domainSummaries || {}).map(([domain, summary]) => {
+                {domainEntries.map(([domain, summary]) => {
                   const config = DOMAIN_CONFIG[domain] || { label: domain, icon: '○' }
                   const isSelected = selectedDomain === domain
-                  const statusColor = SEVERITY_STYLES[summary.status]?.color || '#6b7280'
+                  const statusStyle = SEVERITY_STYLES[summary.status]
+                  const statusColor = statusStyle?.color || '#6b7280'
+                  const statusBg = statusStyle?.bg
                   
                   return (
                     <button
@@ -189,7 +187,7 @@ function ValidationReportModal({ isOpen, onClose, jobId }) {
                         <span style={{
                           ...styles.domainStatus,
                           color: statusColor,
-                          backgroundColor: SEVERITY_STYLES[summary.status]?.bg
+                          backgroundColor: statusBg
                         }}>
                           {summary.featureReady ? '✓' : '○'}
                         </span>
@@ -217,17 +215,17 @@ function ValidationReportModal({ isOpen, onClose, jobId }) {
                       {DOMAIN_CONFIG[selectedDomain]?.description}
                     </p>
                   </div>
-                  {report.domainSummaries[selectedDomain] && (
+                  {selectedSummary && (
                     <div style={{
                       ...styles.featureReadyBadge,
-                      backgroundColor: report.domainSummaries[selectedDomain].featureReady 
+                      backgroundColor: selectedSummary.featureReady 
                         ? 'rgba(16, 185, 129, 0.1)' 
                         : 'rgba(245, 158, 11, 0.1)',
-                      color: report.domainSummaries[selectedDomain].featureReady 
+                      color: selectedSummary.featureReady 
                         ? '#10b981' 
                         : '#f59e0b'
                     }}>
-                      {report.domainSummaries[selectedDomain].featureReady 
+                      {selectedSummary.featureReady 
                         ? '✓ Feature Ready' 
                         : '○ Limited Functionality'}
                     </div>

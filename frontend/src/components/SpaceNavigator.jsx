@@ -106,7 +106,7 @@ function SpaceNavigator({
   }
 
   const handleToggleSpace = (id) => {
-    const newSelection = new Set(hasSearch && isAllSelected ? [] : effectiveSelection)
+    const newSelection = new Set(effectiveSelection)
     if (newSelection.has(id)) {
       newSelection.delete(id)
     } else {

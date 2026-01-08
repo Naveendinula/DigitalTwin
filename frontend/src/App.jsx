@@ -150,13 +150,13 @@ function App() {
   }, [floatingPanels.handleCloseEcPanel, floatingPanels.handleCloseHvacPanel, spaceOverlay.disableSpaceOverlay, occupancy.disable, handleClearAll])
 
   // Validation modal handlers
-  const handleOpenValidationReport = useCallback(() => {
+  const handleOpenValidationReport = () => {
     setValidationModalOpen(true)
-  }, [])
+  }
 
-  const handleCloseValidationReport = useCallback(() => {
+  const handleCloseValidationReport = () => {
     setValidationModalOpen(false)
-  }, [])
+  }
 
   /**
    * Toggle occupancy mode and panel

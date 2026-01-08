@@ -1,10 +1,14 @@
 # Architecture Documentation
 
 > **Status**: Living Document  
-> **Last Updated**: December 31, 2025  
+> **Last Updated**: January 6, 2026  
 > **Owner**: Naveen Panditharatne
 
 ## Recent additions / changes
+
+- **Date:** 2026-01-06
+- **IFC validation pipeline:** Added IDS + coverage validation (`backend/ifc_validation.py`, `backend/validation_api.py`) with cached `validation.json` generated during upload.
+- **Validation UI:** Added `ValidationBadge` in the header and `ValidationReportModal` for detailed reports.
 
 - **Date:** 2025-12-31
 - **Live Occupancy Simulation:** Added synthetic occupancy data generation with time-based patterns (6am–10pm schedule), random walk with mean reversion, and capacity estimation (~10m²/person).
@@ -37,6 +41,7 @@ The system bridges the gap between complex BIM files and accessible web visualiz
 ## 2. Key User Journeys
 
 *   **Upload & Process**: A user uploads an `.ifc` file. The system validates it, saves it, and triggers background processes to convert geometry (GLB) and extract metadata (JSON).
+*   **Validation Report**: The user reviews the validation badge and detailed report for IDS rules and domain coverage.
 *   **3D Visualization**: The user views the 3D model in the browser, navigating via orbit/pan/zoom controls.
 *   **Element Inspection**: Clicking a 3D element reveals its specific BIM properties (Psets, quantities, materials) in a side panel.
 *   **Embodied Carbon Analysis**: The user triggers an EC calculation. The system maps model materials to a backend database (`prac-database.csv`) and visualizes the carbon footprint (kgCO2e) per element and in aggregate.
@@ -58,6 +63,8 @@ The system bridges the gap between complex BIM files and accessible web visualiz
 *   `ec_api.py`: API router specifically for Embodied Carbon endpoints.
 *   `ec_core.py`: Orchestrator for EC calculations.
 *   `fm_api.py`: API router for HVAC/FM analysis, space bbox, and occupancy simulation endpoints.
+*   `validation_api.py`: API router for validation endpoints and cached reports.
+*   `ifc_validation.py`: IDS + coverage validation rules and report builder.
 *   `fm_hvac_core.py`: HVAC/FM core logic (equipment -> terminals -> spaces).
 *   `occupancy_sim.py`: Synthetic occupancy data generation with time-based patterns.
 *   `domain/`:
@@ -68,7 +75,7 @@ The system bridges the gap between complex BIM files and accessible web visualiz
 *   `ifc_spatial_hierarchy.py`: Extracts the building tree (Site -> Building -> Storey -> Space -> Element).
 *   `prac-database.csv`: The reference database for material carbon factors.
 *   `uploads/`: Storage for raw uploaded IFC files.
-*   `output/`: Storage for processed artifacts (GLB, JSON).
+*   `output/`: Storage for processed artifacts (GLB, JSON including validation).
 
 ### Frontend (`/frontend`)
 *   `src/main.jsx`: **Entrypoint**. Bootstraps the React application.
@@ -77,6 +84,8 @@ The system bridges the gap between complex BIM files and accessible web visualiz
 *   `src/components/HvacFmPanel.jsx`: UI for HVAC/FM analysis results and filters.
 *   `src/components/SpaceBboxOverlay.jsx`: Renders space bbox overlays in the viewer (with optional occupancy heatmap).
 *   `src/components/SpaceNavigator.jsx`: Cycles and highlights spaces when overlays are enabled.
+*   `src/components/ValidationBadge.jsx`: Header badge showing validation status.
+*   `src/components/ValidationReportModal.jsx`: Modal for detailed validation results and recommendations.
 *   `src/components/OccupancyLegend.jsx`: Floating legend showing live occupancy totals and color scale.
 *   `src/components/OccupancyPanel.jsx`: Draggable panel with sortable/filterable occupancy breakdown.
 *   `src/hooks/useOccupancy.js`: Hook managing occupancy polling and state.
@@ -110,6 +119,7 @@ graph TB
         ECCore["EC Calculator"]
         HvacCore["HVAC/FM Core"]
         SpaceBBox["Space BBox Extractor"]
+        Validator["IFC Validator"]
         OccSim["Occupancy Simulator"]
     end
 
@@ -130,6 +140,7 @@ graph TB
     Server -->|Calls| ECCore
     Server -->|Calls| HvacCore
     Server -->|Calls| SpaceBBox
+    Server -->|Calls| Validator
     Server -->|Calls| OccSim
 
     Converter -->|Reads| Uploads
@@ -146,6 +157,8 @@ graph TB
 
     SpaceBBox -->|Reads| Uploads
     SpaceBBox -->|Writes JSON| Outputs
+
+    Validator -->|Writes JSON| Outputs
 ```
 
 ### Data Flow: Embodied Carbon Calculation
@@ -172,6 +185,13 @@ graph TB
 3.  **Cache**: Result JSON (bbox + transform) is written to `output/{jobId}/space_bboxes.json`.
 4.  **Render**: Frontend applies the transform and overlays translucent boxes in `SpaceBboxOverlay`.
 
+### Data Flow: IFC Validation
+1.  **Trigger**: Upload processing runs validation after conversion and metadata extraction.
+2.  **Validate**: `ifc_validation.py` evaluates IDS rules and domain coverage metrics.
+3.  **Cache**: Report is saved to `output/{jobId}/validation.json`.
+4.  **Fetch**: `validation_api.py` serves cached results via `GET /validation/{jobId}` and summary via `GET /validation/{jobId}/summary`.
+5.  **Render**: `ValidationBadge` and `ValidationReportModal` display status and details.
+
 ### Data Flow: Occupancy Simulation
 1.  **Enable**: User toggles "Occupancy" in toolbar; `useOccupancy` hook activates.
 2.  **Initial Fetch**: Frontend sends `GET /api/occupancy/{jobId}` to get current snapshot.
@@ -187,6 +207,7 @@ graph TB
 *   **IfcOpenShell**: Parsing and manipulating IFC files.
 *   **Pandas**: Data manipulation for the EC database and material merging.
 *   **IfcConvert**: External executable (must be present in `backend/`) for geometry conversion.
+*   **ifctester**: IDS validation engine used by IFC validation.
 
 ### Frontend
 *   **React**: UI library.
