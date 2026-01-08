@@ -140,7 +140,7 @@ const styles = {
     background: '#e8e8ec',
     fontSize: '12px',
     fontWeight: 500,
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    fontFamily: 'inherit',
     boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.1), 0.5px 0.5px 1px rgba(0,0,0,0.15)',
   },
 

@@ -542,7 +542,7 @@ const styles = {
     boxShadow: softShadow,
     display: 'flex',
     flexDirection: 'column',
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    fontFamily: 'inherit',
     color: '#1d1d1f',
     flexShrink: 0,
     overflow: 'hidden',

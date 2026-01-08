@@ -429,7 +429,7 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     zIndex: 1000,
-    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+    fontFamily: 'inherit',
     overflowY: 'auto',
   },
 

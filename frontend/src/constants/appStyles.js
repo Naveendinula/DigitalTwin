@@ -26,6 +26,8 @@ const softShadowPressed = `
   -0.5px -0.5px 0 0 rgb(0 0 0 / 10%)
 `
 
+const monoFont = "'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', 'Courier New', monospace"
+
 const appStyles = {
   appContainer: {
     width: '100vw',
@@ -33,6 +35,7 @@ const appStyles = {
     display: 'flex',
     flexDirection: 'column',
     background: '#f5f5f5',
+    fontFamily: monoFont,
   },
   header: {
     height: '60px',
@@ -68,12 +71,12 @@ const appStyles = {
     gap: '12px',
     fontSize: '13px',
     color: '#86868b',
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    fontFamily: monoFont,
   },
   fileName: {
     fontWeight: 500,
     color: '#1d1d1f',
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    fontFamily: monoFont,
   },
   fileSchema: {
     background: '#e8e8ec',
@@ -113,7 +116,7 @@ const appStyles = {
     borderRadius: '12px',
     display: 'flex',
     flexDirection: 'column',
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    fontFamily: monoFont,
     color: '#1d1d1f',
     flexShrink: 0,
     overflow: 'hidden',
@@ -207,6 +210,17 @@ if (typeof document !== 'undefined' && !document.querySelector('#soft-ui-global-
       --soft-shadow: ${softShadow};
       --soft-shadow-pressed: ${softShadowPressed};
       --primary-color: #ff6b35;
+    }
+
+    body {
+      font-family: ${monoFont};
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font-family: inherit;
     }
     
     /* Custom scrollbar */

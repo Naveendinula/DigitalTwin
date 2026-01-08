@@ -60,7 +60,7 @@ const styles = {
     boxShadow: softShadow,
     zIndex: 100,
     minWidth: '160px',
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    fontFamily: 'inherit',
   },
   header: {
     display: 'flex',

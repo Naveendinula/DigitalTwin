@@ -306,7 +306,7 @@ const styles = {
     borderRadius: '12px',
     display: 'flex',
     flexDirection: 'column',
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    fontFamily: 'inherit',
     color: '#1d1d1f',
     flexShrink: 0,
     overflow: 'hidden',
@@ -492,7 +492,7 @@ const styles = {
     fontWeight: 500,
   },
   monoText: {
-    fontFamily: "'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', monospace",
+    fontFamily: 'inherit',
     fontSize: '11px',
   },
   materialList: {
@@ -563,7 +563,7 @@ const styles = {
   },
   debugCode: {
     display: 'block',
-    fontFamily: "'SF Mono', 'Monaco', monospace",
+    fontFamily: 'inherit',
     fontSize: '9px',
     background: '#e8e8ec',
     padding: '2px 4px',

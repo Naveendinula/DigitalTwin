@@ -100,7 +100,7 @@ const styles = {
     borderRadius: '10px',
     fontSize: '13px',
     fontWeight: 500,
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    fontFamily: 'inherit',
     boxShadow: 'rgb(255, 255, 255) 1px 1px 1px 0px inset, rgba(0, 0, 0, 0.4) -1px -1px 1px 0px inset, rgba(0, 0, 0, 0.3) 2px 2px 6px',
     maxWidth: '500px',
   },

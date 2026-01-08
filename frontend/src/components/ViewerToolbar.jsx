@@ -309,7 +309,7 @@ const styles = {
     color: '#1d1d1f',
     textAlign: 'left',
     transition: 'background 0.15s ease',
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    fontFamily: 'inherit',
   },
   viewMenuItemActive: {
     background: '#f0f0f2',
@@ -343,7 +343,7 @@ const styles = {
     animation: 'pulse 1s ease-in-out infinite',
   },
   loadingDotActive: {
-    background: '#ffffff',
+    background: '#0071e3',
   },
 }
 

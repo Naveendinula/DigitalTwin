@@ -6,6 +6,9 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>Digital Twin BIM Viewer</title>
     <style>
+      :root {
+        --font-mono: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', 'Courier New', monospace;
+      }
       * {
         margin: 0;
         padding: 0;
@@ -15,6 +18,9 @@
         width: 100%;
         height: 100%;
         overflow: hidden;
+        font-family: var(--font-mono);
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
       }
     </style>
   </head>

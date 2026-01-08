@@ -163,7 +163,7 @@ const styles = {
     padding: '12px 16px',
     borderRadius: '8px',
     color: '#ffffff',
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    fontFamily: 'inherit',
     fontSize: '13px',
     fontWeight: 500,
     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',

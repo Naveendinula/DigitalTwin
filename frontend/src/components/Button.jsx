@@ -83,7 +83,7 @@ const buttonStyles = `
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08),
                       0 1px 2px rgba(0, 0, 0, 0.06);
           transition: all 0.2s ease;
-          font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          font-family: inherit;
           font-size: 13px;
           font-weight: 500;
           outline: none;

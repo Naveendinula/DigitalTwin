@@ -600,7 +600,7 @@ const styles = {
     flexDirection: 'column',
     zIndex: 1000,
     overflow: 'hidden',
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    fontFamily: 'inherit',
   },
   header: {
     padding: '12px 16px',

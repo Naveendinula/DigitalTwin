@@ -80,7 +80,7 @@ const styles = {
     borderRadius: '10px',
     padding: '12px 16px',
     color: '#ffffff',
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    fontFamily: 'inherit',
     fontSize: '12px',
     zIndex: 100,
     animation: 'fadeIn 0.3s ease-out',

@@ -139,6 +139,7 @@ function ValidationReportModal({ isOpen, onClose, jobId }) {
           <div style={styles.content}>
             {/* Progress Overview */}
             <div style={styles.progressSection}>
+              <div style={styles.sectionLabel}>PROGRESS</div>
               <div style={styles.progressBar}>
                 <div style={{ ...styles.progressSegment, width: `${overallProgress.pass}%`, backgroundColor: '#10b981' }} />
                 <div style={{ ...styles.progressSegment, width: `${overallProgress.warn}%`, backgroundColor: '#f59e0b' }} />
@@ -147,15 +148,15 @@ function ValidationReportModal({ isOpen, onClose, jobId }) {
               <div style={styles.progressLabels}>
                 <span style={styles.progressLabel}>
                   <span style={{ ...styles.dot, backgroundColor: '#10b981' }} />
-                  {report.summary.passCount} Passed
+                  {report.summary.passCount} passed
                 </span>
                 <span style={styles.progressLabel}>
                   <span style={{ ...styles.dot, backgroundColor: '#f59e0b' }} />
-                  {report.summary.warnCount} Warnings
+                  {report.summary.warnCount} warnings
                 </span>
                 <span style={styles.progressLabel}>
                   <span style={{ ...styles.dot, backgroundColor: '#ef4444' }} />
-                  {report.summary.failCount} Failed
+                  {report.summary.failCount} failed
                 </span>
               </div>
             </div>
@@ -163,45 +164,41 @@ function ValidationReportModal({ isOpen, onClose, jobId }) {
             <div style={styles.mainLayout}>
               {/* Domain Sidebar */}
               <div style={styles.sidebar}>
-                <div style={styles.sidebarLabel}>Validation Domains</div>
-                {domainEntries.map(([domain, summary]) => {
-                  const config = DOMAIN_CONFIG[domain] || { label: domain, icon: '○' }
-                  const isSelected = selectedDomain === domain
-                  const statusStyle = SEVERITY_STYLES[summary.status]
-                  const statusColor = statusStyle?.color || '#6b7280'
-                  const statusBg = statusStyle?.bg
-                  
-                  return (
-                    <button
-                      key={domain}
-                      style={{
-                        ...styles.domainBtn,
-                        ...(isSelected ? styles.domainBtnActive : {}),
-                        borderLeftColor: statusColor
-                      }}
-                      onClick={() => setSelectedDomain(domain)}
-                    >
-                      <div style={styles.domainBtnTop}>
-                        <span style={styles.domainIcon}>{config.icon}</span>
-                        <span style={styles.domainLabel}>{config.label}</span>
-                        <span style={{
-                          ...styles.domainStatus,
-                          color: statusColor,
-                          backgroundColor: statusBg
-                        }}>
-                          {summary.featureReady ? '✓' : '○'}
-                        </span>
-                      </div>
-                      <div style={styles.domainStats}>
-                        <span style={{ color: '#10b981' }}>{summary.passed}</span>
-                        <span style={styles.statDivider}>/</span>
-                        <span style={{ color: '#f59e0b' }}>{summary.warned}</span>
-                        <span style={styles.statDivider}>/</span>
-                        <span style={{ color: '#ef4444' }}>{summary.failed}</span>
-                      </div>
-                    </button>
-                  )
-                })}
+                <div style={styles.sidebarLabel}>DOMAINS</div>
+                <div style={styles.domainGrid}>
+                  {domainEntries.map(([domain, summary]) => {
+                    const config = DOMAIN_CONFIG[domain] || { label: domain, icon: '○' }
+                    const isSelected = selectedDomain === domain
+                    const statusStyle = SEVERITY_STYLES[summary.status]
+                    const statusColor = statusStyle?.color || '#6b7280'
+                    
+                    return (
+                      <button
+                        key={domain}
+                        style={{
+                          ...styles.domainBtn,
+                          ...(isSelected ? styles.domainBtnActive : {}),
+                        }}
+                        onClick={() => setSelectedDomain(domain)}
+                      >
+                        <div style={styles.domainBtnTop}>
+                          <span style={styles.domainLabel}>{config.label}</span>
+                          <span style={{
+                            ...styles.domainStatus,
+                            backgroundColor: statusColor,
+                          }} />
+                        </div>
+                        <div style={styles.domainStats}>
+                          <span style={{ color: '#10b981' }}>{summary.passed}</span>
+                          <span style={styles.statDivider}>{'\u00B7'}</span>
+                          <span style={{ color: '#f59e0b' }}>{summary.warned}</span>
+                          <span style={styles.statDivider}>{'\u00B7'}</span>
+                          <span style={{ color: '#ef4444' }}>{summary.failed}</span>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
 
               {/* Rules List */}
@@ -240,10 +237,7 @@ function ValidationReportModal({ isOpen, onClose, jobId }) {
                     return (
                       <div 
                         key={rule.ruleId} 
-                        style={{
-                          ...styles.ruleCard,
-                          borderLeftColor: severity.color
-                        }}
+                        style={styles.ruleCard}
                       >
                         <button 
                           style={styles.ruleHeader}
@@ -252,11 +246,8 @@ function ValidationReportModal({ isOpen, onClose, jobId }) {
                           <div style={styles.ruleHeaderLeft}>
                             <span style={{
                               ...styles.ruleSeverityIcon,
-                              color: severity.color,
-                              backgroundColor: severity.bg
-                            }}>
-                              {rule.passed ? '✓' : rule.severity === 'fail' ? '✗' : '⚠'}
-                            </span>
+                              backgroundColor: severity.color,
+                            }} />
                             <div style={styles.ruleInfo}>
                               <span style={styles.ruleName}>{rule.ruleName}</span>
                               <span style={styles.ruleId}>{rule.ruleId}</span>
@@ -397,14 +388,14 @@ function ValidationReportModal({ isOpen, onClose, jobId }) {
   )
 }
 
-const softShadow = '0 4px 24px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08)';
+const monoFont = "'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', 'Courier New', monospace";
 
 const styles = {
   backdrop: {
     position: 'fixed',
     inset: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    backdropFilter: 'blur(4px)',
+    backgroundColor: 'rgba(0, 0, 0, 0.15)',
+    backdropFilter: 'blur(2px)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -414,62 +405,65 @@ const styles = {
 
   modal: {
     width: '100%',
-    maxWidth: '960px',
-    maxHeight: '85vh',
-    backgroundColor: '#ffffff',
+    maxWidth: '1100px',
+    maxHeight: '90vh',
+    backgroundColor: '#f5f5f5',
     borderRadius: '16px',
-    boxShadow: '0 4px 24px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08)',
+    boxShadow: '0 8px 40px rgba(0, 0, 0, 0.12)',
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-    border: '1px solid rgba(0, 0, 0, 0.04)',
+    fontFamily: monoFont,
+    border: '1px solid rgba(0, 0, 0, 0.08)',
   },
 
   header: {
     display: 'flex',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    padding: '20px 24px',
-    borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
+    padding: '24px 28px 20px',
     flexShrink: 0,
-    background: '#ffffff',
+    background: '#f5f5f5',
   },
 
   headerLeft: {
     display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
+    flexDirection: 'column',
+    gap: '4px',
   },
 
   title: {
     margin: 0,
-    fontSize: '18px',
-    fontWeight: 600,
+    fontSize: '14px',
+    fontWeight: 700,
     color: '#1a1a1a',
-    letterSpacing: '-0.02em',
+    letterSpacing: '-0.01em',
+    fontFamily: monoFont,
   },
 
   statusBadge: {
     fontSize: '12px',
-    fontWeight: 500,
-    padding: '4px 10px',
-    borderRadius: '12px',
+    fontWeight: 400,
+    padding: '0',
+    color: '#6b7280',
+    fontFamily: monoFont,
+    borderRadius: 0,
+    background: 'none',
   },
 
   closeBtn: {
-    width: '36px',
-    height: '36px',
+    width: '32px',
+    height: '32px',
     borderRadius: '8px',
-    border: '1px solid rgba(0, 0, 0, 0.06)',
+    border: '1px solid rgba(0, 0, 0, 0.08)',
     background: '#ffffff',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    color: '#6b7280',
-    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
-    transition: 'all 0.2s ease',
+    color: '#9ca3af',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.06)',
+    transition: 'all 0.15s ease',
   },
 
   content: {
@@ -477,21 +471,32 @@ const styles = {
     overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column',
-    background: '#fafafa',
+    background: '#f5f5f5',
+    padding: '0 28px 20px',
   },
 
   progressSection: {
-    padding: '16px 24px',
-    borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
+    marginBottom: '20px',
     flexShrink: 0,
   },
 
+  sectionLabel: {
+    fontSize: '11px',
+    fontWeight: 600,
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+    color: '#1a1a1a',
+    marginBottom: '12px',
+    fontFamily: monoFont,
+  },
+
   progressBar: {
-    height: '6px',
-    backgroundColor: 'rgba(0, 0, 0, 0.06)',
-    borderRadius: '3px',
+    height: '4px',
+    backgroundColor: 'rgba(0, 0, 0, 0.08)',
+    borderRadius: '2px',
     display: 'flex',
     overflow: 'hidden',
+    marginBottom: '10px',
   },
 
   progressSegment: {
@@ -501,106 +506,117 @@ const styles = {
 
   progressLabels: {
     display: 'flex',
-    gap: '16px',
-    marginTop: '10px',
+    gap: '20px',
   },
 
   progressLabel: {
     display: 'flex',
     alignItems: 'center',
     gap: '6px',
-    fontSize: '12px',
+    fontSize: '11px',
     color: '#6b7280',
+    fontFamily: monoFont,
   },
 
   dot: {
-    width: '8px',
-    height: '8px',
+    width: '6px',
+    height: '6px',
     borderRadius: '50%',
   },
 
   mainLayout: {
     flex: 1,
     display: 'flex',
+    gap: '16px',
     overflow: 'hidden',
   },
 
   sidebar: {
-    width: '220px',
-    borderRight: '1px solid rgba(0, 0, 0, 0.06)',
-    padding: '16px',
+    width: '280px',
     flexShrink: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
     overflowY: 'auto',
-    background: '#ffffff',
   },
 
   sidebarLabel: {
-    fontSize: '10px',
+    fontSize: '11px',
     fontWeight: 600,
     textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-    color: '#9ca3af',
-    marginBottom: '12px',
-    padding: '0 8px',
+    letterSpacing: '0.04em',
+    color: '#1a1a1a',
+    marginBottom: '8px',
+    fontFamily: monoFont,
+  },
+
+  domainGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, 1fr)',
+    gap: '8px',
   },
 
   domainBtn: {
     width: '100%',
-    padding: '12px',
-    marginBottom: '8px',
-    background: '#f9f9f9',
-    border: '1px solid rgba(0, 0, 0, 0.04)',
-    borderRadius: '8px',
+    padding: '14px 14px 12px',
+    background: '#ffffff',
+    border: '1px solid rgba(0, 0, 0, 0.06)',
+    borderRadius: '10px',
     cursor: 'pointer',
     textAlign: 'left',
-    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
-    transition: 'all 0.2s ease',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+    transition: 'all 0.15s ease',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+    minHeight: '90px',
+    position: 'relative',
   },
 
   domainBtnActive: {
     backgroundColor: '#ffffff',
-    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.08)',
-    borderColor: 'rgba(0, 0, 0, 0.08)',
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+    borderColor: 'rgba(0, 0, 0, 0.1)',
   },
 
   domainBtnTop: {
     display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    width: '100%',
   },
 
   domainIcon: {
-    fontSize: '14px',
-    opacity: 0.6,
+    display: 'none',
   },
 
   domainLabel: {
-    flex: 1,
     fontSize: '13px',
     fontWeight: 500,
-    color: '#374151',
+    color: '#1a1a1a',
+    fontFamily: monoFont,
+    lineHeight: 1.3,
+    flex: 1,
   },
 
   domainStatus: {
-    width: '20px',
-    height: '20px',
-    borderRadius: '10px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '10px',
+    width: '7px',
+    height: '7px',
+    borderRadius: '50%',
+    flexShrink: 0,
+    marginTop: '4px',
   },
 
   domainStats: {
-    marginTop: '6px',
-    marginLeft: '22px',
     fontSize: '11px',
     color: '#9ca3af',
+    fontFamily: monoFont,
+    marginTop: 'auto',
   },
 
   statDivider: {
-    margin: '0 2px',
-    opacity: 0.4,
+    margin: '0 3px',
+    opacity: 0.5,
   },
 
   rulesPanel: {
@@ -608,35 +624,43 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
+    background: '#ffffff',
+    borderRadius: '12px',
+    border: '1px solid rgba(0, 0, 0, 0.06)',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
   },
 
   rulesPanelHeader: {
-    padding: '16px 20px',
+    padding: '16px 18px',
     borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     flexShrink: 0,
+    background: '#ffffff',
   },
 
   rulesPanelTitle: {
     margin: 0,
-    fontSize: '15px',
+    fontSize: '13px',
     fontWeight: 600,
     color: '#1a1a1a',
+    fontFamily: monoFont,
   },
 
   rulesPanelDesc: {
     margin: '4px 0 0 0',
-    fontSize: '12px',
+    fontSize: '11px',
     color: '#9ca3af',
+    fontFamily: monoFont,
   },
 
   featureReadyBadge: {
-    fontSize: '11px',
+    fontSize: '10px',
     fontWeight: 500,
-    padding: '4px 10px',
-    borderRadius: '12px',
+    padding: '4px 8px',
+    borderRadius: '6px',
+    fontFamily: monoFont,
   },
 
   rulesList: {
@@ -646,19 +670,17 @@ const styles = {
   },
 
   ruleCard: {
-    marginBottom: '8px',
-    borderRadius: '10px',
-    borderLeft: '3px solid',
+    marginBottom: '6px',
+    borderRadius: '8px',
     overflow: 'hidden',
-    backgroundColor: '#ffffff',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.06)',
+    backgroundColor: '#fafafa',
     border: '1px solid rgba(0, 0, 0, 0.04)',
-    transition: 'all 0.2s ease',
+    transition: 'all 0.15s ease',
   },
 
   ruleHeader: {
     width: '100%',
-    padding: '12px 16px',
+    padding: '10px 14px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -666,23 +688,20 @@ const styles = {
     border: 'none',
     cursor: 'pointer',
     textAlign: 'left',
+    fontFamily: monoFont,
   },
 
   ruleHeaderLeft: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
+    gap: '10px',
   },
 
   ruleSeverityIcon: {
-    width: '24px',
-    height: '24px',
-    borderRadius: '6px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '12px',
-    fontWeight: 600,
+    width: '7px',
+    height: '7px',
+    borderRadius: '50%',
+    flexShrink: 0,
   },
 
   ruleInfo: {
@@ -692,15 +711,16 @@ const styles = {
   },
 
   ruleName: {
-    fontSize: '13px',
+    fontSize: '12px',
     fontWeight: 500,
-    color: '#374151',
+    color: '#1a1a1a',
+    fontFamily: monoFont,
   },
 
   ruleId: {
     fontSize: '10px',
     color: '#9ca3af',
-    fontFamily: 'SF Mono, Monaco, monospace',
+    fontFamily: monoFont,
   },
 
   ruleHeaderRight: {
@@ -712,73 +732,78 @@ const styles = {
   idsTag: {
     fontSize: '9px',
     fontWeight: 600,
-    padding: '2px 6px',
+    padding: '2px 5px',
     borderRadius: '4px',
-    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+    backgroundColor: 'rgba(99, 102, 241, 0.08)',
     color: '#6366f1',
-    letterSpacing: '0.03em',
+    letterSpacing: '0.02em',
+    fontFamily: monoFont,
   },
 
   ruleCoverage: {
-    fontSize: '13px',
-    fontWeight: 600,
-    color: '#6b7280',
-    fontFamily: 'SF Mono, Monaco, monospace',
+    fontSize: '11px',
+    fontWeight: 500,
+    color: '#9ca3af',
+    fontFamily: monoFont,
   },
 
   expandIcon: {
     fontSize: '10px',
     color: '#9ca3af',
-    transition: 'transform 0.2s ease',
+    transition: 'transform 0.15s ease',
   },
 
   ruleDetails: {
-    padding: '0 16px 16px 52px',
+    padding: '12px 14px 14px 31px',
     borderTop: '1px solid rgba(0, 0, 0, 0.04)',
+    background: '#ffffff',
   },
 
   ruleDescription: {
-    margin: '12px 0',
-    fontSize: '13px',
+    margin: '0 0 12px 0',
+    fontSize: '11px',
     color: '#6b7280',
     lineHeight: 1.5,
+    fontFamily: monoFont,
   },
 
   metricsGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(4, 1fr)',
     gap: '12px',
-    marginBottom: '16px',
+    marginBottom: '14px',
   },
 
   metricItem: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '4px',
+    gap: '2px',
   },
 
   metricLabel: {
-    fontSize: '10px',
+    fontSize: '9px',
     color: '#9ca3af',
     textTransform: 'uppercase',
-    letterSpacing: '0.03em',
+    letterSpacing: '0.02em',
+    fontFamily: monoFont,
   },
 
   metricValue: {
-    fontSize: '13px',
-    fontWeight: 600,
-    color: '#374151',
+    fontSize: '12px',
+    fontWeight: 500,
+    color: '#1a1a1a',
+    fontFamily: monoFont,
   },
 
   coverageBarContainer: {
-    marginBottom: '16px',
+    marginBottom: '14px',
   },
 
   coverageBar: {
     position: 'relative',
-    height: '8px',
+    height: '4px',
     backgroundColor: 'rgba(0, 0, 0, 0.06)',
-    borderRadius: '4px',
+    borderRadius: '2px',
     overflow: 'visible',
   },
 
@@ -787,7 +812,7 @@ const styles = {
     left: 0,
     top: 0,
     height: '100%',
-    borderRadius: '4px',
+    borderRadius: '2px',
     transition: 'width 0.3s ease',
   },
 
@@ -795,7 +820,7 @@ const styles = {
     position: 'absolute',
     top: '-2px',
     width: '2px',
-    height: '12px',
+    height: '8px',
     backgroundColor: '#f59e0b',
     borderRadius: '1px',
   },
@@ -804,8 +829,9 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     marginTop: '6px',
-    fontSize: '10px',
+    fontSize: '9px',
     color: '#9ca3af',
+    fontFamily: monoFont,
   },
 
   messageBox: {
@@ -813,54 +839,58 @@ const styles = {
     alignItems: 'flex-start',
     gap: '8px',
     padding: '10px 12px',
-    backgroundColor: 'rgba(0, 0, 0, 0.02)',
-    borderRadius: '8px',
-    fontSize: '12px',
+    backgroundColor: '#fafafa',
+    borderRadius: '6px',
+    fontSize: '11px',
     color: '#6b7280',
-    marginBottom: '12px',
+    marginBottom: '10px',
+    fontFamily: monoFont,
+    lineHeight: 1.4,
   },
 
   messageIcon: {
     flexShrink: 0,
-    width: '18px',
-    height: '18px',
-    borderRadius: '9px',
-    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+    width: '16px',
+    height: '16px',
+    borderRadius: '8px',
+    backgroundColor: 'rgba(99, 102, 241, 0.08)',
     color: '#6366f1',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '10px',
+    fontSize: '9px',
   },
 
   recommendationsSection: {
-    padding: '12px',
-    backgroundColor: 'rgba(245, 158, 11, 0.06)',
-    borderRadius: '8px',
-    border: '1px solid rgba(245, 158, 11, 0.15)',
-    marginBottom: '12px',
+    padding: '10px 12px',
+    backgroundColor: 'rgba(245, 158, 11, 0.05)',
+    borderRadius: '6px',
+    border: '1px solid rgba(245, 158, 11, 0.1)',
+    marginBottom: '10px',
   },
 
   recommendationsLabel: {
     display: 'block',
-    fontSize: '11px',
+    fontSize: '10px',
     fontWeight: 600,
     color: '#d97706',
-    marginBottom: '8px',
+    marginBottom: '6px',
     textTransform: 'uppercase',
-    letterSpacing: '0.03em',
+    letterSpacing: '0.02em',
+    fontFamily: monoFont,
   },
 
   recommendationsList: {
     margin: 0,
-    paddingLeft: '16px',
+    paddingLeft: '14px',
   },
 
   recommendationItem: {
-    fontSize: '12px',
+    fontSize: '11px',
     color: '#92400e',
-    lineHeight: 1.5,
-    marginBottom: '4px',
+    lineHeight: 1.4,
+    marginBottom: '3px',
+    fontFamily: monoFont,
   },
 
   idsInfo: {
@@ -868,26 +898,29 @@ const styles = {
     alignItems: 'flex-start',
     gap: '8px',
     padding: '10px 12px',
-    backgroundColor: 'rgba(99, 102, 241, 0.06)',
-    borderRadius: '8px',
-    fontSize: '11px',
+    backgroundColor: 'rgba(99, 102, 241, 0.04)',
+    borderRadius: '6px',
+    fontSize: '10px',
     color: '#4f46e5',
-    lineHeight: 1.5,
+    lineHeight: 1.4,
+    fontFamily: monoFont,
   },
 
   idsInfoIcon: {
     flexShrink: 0,
+    fontSize: '12px',
   },
 
   footer: {
     display: 'flex',
     gap: '24px',
-    padding: '12px 24px',
+    padding: '14px 28px',
     borderTop: '1px solid rgba(0, 0, 0, 0.06)',
-    fontSize: '11px',
+    fontSize: '10px',
     color: '#9ca3af',
     flexShrink: 0,
-    background: '#ffffff',
+    background: '#f5f5f5',
+    fontFamily: monoFont,
   },
 
   footerItem: {
@@ -903,16 +936,17 @@ const styles = {
     justifyContent: 'center',
     gap: '16px',
     color: '#9ca3af',
-    fontSize: '13px',
+    fontSize: '12px',
+    fontFamily: monoFont,
   },
 
   spinner: {
-    width: '32px',
-    height: '32px',
-    border: '3px solid rgba(0, 0, 0, 0.06)',
-    borderTopColor: '#6366f1',
+    width: '24px',
+    height: '24px',
+    border: '2px solid rgba(0, 0, 0, 0.06)',
+    borderTopColor: '#1a1a1a',
     borderRadius: '50%',
-    animation: 'spin 1s linear infinite',
+    animation: 'spin 0.8s linear infinite',
   },
 
   errorState: {
@@ -922,18 +956,20 @@ const styles = {
     justifyContent: 'center',
     gap: '12px',
     color: '#ef4444',
-    fontSize: '13px',
+    fontSize: '12px',
+    fontFamily: monoFont,
   },
 
   errorIcon: {
-    width: '32px',
-    height: '32px',
-    borderRadius: '16px',
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    width: '24px',
+    height: '24px',
+    borderRadius: '12px',
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     fontWeight: 600,
+    fontSize: '12px',
   },
 }
 

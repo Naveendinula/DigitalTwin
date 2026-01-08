@@ -250,7 +250,7 @@ const styles = {
     boxShadow: softShadow,
     zIndex: 100,
     gap: '16px',
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    fontFamily: 'inherit',
   },
   button: {
     display: 'flex',
@@ -347,7 +347,7 @@ const styles = {
     border: '1px solid rgba(0, 0, 0, 0.1)',
     borderRadius: '8px',
     fontSize: '12px',
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    fontFamily: 'inherit',
     backgroundColor: 'rgba(255, 255, 255, 0.7)',
     color: '#1d1d1f',
     outline: 'none',
