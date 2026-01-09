@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react'
+import IdsManager from './IdsManager'
 
 /**
  * ValidationReportModal - Detailed validation report viewer
  * 
  * Arctic Zen minimalist design with full rule details,
  * thresholds, and actionable recommendations.
+ * 
+ * Includes IDS template management tab.
  */
 
 const DOMAIN_CONFIG = {
@@ -43,35 +46,46 @@ function ValidationReportModal({ isOpen, onClose, jobId }) {
   const [error, setError] = useState(null)
   const [selectedDomain, setSelectedDomain] = useState('core')
   const [expandedRule, setExpandedRule] = useState(null)
+  const [activeTab, setActiveTab] = useState('rules') // 'rules' or 'ids'
 
   const API_URL = 'http://localhost:8000'
 
+  const fetchReport = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const response = await fetch(`${API_URL}/validation/${jobId}`)
+      if (!response.ok) throw new Error('Failed to fetch validation report')
+      const data = await response.json()
+      setReport(data)
+      // Auto-select first domain with issues, or first domain
+      const domains = Object.keys(data.domainSummaries || {})
+      const problemDomain = domains.find(d => 
+        data.domainSummaries[d].failed > 0 || data.domainSummaries[d].warned > 0
+      )
+      setSelectedDomain(problemDomain || domains[0] || 'core')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
     if (!isOpen || !jobId) return
-
-    const fetchReport = async () => {
-      setLoading(true)
-      setError(null)
-      try {
-        const response = await fetch(`${API_URL}/validation/${jobId}`)
-        if (!response.ok) throw new Error('Failed to fetch validation report')
-        const data = await response.json()
-        setReport(data)
-        // Auto-select first domain with issues, or first domain
-        const domains = Object.keys(data.domainSummaries || {})
-        const problemDomain = domains.find(d => 
-          data.domainSummaries[d].failed > 0 || data.domainSummaries[d].warned > 0
-        )
-        setSelectedDomain(problemDomain || domains[0] || 'core')
-      } catch (err) {
-        setError(err.message)
-      } finally {
-        setLoading(false)
-      }
-    }
-
     fetchReport()
   }, [isOpen, jobId])
+
+  // Handle IDS changes - trigger revalidation
+  const handleIdsChange = async () => {
+    // Revalidate after IDS change
+    try {
+      await fetch(`${API_URL}/validation/${jobId}/revalidate`, { method: 'POST' })
+      await fetchReport()
+    } catch (err) {
+      console.error('Revalidation failed:', err)
+    }
+  }
 
   const domainSummaries = report?.domainSummaries || {}
   const domainEntries = Object.entries(domainSummaries)
@@ -121,6 +135,28 @@ function ValidationReportModal({ isOpen, onClose, jobId }) {
           </button>
         </div>
 
+        {/* Tab Navigation */}
+        <div style={styles.tabBar}>
+          <button
+            style={{
+              ...styles.tabBtn,
+              ...(activeTab === 'rules' ? styles.tabBtnActive : {})
+            }}
+            onClick={() => setActiveTab('rules')}
+          >
+            Validation Rules
+          </button>
+          <button
+            style={{
+              ...styles.tabBtn,
+              ...(activeTab === 'ids' ? styles.tabBtnActive : {})
+            }}
+            onClick={() => setActiveTab('ids')}
+          >
+            IDS Templates
+          </button>
+        </div>
+
         {loading && (
           <div style={styles.loadingState}>
             <div style={styles.spinner} />
@@ -135,7 +171,15 @@ function ValidationReportModal({ isOpen, onClose, jobId }) {
           </div>
         )}
 
-        {report && !loading && (
+        {/* IDS Templates Tab */}
+        {activeTab === 'ids' && !loading && (
+          <div style={styles.content}>
+            <IdsManager jobId={jobId} onIdsChange={handleIdsChange} />
+          </div>
+        )}
+
+        {/* Rules Tab */}
+        {activeTab === 'rules' && report && !loading && (
           <div style={styles.content}>
             {/* Progress Overview */}
             <div style={styles.progressSection}>
@@ -255,7 +299,15 @@ function ValidationReportModal({ isOpen, onClose, jobId }) {
                           </div>
                           <div style={styles.ruleHeaderRight}>
                             {rule.isIdsRule && (
-                              <span style={styles.idsTag}>IDS</span>
+                              <span style={{
+                                ...styles.idsTag,
+                                ...(rule.idsSource === 'external' ? {
+                                  backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                                  color: '#10b981',
+                                } : {})
+                              }}>
+                                {rule.idsSource === 'external' ? 'IDS↗' : 'IDS'}
+                              </span>
                             )}
                             <span style={styles.ruleCoverage}>
                               {rule.coveragePercent}%
@@ -350,13 +402,69 @@ function ValidationReportModal({ isOpen, onClose, jobId }) {
                               </div>
                             )}
 
+                            {/* IDS Facet Details - for external IDS rules */}
+                            {rule.facetDetails?.length > 0 && (
+                              <div style={styles.facetDetailsSection}>
+                                <span style={styles.facetDetailsLabel}>IDS Facet Checks:</span>
+                                <div style={styles.facetGrid}>
+                                  {rule.facetDetails.map((facet, idx) => (
+                                    <div 
+                                      key={idx} 
+                                      style={{
+                                        ...styles.facetItem,
+                                        borderLeftColor: facet.passed ? '#10b981' : '#ef4444'
+                                      }}
+                                    >
+                                      <div style={styles.facetHeader}>
+                                        <span style={styles.facetType}>{facet.type}</span>
+                                        <span style={{
+                                          ...styles.facetStatus,
+                                          color: facet.passed ? '#10b981' : '#ef4444'
+                                        }}>
+                                          {facet.passed ? '✓' : '✗'}
+                                        </span>
+                                      </div>
+                                      {facet.name && (
+                                        <span style={styles.facetName}>{facet.name}</span>
+                                      )}
+                                      {facet.details && Object.keys(facet.details).length > 0 && (
+                                        <div style={styles.facetDetailsInner}>
+                                          {facet.details.propertySet && (
+                                            <span>Pset: {facet.details.propertySet}</span>
+                                          )}
+                                          {facet.details.baseName && (
+                                            <span>Property: {facet.details.baseName}</span>
+                                          )}
+                                          {facet.details.system && (
+                                            <span>System: {facet.details.system}</span>
+                                          )}
+                                          {facet.details.dataType && (
+                                            <span>Type: {facet.details.dataType}</span>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
                             {/* IDS Rule Info */}
                             {rule.isIdsRule && (
                               <div style={styles.idsInfo}>
                                 <span style={styles.idsInfoIcon}>📋</span>
                                 <span>
-                                  This rule is validated using <strong>IDS (Information Delivery Specification)</strong> standards.
-                                  It checks for required IFC entities and their relationships.
+                                  {rule.idsSource === 'external' ? (
+                                    <>
+                                      This rule is from an <strong>external IDS file</strong>. 
+                                      It validates specific IFC requirements defined in the uploaded specification.
+                                    </>
+                                  ) : (
+                                    <>
+                                      This rule is validated using <strong>IDS (Information Delivery Specification)</strong> standards.
+                                      It checks for required IFC entities and their relationships.
+                                    </>
+                                  )}
                                 </span>
                               </div>
                             )}
@@ -464,6 +572,41 @@ const styles = {
     color: '#9ca3af',
     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.06)',
     transition: 'all 0.15s ease',
+  },
+
+  tabBar: {
+    display: 'flex',
+    gap: '4px',
+    padding: '0 28px 16px',
+    borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
+    background: '#f5f5f5',
+  },
+
+  tabBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '8px 16px',
+    fontSize: '12px',
+    fontWeight: 500,
+    fontFamily: monoFont,
+    color: '#6b7280',
+    background: 'transparent',
+    border: '1px solid transparent',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
+  },
+
+  tabBtnActive: {
+    color: '#1a1a1a',
+    background: '#ffffff',
+    border: '1px solid rgba(0, 0, 0, 0.08)',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+  },
+
+  tabIcon: {
+    fontSize: '14px',
   },
 
   content: {
@@ -910,6 +1053,74 @@ const styles = {
     lineHeight: 1.4,
     marginBottom: '3px',
     fontFamily: monoFont,
+  },
+
+  // IDS Facet Details styles
+  facetDetailsSection: {
+    marginTop: '12px',
+    padding: '12px',
+    backgroundColor: 'rgba(99, 102, 241, 0.03)',
+    borderRadius: '8px',
+    border: '1px solid rgba(99, 102, 241, 0.1)',
+  },
+
+  facetDetailsLabel: {
+    display: 'block',
+    fontSize: '10px',
+    fontWeight: 600,
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+    color: '#4f46e5',
+    marginBottom: '10px',
+    fontFamily: monoFont,
+  },
+
+  facetGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+    gap: '8px',
+  },
+
+  facetItem: {
+    padding: '8px 10px',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    borderRadius: '6px',
+    borderLeft: '3px solid #6b7280',
+    fontSize: '10px',
+    fontFamily: monoFont,
+  },
+
+  facetHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '4px',
+  },
+
+  facetType: {
+    fontWeight: 600,
+    textTransform: 'capitalize',
+    color: '#4f46e5',
+  },
+
+  facetStatus: {
+    fontSize: '12px',
+    fontWeight: 600,
+  },
+
+  facetName: {
+    display: 'block',
+    color: '#374151',
+    fontWeight: 500,
+    marginBottom: '4px',
+  },
+
+  facetDetailsInner: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '2px',
+    color: '#6b7280',
+    fontSize: '9px',
   },
 
   idsInfo: {

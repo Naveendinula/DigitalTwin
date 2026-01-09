@@ -1,10 +1,17 @@
 # Architecture Documentation
 
 > **Status**: Living Document  
-> **Last Updated**: January 6, 2026  
+> **Last Updated**: January 8, 2026  
 > **Owner**: Naveen Panditharatne
 
 ## Recent additions / changes
+
+- **Date:** 2026-01-08
+- **IDS External File Support:** Added full IDS (Information Delivery Specification) file loading and validation support per buildingSMART guidelines. Users can upload `.ids` XML files per job or use default templates. The system validates IFC against IDS specifications with full facet support (Entity, Property, Attribute, Classification, Material, PartOf).
+- **New Module:** `backend/ids_manager.py` handles IDS file storage, loading, XML validation, and result conversion.
+- **IDS API Endpoints:** Added endpoints for listing, uploading, deleting IDS files and running IDS-specific validation (`/validation/{job_id}/ids/*`).
+- **Frontend Updates:** `ValidationReportModal` now displays IDS facet details with visual indicators for external vs builtin IDS rules.
+- **IDS Templates:** Default templates stored in `backend/ids_templates/default/`; per-job uploads in `backend/ids_templates/uploaded/{job_id}/`.
 
 - **Date:** 2026-01-06
 - **IFC validation pipeline:** Added IDS + coverage validation (`backend/ifc_validation.py`, `backend/validation_api.py`) with cached `validation.json` generated during upload; surfaced via `ValidationBadge` + `ValidationReportModal`.
@@ -125,16 +132,19 @@ graph TB
         HvacCore["HVAC/FM Core"]
         SpaceBBox["Space BBox Extractor"]
         Validator["IFC Validator"]
+        IDSMgr["IDS Manager"]
         OccSim["Occupancy Simulator"]
     end
 
     subgraph Storage
         Uploads["./uploads"]
         Outputs["./output"]
+        IDSTemplates["./ids_templates"]
         ECDB["prac-database.csv"]
     end
 
     UI -->|Uploads IFC| Server
+    UI -->|Uploads IDS| Server
     UI -->|Requests Metadata| Server
     UI -->|Requests EC Calc| Server
     Viewer -->|Loads GLB| Server

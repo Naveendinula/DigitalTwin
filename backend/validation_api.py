@@ -1,5 +1,10 @@
 """
 FastAPI router exposing IFC validation endpoints.
+
+Includes:
+- Standard validation endpoints (get report, summary, issues)
+- IDS file management endpoints (upload, list, delete)
+- IDS-specific validation endpoint
 """
 
 from pathlib import Path
@@ -8,7 +13,7 @@ import json
 import traceback
 from typing import Any, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel
 
 from config import UPLOAD_DIR, OUTPUT_DIR
@@ -17,6 +22,18 @@ from ifc_validation import (
     get_validation_summary,
     ValidationReport,
     Severity,
+)
+from ids_manager import (
+    save_uploaded_ids,
+    delete_uploaded_ids,
+    list_uploaded_ids_files,
+    list_default_ids_files,
+    get_ids_info,
+    validate_ids_xml_structure,
+    load_ids_file,
+    validate_ifc_against_ids,
+    list_all_ids_templates,
+    get_job_ids_dir,
 )
 
 router = APIRouter(prefix="/validation", tags=["validation"])
@@ -135,7 +152,7 @@ async def get_validation_report(job_id: str, force_refresh: bool = False) -> dic
         raise HTTPException(status_code=500, detail=f"Error finding IFC file: {str(e)}")
     
     try:
-        report = validate_ifc_to_json(ifc_path)
+        report = validate_ifc_to_json(ifc_path, job_id=job_id)
         _save_validation_cache(job_id, report)
         return report
     except Exception as e:
@@ -321,4 +338,260 @@ async def list_validation_rules() -> dict:
     return {
         "totalRules": len(ALL_RULES),
         "rulesByDomain": rules_by_domain,
+    }
+
+
+# =============================================================================
+# IDS File Management Endpoints
+# =============================================================================
+
+@router.get("/ids/templates")
+async def list_ids_templates() -> dict:
+    """
+    List all available IDS templates (default + uploaded).
+    
+    Returns:
+        Dictionary with default templates and uploaded templates by job.
+    """
+    try:
+        return list_all_ids_templates()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error listing IDS templates: {str(e)}")
+
+
+@router.get("/ids/templates/default")
+async def list_default_templates() -> dict:
+    """
+    List default IDS templates available for all validations.
+    """
+    templates = []
+    for ids_file in list_default_ids_files():
+        info = get_ids_info(ids_file)
+        if info:
+            info["filename"] = ids_file.name
+            templates.append(info)
+    
+    return {
+        "count": len(templates),
+        "templates": templates,
+    }
+
+
+@router.get("/{job_id}/ids")
+async def list_job_ids_files(job_id: str) -> dict:
+    """
+    List IDS files uploaded for a specific job.
+    
+    Args:
+        job_id: The job ID
+        
+    Returns:
+        List of IDS files with their metadata
+    """
+    templates = []
+    for ids_file in list_uploaded_ids_files(job_id):
+        info = get_ids_info(ids_file)
+        if info:
+            info["filename"] = ids_file.name
+            templates.append(info)
+    
+    return {
+        "jobId": job_id,
+        "count": len(templates),
+        "idsFiles": templates,
+    }
+
+
+@router.post("/{job_id}/ids/upload")
+async def upload_ids_file(job_id: str, file: UploadFile = File(...)) -> dict:
+    """
+    Upload an IDS file for a specific job.
+    
+    The IDS file will be validated for basic XML structure before saving.
+    It will be used in subsequent validations for this job.
+    
+    Args:
+        job_id: The job ID
+        file: The IDS file to upload (.ids extension)
+        
+    Returns:
+        Information about the uploaded IDS file
+    """
+    # Validate filename
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No filename provided")
+    
+    if not file.filename.lower().endswith(".ids"):
+        raise HTTPException(
+            status_code=400,
+            detail="File must have .ids extension"
+        )
+    
+    # Read content
+    try:
+        content = await file.read()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error reading file: {str(e)}")
+    
+    # Save temporarily for validation
+    import tempfile
+    with tempfile.NamedTemporaryFile(suffix=".ids", delete=False) as tmp:
+        tmp.write(content)
+        tmp_path = Path(tmp.name)
+    
+    try:
+        # Validate XML structure
+        is_valid, errors = validate_ids_xml_structure(tmp_path)
+        if not is_valid:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid IDS file: {'; '.join(errors)}"
+            )
+        
+        # Try to load with ifctester to ensure it's parseable
+        ids_obj = load_ids_file(tmp_path)
+        if ids_obj is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Could not parse IDS file with ifctester"
+            )
+        
+        # Save to job directory
+        saved_path = save_uploaded_ids(job_id, file.filename, content)
+        
+        # Get info about saved file
+        info = get_ids_info(saved_path)
+        
+        # Clear validation cache so next validation includes this IDS
+        cache_path = _get_validation_cache_path(job_id)
+        if cache_path.exists():
+            cache_path.unlink()
+        
+        return {
+            "success": True,
+            "filename": saved_path.name,
+            "jobId": job_id,
+            "idsInfo": info,
+            "message": "IDS file uploaded successfully. Run revalidation to apply.",
+        }
+        
+    finally:
+        # Clean up temp file
+        if tmp_path.exists():
+            tmp_path.unlink()
+
+
+@router.delete("/{job_id}/ids/{filename}")
+async def delete_ids_file(job_id: str, filename: str) -> dict:
+    """
+    Delete an uploaded IDS file for a job.
+    
+    Args:
+        job_id: The job ID
+        filename: Name of the IDS file to delete
+        
+    Returns:
+        Success status
+    """
+    success = delete_uploaded_ids(job_id, filename)
+    
+    if not success:
+        raise HTTPException(
+            status_code=404,
+            detail=f"IDS file '{filename}' not found for job {job_id}"
+        )
+    
+    # Clear validation cache
+    cache_path = _get_validation_cache_path(job_id)
+    if cache_path.exists():
+        cache_path.unlink()
+    
+    return {
+        "success": True,
+        "message": f"Deleted IDS file: {filename}",
+        "jobId": job_id,
+    }
+
+
+@router.post("/{job_id}/ids/validate")
+async def validate_against_ids(
+    job_id: str,
+    ids_filename: Optional[str] = None
+) -> dict:
+    """
+    Validate the job's IFC file against IDS specifications.
+    
+    Args:
+        job_id: The job ID
+        ids_filename: Optional specific IDS file to validate against.
+                     If not provided, validates against all uploaded + default IDS files.
+                     
+    Returns:
+        IDS validation results with facet-level details
+    """
+    import ifcopenshell
+    
+    # Find IFC file
+    try:
+        ifc_path = _find_ifc_for_job(job_id)
+    except HTTPException:
+        raise
+    
+    # Load IFC
+    try:
+        ifc_model = ifcopenshell.open(str(ifc_path))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error loading IFC: {str(e)}")
+    
+    results = []
+    
+    if ids_filename:
+        # Validate against specific IDS file
+        normalized_name = Path(ids_filename).name
+        if normalized_name != ids_filename:
+            raise HTTPException(status_code=400, detail="Invalid IDS filename")
+        job_ids_dir = get_job_ids_dir(job_id)
+        ids_path = job_ids_dir / normalized_name
+        
+        if not ids_path.exists():
+            # Check defaults
+            ids_path = None
+            for default_file in list_default_ids_files():
+                if default_file.name == ids_filename:
+                    ids_path = default_file
+                    break
+        
+        if not ids_path or not ids_path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=f"IDS file '{ids_filename}' not found"
+            )
+        
+        ids_obj = load_ids_file(ids_path)
+        if ids_obj:
+            result = validate_ifc_against_ids(ifc_model, ids_obj, ifc_path.name)
+            results.append(result.to_dict())
+    else:
+        # Validate against all IDS files
+        from ids_manager import load_all_ids_for_job
+        
+        all_ids = load_all_ids_for_job(job_id, include_defaults=True)
+        for ids_obj in all_ids:
+            result = validate_ifc_against_ids(ifc_model, ids_obj, ifc_path.name)
+            results.append(result.to_dict())
+    
+    # Calculate overall stats
+    total_specs = sum(r["totalSpecs"] for r in results)
+    passed_specs = sum(r["passedSpecs"] for r in results)
+    failed_specs = sum(r["failedSpecs"] for r in results)
+    
+    return {
+        "jobId": job_id,
+        "ifcFilename": ifc_path.name,
+        "idsFilesValidated": len(results),
+        "totalSpecifications": total_specs,
+        "passedSpecifications": passed_specs,
+        "failedSpecifications": failed_specs,
+        "overallPassed": failed_specs == 0,
+        "results": results,
     }

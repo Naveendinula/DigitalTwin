@@ -4,9 +4,15 @@ IFC Validation Module
 Validates IFC files for compatibility with the Digital Twin viewer using:
 1. IDS (Information Delivery Specification) rules via ifctester
 2. Custom coverage metrics for domain-specific validation (HVAC/FM, EC, Occupancy)
+3. External IDS file validation support (buildingSMART IDS standard)
 
 This module provides a unified validation API that returns structured reports
 with pass/warn/fail severities and actionable feedback.
+
+IDS Integration:
+- Supports loading external .ids XML files
+- Full facet support: Entity, Property, Attribute, Classification, Material, PartOf
+- Specification optionality: Required, Optional, Prohibited
 """
 
 from __future__ import annotations
@@ -28,6 +34,15 @@ from ifctester import ids
 from ec_core import extract_lca_properties
 from fm_hvac_core import analyze_hvac_fm
 from domain.materials import has_material, is_leaf_element
+
+# Import IDS manager for external IDS file support
+from ids_manager import (
+    load_all_ids_for_job,
+    validate_ifc_against_ids,
+    merge_ids_results_to_validation_report,
+    build_enhanced_ids_specifications,
+    IDSValidationResult,
+)
 
 
 # =============================================================================
@@ -81,6 +96,7 @@ class RuleResult:
     # Rule metadata
     description: str = ""
     is_ids_rule: bool = False
+    ids_source: str = "builtin"  # "builtin" or "external" for uploaded IDS
     threshold_pass: float = 100.0
     threshold_warn: float = 50.0
     
@@ -94,6 +110,9 @@ class RuleResult:
     message: str = ""
     examples: list[dict[str, Any]] = field(default_factory=list)
     recommendations: list[str] = field(default_factory=list)
+    
+    # IDS facet details (for external IDS rules)
+    facet_details: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -134,6 +153,7 @@ class ValidationReport:
                     "ruleName": r.rule_name,
                     "description": r.description,
                     "isIdsRule": r.is_ids_rule,
+                    "idsSource": r.ids_source,
                     "thresholdPass": r.threshold_pass,
                     "thresholdWarn": r.threshold_warn,
                     "domain": r.domain,
@@ -146,6 +166,7 @@ class ValidationReport:
                     "message": r.message,
                     "examples": r.examples[:5],  # Limit examples
                     "recommendations": r.recommendations,
+                    "facetDetails": r.facet_details,
                 }
                 for r in self.results
             ]
@@ -406,21 +427,33 @@ def build_ids_specifications() -> ids.Ids:
 class IFCValidator:
     """
     Main validation runner that combines IDS rules and custom coverage metrics.
+    
+    Supports:
+    - Built-in programmatic IDS rules
+    - External IDS file validation (loaded from ids_templates/)
+    - Custom coverage-based validation rules
     """
     
-    def __init__(self, ifc_path: str | Path):
+    def __init__(self, ifc_path: str | Path, job_id: Optional[str] = None):
         self.ifc_path = Path(ifc_path)
+        self.job_id = job_id
         self.model: Optional[ifcopenshell.file] = None
         self.ids_specs = build_ids_specifications()
         self.report = ValidationReport()
+        
+        # External IDS results
+        self.external_ids_results: list[IDSValidationResult] = []
         
         # Cached analysis results
         self._hvac_analysis: Optional[dict] = None
         self._ec_data: Optional[Any] = None
     
-    def validate(self) -> ValidationReport:
+    def validate(self, include_external_ids: bool = True) -> ValidationReport:
         """
         Run all validation checks and return a complete report.
+        
+        Args:
+            include_external_ids: Whether to load and validate against external IDS files
         """
         # Load IFC file
         self.model = ifcopenshell.open(str(self.ifc_path))
@@ -429,10 +462,10 @@ class IFCValidator:
         self.report.ifc_filename = self.ifc_path.name
         self.report.ifc_schema = self.model.schema
         
-        # Run IDS validation
+        # Run IDS validation (built-in)
         self.ids_specs.validate(self.model)
         
-        # Run all rules
+        # Run all built-in rules
         for rule in ALL_RULES:
             result = self._evaluate_rule(rule)
             self.report.results.append(result)
@@ -444,6 +477,10 @@ class IFCValidator:
                 self.report.warn_count += 1
             elif result.severity == Severity.FAIL:
                 self.report.fail_count += 1
+        
+        # Load and validate against external IDS files
+        if include_external_ids and self.job_id:
+            self._validate_external_ids()
         
         # Determine overall status
         if self.report.fail_count > 0:
@@ -457,6 +494,150 @@ class IFCValidator:
         self._build_domain_summaries()
         
         return self.report
+    
+    def _validate_external_ids(self):
+        """Load and validate against external IDS files."""
+        if not self.job_id:
+            return
+        
+        try:
+            external_ids_list = load_all_ids_for_job(self.job_id, include_defaults=True)
+            
+            for ids_obj in external_ids_list:
+                try:
+                    ids_result = validate_ifc_against_ids(
+                        self.model,
+                        ids_obj,
+                        self.ifc_path.name
+                    )
+                    self.external_ids_results.append(ids_result)
+                    
+                    # Convert IDS results to RuleResults and add to report
+                    for spec_result in ids_result.spec_results:
+                        rule_result = self._convert_ids_spec_to_rule_result(
+                            spec_result,
+                            ids_result.ids_title
+                        )
+                        self.report.results.append(rule_result)
+                        
+                        # Update counts
+                        if rule_result.severity == Severity.PASS:
+                            self.report.pass_count += 1
+                        elif rule_result.severity == Severity.WARN:
+                            self.report.warn_count += 1
+                        elif rule_result.severity == Severity.FAIL:
+                            self.report.fail_count += 1
+                            
+                except Exception as e:
+                    print(f"Error validating against IDS: {e}")
+                    
+        except Exception as e:
+            print(f"Error loading external IDS files: {e}")
+    
+    def _convert_ids_spec_to_rule_result(self, spec_result, ids_title: str) -> RuleResult:
+        """Convert an IDS specification result to a RuleResult."""
+        # Determine domain from spec
+        domain = self._infer_domain_from_spec_name(spec_result.spec_name)
+        
+        # Determine severity
+        if spec_result.passed:
+            severity = Severity.PASS
+        elif spec_result.optionality == "optional":
+            severity = Severity.WARN
+        else:
+            severity = Severity.FAIL
+        
+        # Calculate coverage
+        coverage = 100.0
+        if spec_result.applicable_count > 0:
+            coverage = ((spec_result.applicable_count - spec_result.failed_count) /
+                       spec_result.applicable_count * 100)
+        
+        # Build facet details
+        facet_details = [
+            {
+                "type": fr.facet_type,
+                "name": fr.facet_name,
+                "passed": fr.passed,
+                "details": fr.details,
+            }
+            for fr in spec_result.facet_results
+        ]
+        
+        return RuleResult(
+            rule_id=f"IDS-{spec_result.spec_name[:15]}",
+            rule_name=spec_result.spec_name,
+            domain=domain,
+            severity=severity,
+            passed=spec_result.passed,
+            description=spec_result.spec_description or f"IDS rule from {ids_title}",
+            is_ids_rule=True,
+            ids_source="external",
+            threshold_pass=100.0,
+            threshold_warn=50.0,
+            total_count=spec_result.applicable_count,
+            pass_count=spec_result.applicable_count - spec_result.failed_count,
+            fail_count=spec_result.failed_count,
+            coverage_percent=coverage,
+            message=self._build_ids_message(spec_result),
+            examples=spec_result.failed_entities[:5],
+            recommendations=self._build_ids_recommendations(spec_result),
+            facet_details=facet_details,
+        )
+    
+    def _infer_domain_from_spec_name(self, spec_name: str) -> str:
+        """Infer domain from specification name."""
+        name_lower = spec_name.lower()
+        
+        if any(kw in name_lower for kw in ["project", "storey", "building", "site", "element"]):
+            return Domain.CORE.value
+        elif any(kw in name_lower for kw in ["hvac", "terminal", "space", "zone", "system", "duct"]):
+            return Domain.HVAC_FM.value
+        elif any(kw in name_lower for kw in ["material", "carbon", "wall", "slab", "column", "beam"]):
+            return Domain.EC.value
+        elif any(kw in name_lower for kw in ["occupancy", "area", "person", "room"]):
+            return Domain.OCCUPANCY.value
+        return Domain.CORE.value
+    
+    def _build_ids_message(self, spec_result) -> str:
+        """Build a user-friendly message from IDS spec result."""
+        if spec_result.passed:
+            return f"Passed: {spec_result.applicable_count} entities meet requirements"
+        else:
+            return (
+                f"Failed: {spec_result.failed_count}/{spec_result.applicable_count} "
+                f"entities did not meet requirements"
+            )
+    
+    def _build_ids_recommendations(self, spec_result) -> list[str]:
+        """Build recommendations from IDS spec failure."""
+        if spec_result.passed:
+            return []
+        
+        recommendations = []
+        
+        for facet in spec_result.facet_results:
+            if not facet.passed:
+                if facet.facet_type == "property":
+                    pset = facet.details.get("propertySet", "")
+                    prop = facet.details.get("baseName", facet.facet_name)
+                    recommendations.append(
+                        f"Add property '{prop}' in property set '{pset}'"
+                    )
+                elif facet.facet_type == "attribute":
+                    recommendations.append(
+                        f"Ensure '{facet.facet_name}' attribute is set"
+                    )
+                elif facet.facet_type == "material":
+                    recommendations.append("Assign materials to elements")
+                elif facet.facet_type == "classification":
+                    system = facet.details.get("system", "")
+                    recommendations.append(f"Add classification from '{system}'")
+        
+        if not recommendations:
+            recommendations.append(f"Review: {spec_result.spec_name}")
+        
+        return recommendations[:3]
     
     def _evaluate_rule(self, rule: ValidationRule) -> RuleResult:
         """Evaluate a single validation rule."""
@@ -891,32 +1072,45 @@ class IFCValidator:
 # Public API
 # =============================================================================
 
-def validate_ifc(ifc_path: str | Path) -> ValidationReport:
+def validate_ifc(
+    ifc_path: str | Path,
+    job_id: Optional[str] = None,
+    include_external_ids: bool = True
+) -> ValidationReport:
     """
     Validate an IFC file and return a validation report.
     
     Args:
         ifc_path: Path to the IFC file
+        job_id: Optional job ID for loading job-specific IDS files
+        include_external_ids: Whether to include external IDS file validation
         
     Returns:
         ValidationReport with all rule results
     """
-    validator = IFCValidator(ifc_path)
-    return validator.validate()
+    validator = IFCValidator(ifc_path, job_id=job_id)
+    return validator.validate(include_external_ids=include_external_ids)
 
 
-def validate_ifc_to_json(ifc_path: str | Path, output_path: Optional[str | Path] = None) -> dict:
+def validate_ifc_to_json(
+    ifc_path: str | Path,
+    output_path: Optional[str | Path] = None,
+    job_id: Optional[str] = None,
+    include_external_ids: bool = True
+) -> dict:
     """
     Validate an IFC file and return/save results as JSON.
     
     Args:
         ifc_path: Path to the IFC file
         output_path: Optional path to save validation.json
+        job_id: Optional job ID for loading job-specific IDS files
+        include_external_ids: Whether to include external IDS file validation
         
     Returns:
         Validation report as dictionary
     """
-    report = validate_ifc(ifc_path)
+    report = validate_ifc(ifc_path, job_id=job_id, include_external_ids=include_external_ids)
     report_dict = report.to_dict()
     
     if output_path:
