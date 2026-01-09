@@ -64,6 +64,15 @@ const createShapeFromFootprint = (footprint) => {
  * SpaceFootprintMesh - Renders a single space as an extruded footprint
  */
 function SpaceFootprintMesh({ space, material, onSelect, occupancyData }) {
+  const transformMatrix = useMemo(() => {
+    if (space?.transform && Array.isArray(space.transform) && space.transform.length === 16) {
+      const matrix = new THREE.Matrix4()
+      matrix.fromArray(space.transform)
+      return matrix
+    }
+    return null
+  }, [space?.transform])
+
   const geometry = useMemo(() => {
     // If footprint exists, use it; otherwise fall back to bbox
     if (space.footprint && space.footprint.length >= 3) {
@@ -145,7 +154,10 @@ function SpaceFootprintMesh({ space, material, onSelect, occupancyData }) {
   const label = getSpaceLabel(space, occupancyData)
 
   return (
-    <group>
+    <group
+      matrixAutoUpdate={!!transformMatrix ? false : true}
+      matrix={transformMatrix ?? undefined}
+    >
       <mesh
         geometry={geometry}
         material={material}

@@ -3,6 +3,7 @@
 Web BIM viewer and embodied carbon analysis tool (FastAPI backend + React/Three.js frontend).
 
 Web app documentation: `docs/WEB_APP.md`.
+Architecture docs: `ARCHITECTURE.md`, `SYSTEM_MAP.md`, and validation details in `docs/VALIDATION.md`.
 
 ## Refactor Notes (App.jsx)
 - `frontend/src/App.jsx` is now a thin orchestrator that wires hooks and UI shells.

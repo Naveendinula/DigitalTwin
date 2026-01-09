@@ -7,7 +7,7 @@
 ## Recent additions / changes
 
 - **Date:** 2026-01-06
-- **IFC validation pipeline:** Added IDS + coverage validation (`backend/ifc_validation.py`, `backend/validation_api.py`) with cached `validation.json` generated during upload.
+- **IFC validation pipeline:** Added IDS + coverage validation (`backend/ifc_validation.py`, `backend/validation_api.py`) with cached `validation.json` generated during upload; surfaced via `ValidationBadge` + `ValidationReportModal`.
 - **Validation UI:** Added `ValidationBadge` in the header and `ValidationReportModal` for detailed reports.
 
 - **Date:** 2025-12-31
@@ -76,6 +76,11 @@ The system bridges the gap between complex BIM files and accessible web visualiz
 *   `prac-database.csv`: The reference database for material carbon factors.
 *   `uploads/`: Storage for raw uploaded IFC files.
 *   `output/`: Storage for processed artifacts (GLB, JSON including validation).
+
+#### Validation flow (backend)
+1) Upload completes and writes the raw IFC to `uploads/{job_id}.ifc`.
+2) `validation_api.py` triggers `ifc_validation.py` to run IDS + coverage rules; results are cached to `output/{job_id}/validation.json`.
+3) Clients fetch `GET /validation/{job_id}/summary` (badge) or `GET /validation/{job_id}` (full report); domain slices are available at `/validation/{job_id}/domain/{domain}`.
 
 ### Frontend (`/frontend`)
 *   `src/main.jsx`: **Entrypoint**. Bootstraps the React application.

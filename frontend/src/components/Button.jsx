@@ -80,8 +80,15 @@ const buttonStyles = `
           color: #1d1d1f;
           cursor: pointer;
           user-select: none;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08),
-                      0 1px 2px rgba(0, 0, 0, 0.06);
+          box-shadow: 
+            rgb(255, 255, 255) 1px 1px 1px 0px inset,
+            rgba(0, 0, 0, 0.15) -1px -1px 1px 0px inset,
+            rgba(0, 0, 0, 0.26) 0.444584px 0.444584px 0.628737px -1px,
+            rgba(0, 0, 0, 0.247) 1.21072px 1.21072px 1.71222px -1.5px,
+            rgba(0, 0, 0, 0.23) 2.6583px 2.6583px 3.75941px -2.25px,
+            rgba(0, 0, 0, 0.192) 5.90083px 5.90083px 8.34503px -3px,
+            rgba(0, 0, 0, 0.056) 10px 10px 21.2132px -3.75px,
+            -0.5px -0.5px 0 0 rgb(0 0 0 / 5%);
           transition: all 0.2s ease;
           font-family: inherit;
           font-size: 13px;
@@ -89,25 +96,27 @@ const buttonStyles = `
           outline: none;
           position: relative;
           min-width: 80px;
-          border: 1px solid rgba(0, 0, 0, 0.04);
+          border: none;
         }
 
-        /* Hover State */
+        /* Hover State - Minimal change to preserve heavy shadow */
         .tactile-btn:hover:not([data-disabled="true"]) {
-          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12),
-                      0 2px 4px rgba(0, 0, 0, 0.08);
-          transform: translateY(-1px);
           background: #fafafa;
         }
 
         /* Active/Selected State */
         .tactile-btn:active,
         .tactile-btn[data-selected="true"] {
-          box-shadow: inset 0.5px 0.5px 1px #fff, inset -0.5px -0.5px 1px #00000026,
+          background: #eaeaea;
+          transform: scale(0.98);
+          box-shadow: 
+            inset 0.5px 0.5px 1px #fff, 
+            inset -0.5px -0.5px 1px #00000026,
             0.222px 0.222px 0.314px -0.5px #0003,
             0.605px 0.605px 0.856px -1px #0000002e,
             1.329px 1.329px 1.88px -1.5px #00000040,
-            2.95px 2.95px 4.172px -2px #0000001a, 2.5px 2.5px 3px -2.5px #00000026,
+            2.95px 2.95px 4.172px -2px #0000001a, 
+            2.5px 2.5px 3px -2.5px #00000026,
             -0.5px -0.5px 0 0 rgb(0 0 0 / 10%);
         }
 

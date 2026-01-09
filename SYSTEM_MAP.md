@@ -247,10 +247,10 @@ sequenceDiagram
     participant FS as File System
 
     User->>UI: Open validation report
-    UI->>API: GET /validation/{job_id}/summary
+    UI->>API: GET /validation/{job_id}/summary (badge)
     API->>FS: Read validation.json (cached)
     API-->>UI: Summary
-    UI->>API: GET /validation/{job_id}
+    UI->>API: GET /validation/{job_id} (modal)
     API->>FS: Read validation.json (cached)
     API-->>UI: Full report
 ```

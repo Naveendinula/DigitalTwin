@@ -551,32 +551,51 @@ const styles = {
   },
 
   domainGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(2, 1fr)',
-    gap: '8px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
   },
 
   domainBtn: {
     width: '100%',
     padding: '14px 14px 12px',
-    background: '#ffffff',
-    border: '1px solid rgba(0, 0, 0, 0.06)',
-    borderRadius: '10px',
+    background: '#f4f4f4',
+    border: 'none',
+    borderRadius: '12px',
     cursor: 'pointer',
     textAlign: 'left',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
-    transition: 'all 0.15s ease',
+    boxShadow: `
+      rgb(255, 255, 255) 1px 1px 1px 0px inset,
+      rgba(0, 0, 0, 0.15) -1px -1px 1px 0px inset,
+      rgba(0, 0, 0, 0.26) 0.444584px 0.444584px 0.628737px -1px,
+      rgba(0, 0, 0, 0.247) 1.21072px 1.21072px 1.71222px -1.5px,
+      rgba(0, 0, 0, 0.23) 2.6583px 2.6583px 3.75941px -2.25px,
+      rgba(0, 0, 0, 0.192) 5.90083px 5.90083px 8.34503px -3px,
+      rgba(0, 0, 0, 0.056) 10px 10px 21.2132px -3.75px,
+      -0.5px -0.5px 0 0 rgb(0 0 0 / 5%)
+    `,
+    transition: 'all 0.2s ease',
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'space-between',
     minHeight: '90px',
     position: 'relative',
+    userSelect: 'none',
   },
 
   domainBtnActive: {
-    backgroundColor: '#ffffff',
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
-    borderColor: 'rgba(0, 0, 0, 0.1)',
+    background: '#eaeaea',
+    transform: 'scale(0.98)',
+    boxShadow: `
+      inset 0.5px 0.5px 1px #fff, 
+      inset -0.5px -0.5px 1px #00000026,
+      0.222px 0.222px 0.314px -0.5px #0003,
+      0.605px 0.605px 0.856px -1px #0000002e,
+      1.329px 1.329px 1.88px -1.5px #00000040,
+      2.95px 2.95px 4.172px -2px #0000001a, 
+      2.5px 2.5px 3px -2.5px #00000026,
+      -0.5px -0.5px 0 0 rgb(0 0 0 / 10%)
+    `,
   },
 
   domainBtnTop: {
