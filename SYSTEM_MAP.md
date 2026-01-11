@@ -34,14 +34,12 @@ graph TD
         ECCalc[EC Calculator]
         HvacCore["HVAC/FM Core"]
         SpaceBBox["Space BBox Extractor"]
-        Validator["IFC Validator"]
         
         Router --> IFCConv
         Router --> MetaExt
         Router --> ECCalc
         Router --> HvacCore
         Router --> SpaceBBox
-        Router --> Validator
         Router --> OccSim["Occupancy Simulator"]
     end
 
@@ -52,7 +50,6 @@ graph TD
         ECDB["EC Database (CSV)"]
         HVACJson[HVAC/FM JSON]
         SpaceBBoxJson[Space BBoxes + Transform JSON]
-        ValidationJson[Validation JSON]
         
         IFCConv -- Reads --> IFCFiles
         IFCConv -- Writes --> GLBFiles
@@ -68,8 +65,6 @@ graph TD
 
         SpaceBBox -- Reads --> IFCFiles
         SpaceBBox -- Writes --> SpaceBBoxJson
-
-        Validator -- Writes --> ValidationJson
 
         OccSim -- Reads --> SpaceBBoxJson
         OccSim -- Writes --> OccJson[Occupancy JSON]
@@ -89,8 +84,6 @@ graph LR
         API[ec_api.py]
         FmCore[fm_hvac_core.py]
         FmAPI[fm_api.py]
-        ValCore[ifc_validation.py]
-        ValAPI[validation_api.py]
         DB[prac-database.csv]
         Uploads[uploads/]
         Output[output/]
@@ -100,8 +93,6 @@ graph LR
         BE --> API
         BE --> FmCore
         BE --> FmAPI
-        BE --> ValCore
-        BE --> ValAPI
         OccSim2[occupancy_sim.py]
         BE --> OccSim2
         BE --> DB
@@ -118,8 +109,6 @@ graph LR
         HvacPanel[HvacFmPanel.jsx]
         SpaceOverlay[SpaceBboxOverlay.jsx]
         SpaceNav[SpaceNavigator.jsx]
-        ValBadge[ValidationBadge.jsx]
-        ValModal[ValidationReportModal.jsx]
         
         FE --> Src
         Src --> Comps
@@ -128,8 +117,6 @@ graph LR
         Comps --> HvacPanel
         Comps --> SpaceOverlay
         Comps --> SpaceNav
-        Comps --> ValBadge
-        Comps --> ValModal
         OccLegend[OccupancyLegend.jsx]
         OccPanel[OccupancyPanel.jsx]
         Comps --> OccLegend
@@ -150,7 +137,6 @@ sequenceDiagram
     participant API as Backend API
     participant FS as File System
     participant Conv as IfcConvert
-    participant Val as IFC Validator
     
     User->>UI: Upload IFC File
     UI->>API: POST /upload
@@ -158,8 +144,6 @@ sequenceDiagram
     API->>Conv: Trigger Conversion
     Conv->>FS: Read .ifc
     Conv->>FS: Write .glb
-    API->>Val: Run validation
-    Val->>FS: Write validation.json
     API-->>UI: Return Job ID
 ```
 
@@ -236,21 +220,4 @@ sequenceDiagram
         API-->>UI: Updated JSON
         UI->>User: Update colors + counts
     end
-```
-
-### 6. Validation Report
-```mermaid
-sequenceDiagram
-    participant User
-    participant UI as Frontend
-    participant API as Backend API
-    participant FS as File System
-
-    User->>UI: Open validation report
-    UI->>API: GET /validation/{job_id}/summary (badge)
-    API->>FS: Read validation.json (cached)
-    API-->>UI: Summary
-    UI->>API: GET /validation/{job_id} (modal)
-    API->>FS: Read validation.json (cached)
-    API-->>UI: Full report
 ```

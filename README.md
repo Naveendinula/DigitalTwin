@@ -3,7 +3,7 @@
 Web BIM viewer and embodied carbon analysis tool (FastAPI backend + React/Three.js frontend).
 
 Web app documentation: `docs/WEB_APP.md`.
-Architecture docs: `ARCHITECTURE.md`, `SYSTEM_MAP.md`, and validation details in `docs/VALIDATION.md`.
+Architecture docs: `ARCHITECTURE.md` and `SYSTEM_MAP.md`.
 
 ## Refactor Notes (App.jsx)
 - `frontend/src/App.jsx` is now a thin orchestrator that wires hooks and UI shells.
@@ -57,7 +57,6 @@ https://github.com/user-attachments/assets/13ed555d-da2b-4b52-ab9b-3861132c5abe
 - Embodied carbon calculation with override UI (`frontend/src/components/EcPanel.jsx`) backed by FastAPI (`backend/ec_api.py`, `backend/ec_core.py`).
 - HVAC/FM analysis panel with served terminals/spaces, filters, and selection-driven highlights (`frontend/src/components/HvacFmPanel.jsx`) backed by FastAPI (`backend/fm_api.py`, `backend/fm_hvac_core.py`).
 - Space bbox overlay toggle and navigator for translucent room boxes (`frontend/src/components/SpaceBboxOverlay.jsx`, `frontend/src/components/SpaceNavigator.jsx`, `backend/fm_api.py`).
-- IFC validation status badge and full report modal backed by IDS + coverage rules (`frontend/src/components/ValidationBadge.jsx`, `frontend/src/components/ValidationReportModal.jsx`, `backend/ifc_validation.py`, `backend/validation_api.py`).
 - Live occupancy simulation with time-based patterns and heatmap visualization (`frontend/src/components/OccupancyPanel.jsx`, `frontend/src/components/OccupancyLegend.jsx`, `backend/occupancy_sim.py`).
 
 ## Run locally
@@ -76,13 +75,6 @@ npm run dev
 ```
 
 ## API (backend)
-- `GET /validation/{job_id}` - full validation report (cached as `validation.json`).
-- `GET /validation/{job_id}/summary` - concise status and counts.
-- `GET /validation/{job_id}/domain/{domain}` - domain-only results (`core`, `hvac_fm`, `ec`, `occupancy`).
-- `GET /validation/{job_id}/issues` - non-passing rules with optional filters.
-- `POST /validation/{job_id}/revalidate` - force re-run validation.
-- `GET /validation/{job_id}/feature-readiness` - per-domain readiness summary.
-- `GET /validation/rules/list` - list validation rules.
 - `POST /upload` — upload an IFC for processing.
 - `GET /job/{job_id}` — check job status and output URLs.
 - `GET /jobs` — list jobs.
@@ -100,7 +92,6 @@ Notes:
 - HVAC/FM output includes served spaces with `room_no`, `room_name`, and grouped system names when available.
 - Space bbox output includes local `bbox` plus a `transform` matrix for model-aligned overlays.
 - Occupancy simulation uses absolute headcount as canonical data; percentage is derived for UX display.
-- Validation reports are saved as `output/{job_id}/validation.json` and surfaced via job `validation_status` and `validation_url`.
 
 ## Media assets
 - Final clips live in `frontend/public/media/mp4/`, posters in `frontend/public/media/posters/`. See `frontend/public/media/README.md` for encoding settings and naming.

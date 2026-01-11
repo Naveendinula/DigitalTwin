@@ -3,7 +3,6 @@ import AppHeader from './components/AppHeader'
 import PropertyPanel from './components/PropertyPanel'
 import StructureTree from './components/StructureTree'
 import UploadPanel from './components/UploadPanel'
-import ValidationReportModal from './components/ValidationReportModal'
 import ViewerShell from './components/ViewerShell'
 import { useToast } from './components/Toast'
 import useKeyboardShortcuts from './hooks/useKeyboardShortcuts'
@@ -36,9 +35,6 @@ function App() {
   // Panel visibility state
   const [structureTreeVisible, setStructureTreeVisible] = useState(true)
   const [propertiesPanelVisible, setPropertiesPanelVisible] = useState(true)
-
-  // Validation report modal state
-  const [validationModalOpen, setValidationModalOpen] = useState(false)
 
   const selection = useSelection()
   const visibility = useVisibility()
@@ -139,7 +135,6 @@ function App() {
   const handleResetModel = useCallback(() => {
     setModelUrls(null)
     setJobId(null)
-    setValidationModalOpen(false)
     floatingPanels.handleCloseEcPanel()
     floatingPanels.handleCloseHvacPanel()
     spaceOverlay.disableSpaceOverlay()
@@ -148,15 +143,6 @@ function App() {
     setGeometryHidden(false)
     handleClearAll()
   }, [floatingPanels.handleCloseEcPanel, floatingPanels.handleCloseHvacPanel, spaceOverlay.disableSpaceOverlay, occupancy.disable, handleClearAll])
-
-  // Validation modal handlers
-  const handleOpenValidationReport = () => {
-    setValidationModalOpen(true)
-  }
-
-  const handleCloseValidationReport = () => {
-    setValidationModalOpen(false)
-  }
 
   /**
    * Toggle occupancy mode and panel
@@ -212,15 +198,6 @@ function App() {
       <AppHeader 
         filename={modelUrls?.filename}
         ifcSchema={modelUrls?.ifcSchema}
-        jobId={jobId}
-        onOpenValidationReport={handleOpenValidationReport}
-      />
-
-      {/* Validation Report Modal */}
-      <ValidationReportModal
-        isOpen={validationModalOpen}
-        onClose={handleCloseValidationReport}
-        jobId={jobId}
       />
 
       <div style={appStyles.mainContent}>

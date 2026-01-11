@@ -172,15 +172,15 @@ const appStyles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: '#ffffff',
-    border: '1px solid rgba(0, 0, 0, 0.08)',
+    background: '#f1f1f3',
+    border: '1px solid rgba(0, 0, 0, 0.16)',
     borderRadius: '0 8px 8px 0',
     cursor: 'pointer',
-    color: '#86868b',
+    color: '#4b4b4f',
     zIndex: 50,
     transition: 'all 0.2s ease',
-    boxShadow: '2px 0 8px rgba(0, 0, 0, 0.06)',
-    opacity: 0.4,
+    boxShadow: '2px 0 10px rgba(0, 0, 0, 0.12)',
+    opacity: 0.85,
   },
   panelToggleLeft: {
     left: 0,
@@ -194,7 +194,7 @@ const appStyles = {
     borderRight: 'none',
   },
   panelToggleHidden: {
-    opacity: 0.6,
+    opacity: 1,
   },
 }
 

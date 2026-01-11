@@ -1,21 +1,13 @@
 # Architecture Documentation
 
 > **Status**: Living Document  
-> **Last Updated**: January 8, 2026  
+> **Last Updated**: January 11, 2026  
 > **Owner**: Naveen Panditharatne
 
 ## Recent additions / changes
 
-- **Date:** 2026-01-08
-- **IDS External File Support:** Added full IDS (Information Delivery Specification) file loading and validation support per buildingSMART guidelines. Users can upload `.ids` XML files per job or use default templates. The system validates IFC against IDS specifications with full facet support (Entity, Property, Attribute, Classification, Material, PartOf).
-- **New Module:** `backend/ids_manager.py` handles IDS file storage, loading, XML validation, and result conversion.
-- **IDS API Endpoints:** Added endpoints for listing, uploading, deleting IDS files and running IDS-specific validation (`/validation/{job_id}/ids/*`).
-- **Frontend Updates:** `ValidationReportModal` now displays IDS facet details with visual indicators for external vs builtin IDS rules.
-- **IDS Templates:** Default templates stored in `backend/ids_templates/default/`; per-job uploads in `backend/ids_templates/uploaded/{job_id}/`.
-
-- **Date:** 2026-01-06
-- **IFC validation pipeline:** Added IDS + coverage validation (`backend/ifc_validation.py`, `backend/validation_api.py`) with cached `validation.json` generated during upload; surfaced via `ValidationBadge` + `ValidationReportModal`.
-- **Validation UI:** Added `ValidationBadge` in the header and `ValidationReportModal` for detailed reports.
+- **Date:** 2026-01-11
+- **IFC Validation:** Added a minimal `ifc_validation.py` module so `/validation/{job_id}` endpoints can return reports again.
 
 - **Date:** 2025-12-31
 - **Live Occupancy Simulation:** Added synthetic occupancy data generation with time-based patterns (6am–10pm schedule), random walk with mean reversion, and capacity estimation (~10m²/person).
@@ -47,8 +39,7 @@ The system bridges the gap between complex BIM files and accessible web visualiz
 
 ## 2. Key User Journeys
 
-*   **Upload & Process**: A user uploads an `.ifc` file. The system validates it, saves it, and triggers background processes to convert geometry (GLB) and extract metadata (JSON).
-*   **Validation Report**: The user reviews the validation badge and detailed report for IDS rules and domain coverage.
+*   **Upload & Process**: A user uploads an `.ifc` file. The system saves it and triggers background processes to convert geometry (GLB) and extract metadata (JSON).
 *   **3D Visualization**: The user views the 3D model in the browser, navigating via orbit/pan/zoom controls.
 *   **Element Inspection**: Clicking a 3D element reveals its specific BIM properties (Psets, quantities, materials) in a side panel.
 *   **Embodied Carbon Analysis**: The user triggers an EC calculation. The system maps model materials to a backend database (`prac-database.csv`) and visualizes the carbon footprint (kgCO2e) per element and in aggregate.
@@ -70,9 +61,10 @@ The system bridges the gap between complex BIM files and accessible web visualiz
 *   `ec_api.py`: API router specifically for Embodied Carbon endpoints.
 *   `ec_core.py`: Orchestrator for EC calculations.
 *   `fm_api.py`: API router for HVAC/FM analysis, space bbox, and occupancy simulation endpoints.
-*   `validation_api.py`: API router for validation endpoints and cached reports.
-*   `ifc_validation.py`: IDS + coverage validation rules and report builder.
 *   `fm_hvac_core.py`: HVAC/FM core logic (equipment -> terminals -> spaces).
+*   `validation_api.py`: API router for IFC validation and IDS file workflows.
+*   `ifc_validation.py`: Minimal IFC rule checks and report summaries used by validation endpoints.
+*   `ids_manager.py`: IDS file management and two-gate validation (Gate 1 XSD schema, Gate 2 ifctester).
 *   `occupancy_sim.py`: Synthetic occupancy data generation with time-based patterns.
 *   `domain/`:
     *   `materials.py`: Material classification and extraction logic.
@@ -82,12 +74,7 @@ The system bridges the gap between complex BIM files and accessible web visualiz
 *   `ifc_spatial_hierarchy.py`: Extracts the building tree (Site -> Building -> Storey -> Space -> Element).
 *   `prac-database.csv`: The reference database for material carbon factors.
 *   `uploads/`: Storage for raw uploaded IFC files.
-*   `output/`: Storage for processed artifacts (GLB, JSON including validation).
-
-#### Validation flow (backend)
-1) Upload completes and writes the raw IFC to `uploads/{job_id}.ifc`.
-2) `validation_api.py` triggers `ifc_validation.py` to run IDS + coverage rules; results are cached to `output/{job_id}/validation.json`.
-3) Clients fetch `GET /validation/{job_id}/summary` (badge) or `GET /validation/{job_id}` (full report); domain slices are available at `/validation/{job_id}/domain/{domain}`.
+*   `output/`: Storage for processed artifacts (GLB, JSON).
 
 ### Frontend (`/frontend`)
 *   `src/main.jsx`: **Entrypoint**. Bootstraps the React application.
@@ -96,8 +83,6 @@ The system bridges the gap between complex BIM files and accessible web visualiz
 *   `src/components/HvacFmPanel.jsx`: UI for HVAC/FM analysis results and filters.
 *   `src/components/SpaceBboxOverlay.jsx`: Renders space bbox overlays in the viewer (with optional occupancy heatmap).
 *   `src/components/SpaceNavigator.jsx`: Cycles and highlights spaces when overlays are enabled.
-*   `src/components/ValidationBadge.jsx`: Header badge showing validation status.
-*   `src/components/ValidationReportModal.jsx`: Modal for detailed validation results and recommendations.
 *   `src/components/OccupancyLegend.jsx`: Floating legend showing live occupancy totals and color scale.
 *   `src/components/OccupancyPanel.jsx`: Draggable panel with sortable/filterable occupancy breakdown.
 *   `src/hooks/useOccupancy.js`: Hook managing occupancy polling and state.
@@ -131,20 +116,16 @@ graph TB
         ECCore["EC Calculator"]
         HvacCore["HVAC/FM Core"]
         SpaceBBox["Space BBox Extractor"]
-        Validator["IFC Validator"]
-        IDSMgr["IDS Manager"]
         OccSim["Occupancy Simulator"]
     end
 
     subgraph Storage
         Uploads["./uploads"]
         Outputs["./output"]
-        IDSTemplates["./ids_templates"]
         ECDB["prac-database.csv"]
     end
 
     UI -->|Uploads IFC| Server
-    UI -->|Uploads IDS| Server
     UI -->|Requests Metadata| Server
     UI -->|Requests EC Calc| Server
     Viewer -->|Loads GLB| Server
@@ -155,7 +136,6 @@ graph TB
     Server -->|Calls| ECCore
     Server -->|Calls| HvacCore
     Server -->|Calls| SpaceBBox
-    Server -->|Calls| Validator
     Server -->|Calls| OccSim
 
     Converter -->|Reads| Uploads
@@ -172,8 +152,6 @@ graph TB
 
     SpaceBBox -->|Reads| Uploads
     SpaceBBox -->|Writes JSON| Outputs
-
-    Validator -->|Writes JSON| Outputs
 ```
 
 ### Data Flow: Embodied Carbon Calculation
@@ -200,13 +178,6 @@ graph TB
 3.  **Cache**: Result JSON (bbox + transform) is written to `output/{jobId}/space_bboxes.json`.
 4.  **Render**: Frontend applies the transform and overlays translucent boxes in `SpaceBboxOverlay`.
 
-### Data Flow: IFC Validation
-1.  **Trigger**: Upload processing runs validation after conversion and metadata extraction.
-2.  **Validate**: `ifc_validation.py` evaluates IDS rules and domain coverage metrics.
-3.  **Cache**: Report is saved to `output/{jobId}/validation.json`.
-4.  **Fetch**: `validation_api.py` serves cached results via `GET /validation/{jobId}` and summary via `GET /validation/{jobId}/summary`.
-5.  **Render**: `ValidationBadge` and `ValidationReportModal` display status and details.
-
 ### Data Flow: Occupancy Simulation
 1.  **Enable**: User toggles "Occupancy" in toolbar; `useOccupancy` hook activates.
 2.  **Initial Fetch**: Frontend sends `GET /api/occupancy/{jobId}` to get current snapshot.
@@ -222,7 +193,6 @@ graph TB
 *   **IfcOpenShell**: Parsing and manipulating IFC files.
 *   **Pandas**: Data manipulation for the EC database and material merging.
 *   **IfcConvert**: External executable (must be present in `backend/`) for geometry conversion.
-*   **ifctester**: IDS validation engine used by IFC validation.
 
 ### Frontend
 *   **React**: UI library.

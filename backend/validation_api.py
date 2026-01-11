@@ -17,24 +17,62 @@ from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel
 
 from config import UPLOAD_DIR, OUTPUT_DIR
-from ifc_validation import (
-    validate_ifc_to_json,
-    get_validation_summary,
-    ValidationReport,
-    Severity,
-)
-from ids_manager import (
-    save_uploaded_ids,
-    delete_uploaded_ids,
-    list_uploaded_ids_files,
-    list_default_ids_files,
-    get_ids_info,
-    validate_ids_xml_structure,
-    load_ids_file,
-    validate_ifc_against_ids,
-    list_all_ids_templates,
-    get_job_ids_dir,
-)
+_IFC_VALIDATION_AVAILABLE = True
+_IFC_VALIDATION_IMPORT_ERROR: Optional[Exception] = None
+try:
+    from ifc_validation import (
+        validate_ifc_to_json,
+        get_validation_summary,
+        ValidationReport,
+        Severity,
+    )
+except ModuleNotFoundError as exc:
+    _IFC_VALIDATION_AVAILABLE = False
+    _IFC_VALIDATION_IMPORT_ERROR = exc
+    validate_ifc_to_json = None  # type: ignore[assignment]
+    get_validation_summary = None  # type: ignore[assignment]
+    ValidationReport = None  # type: ignore[assignment]
+    Severity = None  # type: ignore[assignment]
+
+_IDS_MANAGER_AVAILABLE = True
+_IDS_MANAGER_IMPORT_ERROR: Optional[Exception] = None
+try:
+    from ids_manager import (
+        save_uploaded_ids,
+        delete_uploaded_ids,
+        list_uploaded_ids_files,
+        list_default_ids_files,
+        get_ids_info,
+        validate_ids_xml_structure,
+        load_ids_file,
+        validate_ifc_against_ids,
+        list_all_ids_templates,
+        get_job_ids_dir,
+        # New multi-gate validation
+        validate_ids_file,
+        validate_file_security,
+        load_audit_result,
+        IdsAuditResult,
+        MAX_IDS_FILE_SIZE,
+    )
+except ModuleNotFoundError as exc:
+    _IDS_MANAGER_AVAILABLE = False
+    _IDS_MANAGER_IMPORT_ERROR = exc
+    save_uploaded_ids = None  # type: ignore[assignment]
+    delete_uploaded_ids = None  # type: ignore[assignment]
+    list_uploaded_ids_files = None  # type: ignore[assignment]
+    list_default_ids_files = None  # type: ignore[assignment]
+    get_ids_info = None  # type: ignore[assignment]
+    validate_ids_xml_structure = None  # type: ignore[assignment]
+    load_ids_file = None  # type: ignore[assignment]
+    validate_ifc_against_ids = None  # type: ignore[assignment]
+    list_all_ids_templates = None  # type: ignore[assignment]
+    get_job_ids_dir = None  # type: ignore[assignment]
+    validate_ids_file = None  # type: ignore[assignment]
+    validate_file_security = None  # type: ignore[assignment]
+    load_audit_result = None  # type: ignore[assignment]
+    IdsAuditResult = None  # type: ignore[assignment]
+    MAX_IDS_FILE_SIZE = None  # type: ignore[assignment]
 
 router = APIRouter(prefix="/validation", tags=["validation"])
 
@@ -82,6 +120,22 @@ class FullValidationReport(BaseModel):
 # =============================================================================
 # Helper Functions
 # =============================================================================
+
+def _require_ifc_validation() -> None:
+    if not _IFC_VALIDATION_AVAILABLE:
+        detail = "IFC validation dependencies are missing."
+        if _IFC_VALIDATION_IMPORT_ERROR:
+            detail = f"IFC validation dependencies are missing: {_IFC_VALIDATION_IMPORT_ERROR}"
+        raise HTTPException(status_code=503, detail=detail)
+
+
+def _require_ids_manager() -> None:
+    if not _IDS_MANAGER_AVAILABLE:
+        detail = "IDS validation dependencies are missing."
+        if _IDS_MANAGER_IMPORT_ERROR:
+            detail = f"IDS validation dependencies are missing: {_IDS_MANAGER_IMPORT_ERROR}"
+        raise HTTPException(status_code=503, detail=detail)
+
 
 def _find_ifc_for_job(job_id: str) -> Path:
     """Find the IFC file associated with a job ID."""
@@ -142,6 +196,8 @@ async def get_validation_report(job_id: str, force_refresh: bool = False) -> dic
         cached = _load_cached_validation(job_id)
         if cached:
             return cached
+
+    _require_ifc_validation()
     
     # Find and validate IFC file
     try:
@@ -170,6 +226,7 @@ async def get_validation_summary_endpoint(job_id: str) -> dict:
     
     Returns just the status, counts, and critical issues.
     """
+    _require_ifc_validation()
     # Try to get from cache or run validation
     cached = _load_cached_validation(job_id)
     if cached:
@@ -318,6 +375,7 @@ async def list_validation_rules() -> dict:
     
     Useful for documentation and understanding what is being validated.
     """
+    _require_ifc_validation()
     from ifc_validation import ALL_RULES
     
     rules_by_domain = {}
@@ -353,6 +411,7 @@ async def list_ids_templates() -> dict:
     Returns:
         Dictionary with default templates and uploaded templates by job.
     """
+    _require_ids_manager()
     try:
         return list_all_ids_templates()
     except Exception as e:
@@ -364,6 +423,7 @@ async def list_default_templates() -> dict:
     """
     List default IDS templates available for all validations.
     """
+    _require_ids_manager()
     templates = []
     for ids_file in list_default_ids_files():
         info = get_ids_info(ids_file)
@@ -382,17 +442,36 @@ async def list_job_ids_files(job_id: str) -> dict:
     """
     List IDS files uploaded for a specific job.
     
+    Includes validation audit status for each file.
+    
     Args:
         job_id: The job ID
         
     Returns:
-        List of IDS files with their metadata
+        List of IDS files with their metadata and audit status
     """
+    _require_ids_manager()
     templates = []
     for ids_file in list_uploaded_ids_files(job_id):
         info = get_ids_info(ids_file)
         if info:
             info["filename"] = ids_file.name
+            
+            # Load audit result if available
+            audit = load_audit_result(job_id, ids_file.name)
+            if audit:
+                info["audit"] = {
+                    "gate1Passed": audit.gate1_passed,
+                    "gate2Passed": audit.gate2_passed,
+                    "overallPassed": audit.overall_passed,
+                    "canRunAgainstIfc": audit.can_run_against_ifc,
+                    "errorCount": len(audit.gate1_errors) + len(audit.gate2_errors),
+                    "warningCount": len(audit.gate2_warnings),
+                    "validatedAt": audit.validated_at,
+                }
+            else:
+                info["audit"] = None
+            
             templates.append(info)
     
     return {
@@ -402,21 +481,113 @@ async def list_job_ids_files(job_id: str) -> dict:
     }
 
 
+@router.get("/{job_id}/ids/{filename}/audit")
+async def get_ids_audit(job_id: str, filename: str) -> dict:
+    """
+    Get the full audit result for a specific IDS file.
+    
+    Returns detailed Gate 1 and Gate 2 validation results including
+    all errors and warnings with line numbers.
+    
+    Args:
+        job_id: The job ID
+        filename: Name of the IDS file
+        
+    Returns:
+        Complete audit result
+    """
+    _require_ids_manager()
+    # Sanitize filename
+    normalized_name = Path(filename).name
+    if normalized_name != filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    
+    audit = load_audit_result(job_id, normalized_name)
+    
+    if audit is None:
+        # Try to re-audit if file exists
+        job_ids_dir = get_job_ids_dir(job_id)
+        ids_path = job_ids_dir / normalized_name
+        
+        if not ids_path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=f"IDS file '{filename}' not found for job {job_id}"
+            )
+        
+        # Run audit
+        audit = validate_ids_file(ids_path, job_id=job_id)
+    
+    return {
+        "jobId": job_id,
+        "filename": filename,
+        "audit": audit.to_dict(),
+    }
+
+
+@router.post("/{job_id}/ids/{filename}/reaudit")
+async def reaudit_ids_file(job_id: str, filename: str) -> dict:
+    """
+    Re-run the two-gate validation on an IDS file.
+    
+    Useful after modifying the IDS file externally or to refresh
+    the audit after schema updates.
+    
+    Args:
+        job_id: The job ID
+        filename: Name of the IDS file to re-audit
+        
+    Returns:
+        Fresh audit result
+    """
+    _require_ids_manager()
+    # Sanitize filename
+    normalized_name = Path(filename).name
+    if normalized_name != filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    
+    job_ids_dir = get_job_ids_dir(job_id)
+    ids_path = job_ids_dir / normalized_name
+    
+    if not ids_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"IDS file '{filename}' not found for job {job_id}"
+        )
+    
+    # Run fresh audit
+    audit = validate_ids_file(ids_path, job_id=job_id)
+    
+    # Clear validation cache since audit status changed
+    cache_path = _get_validation_cache_path(job_id)
+    if cache_path.exists():
+        cache_path.unlink()
+    
+    return {
+        "jobId": job_id,
+        "filename": filename,
+        "audit": audit.to_dict(),
+        "message": "Re-audit completed",
+    }
+
+
 @router.post("/{job_id}/ids/upload")
 async def upload_ids_file(job_id: str, file: UploadFile = File(...)) -> dict:
     """
     Upload an IDS file for a specific job.
     
-    The IDS file will be validated for basic XML structure before saving.
-    It will be used in subsequent validations for this job.
+    The IDS file undergoes two-gate validation:
+    - Gate 1: XSD schema validation (must pass to save)
+    - Gate 2: Semantic audit via ifctester (warnings allowed)
     
     Args:
         job_id: The job ID
         file: The IDS file to upload (.ids extension)
         
     Returns:
-        Information about the uploaded IDS file
+        Information about the uploaded IDS file including validation results
     """
+    _require_ids_manager()
     # Validate filename
     if not file.filename:
         raise HTTPException(status_code=400, detail="No filename provided")
@@ -433,6 +604,14 @@ async def upload_ids_file(job_id: str, file: UploadFile = File(...)) -> dict:
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error reading file: {str(e)}")
     
+    # Security checks
+    is_safe, security_issues = validate_file_security(content, file.filename)
+    if not is_safe:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Security check failed: {'; '.join(security_issues)}"
+        )
+    
     # Save temporarily for validation
     import tempfile
     with tempfile.NamedTemporaryFile(suffix=".ids", delete=False) as tmp:
@@ -440,24 +619,27 @@ async def upload_ids_file(job_id: str, file: UploadFile = File(...)) -> dict:
         tmp_path = Path(tmp.name)
     
     try:
-        # Validate XML structure
-        is_valid, errors = validate_ids_xml_structure(tmp_path)
-        if not is_valid:
+        # Run two-gate validation
+        audit_result = validate_ids_file(tmp_path)
+        
+        # Gate 1 must pass to save the file
+        if not audit_result.gate1_passed:
+            error_messages = [e.message for e in audit_result.gate1_errors[:5]]
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid IDS file: {'; '.join(errors)}"
+                detail={
+                    "message": "IDS file failed schema validation (Gate 1)",
+                    "errors": [e.to_dict() for e in audit_result.gate1_errors],
+                }
             )
         
-        # Try to load with ifctester to ensure it's parseable
-        ids_obj = load_ids_file(tmp_path)
-        if ids_obj is None:
-            raise HTTPException(
-                status_code=400,
-                detail="Could not parse IDS file with ifctester"
-            )
-        
-        # Save to job directory
+        # Save to job directory (even if Gate 2 has warnings)
         saved_path = save_uploaded_ids(job_id, file.filename, content)
+        
+        # Save audit result alongside the IDS file
+        from ids_manager import save_audit_result
+        audit_result.filename = saved_path.name
+        save_audit_result(job_id, saved_path.name, audit_result)
         
         # Get info about saved file
         info = get_ids_info(saved_path)
@@ -467,13 +649,23 @@ async def upload_ids_file(job_id: str, file: UploadFile = File(...)) -> dict:
         if cache_path.exists():
             cache_path.unlink()
         
-        return {
+        # Build response based on Gate 2 status
+        response = {
             "success": True,
             "filename": saved_path.name,
             "jobId": job_id,
             "idsInfo": info,
-            "message": "IDS file uploaded successfully. Run revalidation to apply.",
+            "validation": audit_result.to_dict(),
         }
+        
+        if audit_result.overall_passed:
+            response["message"] = "IDS file uploaded and validated successfully."
+        elif audit_result.can_run_against_ifc:
+            response["message"] = "IDS file uploaded with warnings. Review audit results before running against IFC."
+        else:
+            response["message"] = "IDS file uploaded but has validation errors. Fix errors before running against IFC."
+        
+        return response
         
     finally:
         # Clean up temp file
@@ -493,6 +685,7 @@ async def delete_ids_file(job_id: str, filename: str) -> dict:
     Returns:
         Success status
     """
+    _require_ids_manager()
     success = delete_uploaded_ids(job_id, filename)
     
     if not success:
@@ -516,19 +709,24 @@ async def delete_ids_file(job_id: str, filename: str) -> dict:
 @router.post("/{job_id}/ids/validate")
 async def validate_against_ids(
     job_id: str,
-    ids_filename: Optional[str] = None
+    ids_filename: Optional[str] = None,
+    skip_audit_check: bool = False
 ) -> dict:
     """
     Validate the job's IFC file against IDS specifications.
+    
+    Only IDS files that have passed the two-gate audit can be used.
     
     Args:
         job_id: The job ID
         ids_filename: Optional specific IDS file to validate against.
                      If not provided, validates against all uploaded + default IDS files.
+        skip_audit_check: Skip audit check (not recommended, use at own risk)
                      
     Returns:
         IDS validation results with facet-level details
     """
+    _require_ids_manager()
     import ifcopenshell
     
     # Find IFC file
@@ -544,6 +742,7 @@ async def validate_against_ids(
         raise HTTPException(status_code=500, detail=f"Error loading IFC: {str(e)}")
     
     results = []
+    skipped_files = []
     
     if ids_filename:
         # Validate against specific IDS file
@@ -552,6 +751,7 @@ async def validate_against_ids(
             raise HTTPException(status_code=400, detail="Invalid IDS filename")
         job_ids_dir = get_job_ids_dir(job_id)
         ids_path = job_ids_dir / normalized_name
+        is_default = False
         
         if not ids_path.exists():
             # Check defaults
@@ -559,6 +759,7 @@ async def validate_against_ids(
             for default_file in list_default_ids_files():
                 if default_file.name == ids_filename:
                     ids_path = default_file
+                    is_default = True
                     break
         
         if not ids_path or not ids_path.exists():
@@ -567,25 +768,53 @@ async def validate_against_ids(
                 detail=f"IDS file '{ids_filename}' not found"
             )
         
+        # Check audit status for non-default files
+        if not is_default and not skip_audit_check:
+            audit = load_audit_result(job_id, normalized_name)
+            if audit and not audit.can_run_against_ifc:
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "message": f"IDS file '{ids_filename}' has not passed validation. Fix audit errors first.",
+                        "audit": audit.to_dict(),
+                    }
+                )
+        
         ids_obj = load_ids_file(ids_path)
         if ids_obj:
-            result = validate_ifc_against_ids(ifc_model, ids_obj, ifc_path.name)
+            result = validate_ifc_against_ids(ifc_model, ids_obj, ifc_path.name, ids_path.name)
             results.append(result.to_dict())
     else:
-        # Validate against all IDS files
-        from ids_manager import load_all_ids_for_job
+        # Validate against all IDS files that pass audit
+        # Check uploaded files for audit status
+        for ids_file in list_uploaded_ids_files(job_id):
+            if not skip_audit_check:
+                audit = load_audit_result(job_id, ids_file.name)
+                if audit and not audit.can_run_against_ifc:
+                    skipped_files.append({
+                        "filename": ids_file.name,
+                        "reason": "Failed audit validation",
+                    })
+                    continue
+            
+            ids_obj = load_ids_file(ids_file)
+            if ids_obj:
+                result = validate_ifc_against_ids(ifc_model, ids_obj, ifc_path.name, ids_file.name)
+                results.append(result.to_dict())
         
-        all_ids = load_all_ids_for_job(job_id, include_defaults=True)
-        for ids_obj in all_ids:
-            result = validate_ifc_against_ids(ifc_model, ids_obj, ifc_path.name)
-            results.append(result.to_dict())
+        # Always include defaults (they're trusted)
+        for ids_file in list_default_ids_files():
+            ids_obj = load_ids_file(ids_file)
+            if ids_obj:
+                result = validate_ifc_against_ids(ifc_model, ids_obj, ifc_path.name, ids_file.name)
+                results.append(result.to_dict())
     
     # Calculate overall stats
     total_specs = sum(r["totalSpecs"] for r in results)
     passed_specs = sum(r["passedSpecs"] for r in results)
     failed_specs = sum(r["failedSpecs"] for r in results)
     
-    return {
+    response = {
         "jobId": job_id,
         "ifcFilename": ifc_path.name,
         "idsFilesValidated": len(results),
@@ -595,3 +824,9 @@ async def validate_against_ids(
         "overallPassed": failed_specs == 0,
         "results": results,
     }
+    
+    if skipped_files:
+        response["skippedFiles"] = skipped_files
+        response["skippedCount"] = len(skipped_files)
+    
+    return response

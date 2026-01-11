@@ -1,6 +1,7 @@
 import AxisViewWidget from './AxisViewWidget'
 import EcPanel from './EcPanel'
 import HvacFmPanel from './HvacFmPanel'
+import IdsValidationPanel from './IdsValidationPanel'
 import KeyboardHints from './KeyboardHints'
 import OccupancyLegend from './OccupancyLegend'
 import OccupancyPanel from './OccupancyPanel'
@@ -58,6 +59,7 @@ export default function ViewerShell({
     onFitToModel: viewModeState.fitToModel,
     onOpenEcPanel: floatingPanels.handleToggleEcPanel,
     onOpenHvacPanel: floatingPanels.handleToggleHvacPanel,
+    onOpenIdsValidationPanel: floatingPanels.handleToggleIdsValidationPanel,
     onToggleSpaceOverlay: spaceOverlay.toggleSpaceOverlay,
     spaceOverlayEnabled: spaceOverlay.spaceOverlayEnabled,
     spaceOverlayLoading: spaceOverlay.spaceOverlayStatus.loading,
@@ -110,6 +112,8 @@ export default function ViewerShell({
     visible: !geometryHidden
   }
 
+  const hasGeometry = !!modelUrls.glbUrl
+
   const spaceOverlayProps = {
     enabled: spaceOverlay.spaceOverlayEnabled,
     jobId,
@@ -148,6 +152,14 @@ export default function ViewerShell({
     spaceOverlayLoading: spaceOverlay.spaceOverlayStatus.loading
   }
 
+  const idsValidationPanelProps = {
+    isOpen: floatingPanels.idsValidationPanelOpen,
+    onClose: floatingPanels.handleCloseIdsValidationPanel,
+    jobId,
+    focusToken: floatingPanels.idsValidationPanelZIndex,
+    zIndex: floatingPanels.idsValidationPanelZIndex
+  }
+
   const spaceNavigatorProps = spaceOverlay.spaceNavigatorProps
   const { visible: showSpaceNavigator, ...navigatorProps } = spaceNavigatorProps || {}
 
@@ -181,14 +193,47 @@ export default function ViewerShell({
 
       <Viewer {...viewerProps}>
         <SectionPlaneHelper {...sectionPlaneHelperProps} />
-        <SelectableModel {...selectableModelProps} />
+        {hasGeometry ? (
+          <SelectableModel {...selectableModelProps} />
+        ) : (
+          <mesh position={[0, 0, 0]}>
+            <boxGeometry args={[0.1, 0.1, 0.1]} />
+            <meshBasicMaterial color="#cccccc" transparent opacity={0} />
+          </mesh>
+        )}
         <SpaceBboxOverlay {...spaceOverlayProps} />
       </Viewer>
+
+      {!hasGeometry && (
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          padding: '2rem',
+          background: 'rgba(255, 255, 255, 0.95)',
+          borderRadius: '8px',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+          textAlign: 'center',
+          maxWidth: '400px',
+          pointerEvents: 'none'
+        }}>
+          <div style={{ fontSize: '48px', marginBottom: '1rem', opacity: 0.5 }}>📦</div>
+          <div style={{ fontSize: '16px', fontWeight: '500', color: '#333', marginBottom: '0.5rem' }}>
+            No 3D Geometry Available
+          </div>
+          <div style={{ fontSize: '13px', color: '#666', lineHeight: '1.5' }}>
+            This IFC file contains only data entities without geometric representations.
+            You can still access metadata and other analysis results.
+          </div>
+        </div>
+      )}
 
       <UploadPanel {...uploadPanelProps} />
 
       <EcPanel {...ecPanelProps} />
       <HvacFmPanel {...hvacPanelProps} />
+      <IdsValidationPanel {...idsValidationPanelProps} />
       <OccupancyPanel {...occupancyPanelProps} />
 
       {showSpaceNavigator && <SpaceNavigator {...navigatorProps} />}

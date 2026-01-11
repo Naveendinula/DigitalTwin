@@ -11,6 +11,7 @@ import {
   PeopleIcon,
   ResetIcon,
   SectionIcon,
+  ValidationIcon,
   ViewCubeIcon,
   EyeIcon,
   SidebarLeftIcon,
@@ -46,6 +47,7 @@ function ViewerToolbar({
   onFitToModel,
   onOpenEcPanel,
   onOpenHvacPanel,
+  onOpenIdsValidationPanel,
   onToggleSpaceOverlay,
   spaceOverlayEnabled,
   spaceOverlayLoading = false,
@@ -128,6 +130,14 @@ function ViewerToolbar({
       title: 'Analyze HVAC/FM',
       icon: <FanIcon />,
       label: 'HVAC/FM'
+    },
+    {
+      key: 'ids-validation',
+      show: hasModel,
+      onClick: onOpenIdsValidationPanel,
+      title: 'IDS Validation',
+      icon: <ValidationIcon />,
+      label: 'Validate'
     },
     {
       key: 'spaces',

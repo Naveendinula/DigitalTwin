@@ -26,16 +26,9 @@ def convert_ifc_to_glb(input_ifc_path: str, output_glb_path: str) -> bool:
         True if conversion succeeded, False otherwise.
 
     Raises:
-        FileNotFoundError: If the input IFC file doesn't exist.
         RuntimeError: If IfcConvert is not found or conversion fails.
     """
-    # Validate input file exists
     input_path = Path(input_ifc_path)
-    if not input_path.exists():
-        raise FileNotFoundError(f"Input IFC file not found: {input_ifc_path}")
-
-    if not input_path.suffix.lower() == '.ifc':
-        raise ValueError(f"Input file must be an IFC file, got: {input_path.suffix}")
 
     # Ensure output directory exists
     output_path = Path(output_glb_path)
@@ -56,20 +49,38 @@ def convert_ifc_to_glb(input_ifc_path: str, output_glb_path: str) -> bool:
 
     try:
         # Run IfcConvert
+        # Note: On Windows, IfcConvert outputs in UTF-16, so we need special encoding handling
         result = subprocess.run(
             command,
             capture_output=True,
-            text=True,
+            text=False,  # Get bytes, we'll decode manually
             check=False  # We'll handle errors manually for better messages
         )
 
+        # Decode output with proper encoding
+        # IfcConvert on Windows uses UTF-16, try multiple encodings
+        stdout_text = ""
+        stderr_text = ""
+        
+        for encoding in ['utf-16', 'utf-8', 'cp1252']:
+            try:
+                stdout_text = result.stdout.decode(encoding) if result.stdout else ""
+                stderr_text = result.stderr.decode(encoding) if result.stderr else ""
+                break
+            except (UnicodeDecodeError, AttributeError):
+                continue
+
         # Check for errors
+        # Note: IfcConvert return code can be non-zero even for successful conversions
+        # We'll verify by checking if output file exists instead
         if result.returncode != 0:
-            error_msg = result.stderr if result.stderr else result.stdout
-            raise RuntimeError(
-                f"IfcConvert failed with return code {result.returncode}.\n"
-                f"Error output: {error_msg}"
-            )
+            error_msg = stderr_text if stderr_text else stdout_text
+            # Only raise if output file doesn't exist (true error)
+            if not output_path.exists():
+                raise RuntimeError(
+                    f"IfcConvert failed with return code {result.returncode}.\n"
+                    f"Error output: {error_msg}"
+                )
 
         # Verify output file was created
         if not output_path.exists():
@@ -78,7 +89,15 @@ def convert_ifc_to_glb(input_ifc_path: str, output_glb_path: str) -> bool:
                 "Check if the IFC file contains valid geometry."
             )
 
-        print(f"Conversion successful! Output size: {output_path.stat().st_size} bytes")
+        file_size = output_path.stat().st_size
+        print(f"Conversion successful! Output size: {file_size} bytes")
+        
+        # Log IfcConvert output for debugging
+        if stdout_text:
+            print(f"IfcConvert stdout: {stdout_text[:200]}")
+        if stderr_text:
+            print(f"IfcConvert stderr: {stderr_text[:200]}")
+        
         return True
 
     except FileNotFoundError:
@@ -103,12 +122,6 @@ def main():
         convert_ifc_to_glb(input_file, output_file)
         print("Done!")
         sys.exit(0)
-    except FileNotFoundError as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
-    except ValueError as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
     except RuntimeError as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(2)

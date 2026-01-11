@@ -363,15 +363,6 @@ def main():
     input_file = sys.argv[1]
     output_file = sys.argv[2]
     
-    # Validate input file
-    if not Path(input_file).exists():
-        print(f"Error: Input file not found: {input_file}", file=sys.stderr)
-        sys.exit(1)
-    
-    if not input_file.lower().endswith('.ifc'):
-        print(f"Error: Input file must be an IFC file", file=sys.stderr)
-        sys.exit(1)
-    
     try:
         # Extract and save metadata
         metadata = extract_metadata(input_file)

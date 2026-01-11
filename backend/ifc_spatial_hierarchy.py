@@ -344,7 +344,16 @@ def extract_spatial_hierarchy(ifc_path: str) -> dict[str, Any]:
     # Find the project
     projects = ifc_file.by_type('IfcProject')
     if not projects:
-        raise ValueError("No IfcProject found in the IFC file")
+        print("Warning: No IfcProject found in the IFC file. Returning empty hierarchy.")
+        # Return a minimal placeholder hierarchy for files without structure
+        return {
+            "type": "IfcProject",
+            "name": "Untitled Project",
+            "globalId": "0000000000000000000000",
+            "children": [],
+            "properties": {}
+        }
+        # raise ValueError("No IfcProject found in the IFC file")
     
     project = projects[0]
     print(f"Found project: {project.Name}")

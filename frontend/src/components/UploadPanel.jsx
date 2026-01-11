@@ -5,7 +5,6 @@ const STAGE_LABELS = {
   converting_glb: 'Converting geometry to GLB...',
   extracting_metadata: 'Extracting metadata...',
   extracting_hierarchy: 'Building spatial hierarchy...',
-  validating: 'Validating IFC model...',
   finalizing: 'Finalizing outputs...',
   completed: 'Finalizing outputs...'
 }
@@ -15,7 +14,6 @@ const STAGE_ORDER = [
   'converting_glb',
   'extracting_metadata',
   'extracting_hierarchy',
-  'validating',
   'finalizing'
 ]
 
@@ -24,7 +22,6 @@ const STAGE_HINTS = {
   converting_glb: 'Generating viewable geometry from the IFC file.',
   extracting_metadata: 'Reading BIM properties and attributes.',
   extracting_hierarchy: 'Building the navigation tree.',
-  validating: 'Checking model quality and compatibility.',
   finalizing: 'Writing output files to disk.'
 }
 
@@ -73,7 +70,7 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
         if (job.status === 'completed') {
           setUploadState('idle')
           onModelReady?.({
-            glbUrl: `${API_URL}${job.glb_url}`,
+            glbUrl: job.glb_url ? `${API_URL}${job.glb_url}` : null,
             metadataUrl: `${API_URL}${job.metadata_url}`,
             hierarchyUrl: `${API_URL}${job.hierarchy_url}`,
             jobId: jobId,

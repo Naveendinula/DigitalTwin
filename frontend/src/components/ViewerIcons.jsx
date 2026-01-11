@@ -283,3 +283,21 @@ export function SidebarRightIcon({ size = 20, stroke = '#1d1d1f', strokeWidth = 
     </svg>
   )
 }
+
+export function ValidationIcon({ size = 20, stroke = '#1d1d1f', strokeWidth = 1.5 }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={stroke}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M9 11l3 3L22 4" />
+      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+    </svg>
+  )
+}

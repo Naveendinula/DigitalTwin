@@ -5,7 +5,10 @@ python-multipart>=0.0.6
 
 # IFC processing
 ifcopenshell>=0.7.0
-ifctester>=0.0.0
+
+# IDS validation
+lxml>=4.9.0
+ifctester>=0.0.1
 
 # Utilities
 pydantic>=2.0.0
