@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ids xmlns:xs="http://www.w3.org/2001/XMLSchema"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:schemaLocation="http://standards.buildingsmart.org/IDS http://standards.buildingsmart.org/IDS/1.0/ids.xsd"
+     xmlns="http://standards.buildingsmart.org/IDS">
+  <info>
+    <title>EC Readiness - Materials Present</title>
+    <description>Checks that building elements have material assignments for prac_database.csv mapping.</description>
+  </info>
+  <specifications>
+    <specification name="Building elements must have materials" ifcVersion="IFC2X3 IFC4 IFC4X3_ADD2">
+      <applicability maxOccurs="unbounded">
+        <entity>
+          <name>
+            <simpleValue>IFCBUILDINGELEMENT</simpleValue>
+          </name>
+        </entity>
+      </applicability>
+      <requirements>
+        <material instructions="Assign a material or material layer so it can map to prac_database.csv." />
+      </requirements>
+    </specification>
+  </specifications>
+</ids>
