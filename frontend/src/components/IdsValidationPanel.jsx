@@ -11,8 +11,10 @@ function IdsValidationPanel({ isOpen, onClose, jobId, focusToken, zIndex }) {
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [idsFiles, setIdsFiles] = useState([])
+  const [defaultTemplates, setDefaultTemplates] = useState([])
   const [validationResult, setValidationResult] = useState(null)
   const [error, setError] = useState(null)
+  const [activeTab, setActiveTab] = useState('uploaded')
   
   // Draggable state
   const [position, setPosition] = useState({ x: 80, y: 80 })
@@ -57,6 +59,12 @@ function IdsValidationPanel({ isOpen, onClose, jobId, focusToken, zIndex }) {
     }
   }, [isOpen, jobId])
 
+  useEffect(() => {
+    if (isOpen) {
+      fetchDefaultTemplates()
+    }
+  }, [isOpen])
+
   const fetchIdsFiles = async () => {
     if (!jobId) return
     try {
@@ -67,6 +75,18 @@ function IdsValidationPanel({ isOpen, onClose, jobId, focusToken, zIndex }) {
       }
     } catch (err) {
       console.error('Error fetching IDS files:', err)
+    }
+  }
+
+  const fetchDefaultTemplates = async () => {
+    try {
+      const response = await fetch(`${API_URL}/validation/ids/templates/default`)
+      if (response.ok) {
+        const data = await response.json()
+        setDefaultTemplates(data.templates || [])
+      }
+    } catch (err) {
+      console.error('Error fetching default IDS templates:', err)
     }
   }
 
@@ -266,7 +286,25 @@ function IdsValidationPanel({ isOpen, onClose, jobId, focusToken, zIndex }) {
 
       {/* Content */}
       <div style={styles.content}>
-        {/* Upload Section */}
+        <div style={styles.tabContainer}>
+          <button
+            style={{ ...styles.tab, ...(activeTab === 'uploaded' ? styles.activeTab : {}) }}
+            onClick={() => setActiveTab('uploaded')}
+            type="button"
+          >
+            Uploaded IDS
+          </button>
+          <button
+            style={{ ...styles.tab, ...(activeTab === 'defaults' ? styles.activeTab : {}) }}
+            onClick={() => setActiveTab('defaults')}
+            type="button"
+          >
+            Default Templates
+          </button>
+        </div>
+        {activeTab === 'uploaded' && (
+          <>
+            {/* Upload Section */}
         <div style={styles.section}>
           <div style={styles.sectionHeader}>
             <span style={styles.sectionTitle}>Upload IDS File</span>
@@ -350,6 +388,46 @@ function IdsValidationPanel({ isOpen, onClose, jobId, focusToken, zIndex }) {
             </div>
           )}
         </div>
+
+          </>
+        )}
+
+        {activeTab === 'defaults' && (
+          <div style={styles.section}>
+            <div style={styles.sectionHeader}>
+              <span style={styles.sectionTitle}>Default IDS Templates ({defaultTemplates.length})</span>
+            </div>
+            {defaultTemplates.length === 0 ? (
+              <div style={styles.emptyState}>
+                No default IDS templates found
+              </div>
+            ) : (
+              <div style={styles.fileList}>
+                {defaultTemplates.map((template, idx) => (
+                  <div key={idx} style={styles.fileItem}>
+                    <div style={styles.fileInfo}>
+                      <span style={styles.fileName}>{template.filename}</span>
+                      {template.title && <span style={styles.fileDesc}>{template.title}</span>}
+                      {!template.title && template.description && (
+                        <span style={styles.fileDesc}>{template.description}</span>
+                      )}
+                    </div>
+                    <div style={styles.fileActions}>
+                      <button
+                        style={styles.fileActionBtn}
+                        onClick={() => handleValidate(template.filename)}
+                        disabled={loading || !jobId}
+                        title={jobId ? 'Validate against this IDS' : 'Upload a model first'}
+                      >
+                        ▶
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Error Display */}
         {error && (
@@ -508,6 +586,31 @@ const styles = {
     flex: 1,
     overflowY: 'auto',
     padding: '16px',
+  },
+  tabContainer: {
+    display: 'flex',
+    gap: '6px',
+    marginBottom: '16px',
+    padding: '4px',
+    background: '#f5f5f7',
+    borderRadius: '8px',
+  },
+  tab: {
+    flex: 1,
+    padding: '6px 8px',
+    textAlign: 'center',
+    fontSize: '12px',
+    fontWeight: '600',
+    color: '#86868b',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    background: 'transparent',
+  },
+  activeTab: {
+    color: '#1d1d1f',
+    background: '#ffffff',
+    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)',
   },
   section: {
     marginBottom: '20px',

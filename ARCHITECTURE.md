@@ -8,6 +8,7 @@
 
 - **Date:** 2026-01-11
 - **IFC Validation:** Added a minimal `ifc_validation.py` module so `/validation/{job_id}` endpoints can return reports again.
+- **IDS Validation:** Added default IDS templates (`backend/ids_templates`) and a frontend tab for running them.
 
 - **Date:** 2025-12-31
 - **Live Occupancy Simulation:** Added synthetic occupancy data generation with time-based patterns (6am–10pm schedule), random walk with mean reversion, and capacity estimation (~10m²/person).
@@ -65,6 +66,7 @@ The system bridges the gap between complex BIM files and accessible web visualiz
 *   `validation_api.py`: API router for IFC validation and IDS file workflows.
 *   `ifc_validation.py`: Minimal IFC rule checks and report summaries used by validation endpoints.
 *   `ids_manager.py`: IDS file management and two-gate validation (Gate 1 XSD schema, Gate 2 ifctester).
+*   `ids_templates/`: Default IDS templates available to all jobs.
 *   `occupancy_sim.py`: Synthetic occupancy data generation with time-based patterns.
 *   `domain/`:
     *   `materials.py`: Material classification and extraction logic.
