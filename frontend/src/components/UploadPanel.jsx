@@ -1,4 +1,8 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
+import gsap from 'gsap'
+import { ScrollTrigger } from 'gsap/ScrollTrigger'
+
+gsap.registerPlugin(ScrollTrigger)
 
 const STAGE_LABELS = {
   queued: 'Queued for processing...',
@@ -36,30 +40,328 @@ const getStageLabel = (stage, status) => {
   return `Processing... (${status})`
 }
 
+// Frame animation configuration
+const FRAME_COUNT = 120
+const FRAME_PATH = '/media/frames_max/ezgif-frame-'
+
+// Story beats configuration - Updated for new scroll pattern
+const STORY_BEATS = [
+  {
+    id: 'title',
+    trigger: 0,
+    end: 0.25,
+    title: 'Building Insights',
+    desc: 'Digital Twin BIM Viewer',
+    position: 'center'
+  },
+  {
+    id: 'viz',
+    trigger: 0.30,
+    end: 0.55,
+    title: '3D Visualization',
+    desc: 'Explore your model from every angle',
+    position: 'left'
+  },
+  {
+    id: 'meta',
+    trigger: 0.60,
+    end: 0.85,
+    title: 'Metadata + Hierarchy',
+    desc: 'Navigate BIM properties intuitively',
+    position: 'right'
+  },
+
+]
+
+// Feature cards data - Clean minimal design
+const FEATURES = [
+  {
+    title: '3D Visualization',
+    desc: 'Explore your model in real-time 3D with intuitive navigation controls'
+  },
+  {
+    title: 'Metadata Extraction',
+    desc: 'Access all BIM properties and attributes instantly from any element'
+  },
+  {
+    title: 'Spatial Hierarchy',
+    desc: 'Navigate building structure intuitively through the element tree'
+  },
+  {
+    title: 'Carbon Analysis',
+    desc: 'Understand embodied carbon impact with detailed material breakdowns'
+  },
+]
+
 /**
- * UploadPanel Component - Arctic Zen Minimalist Design
+ * UploadPanel Component - Arctic Zen Minimalist Design with Canvas Scrollytelling
  * 
- * Handles IFC file upload and displays processing status.
- * Features a clean, minimal hero with the arctic pavilion image.
- * 
- * @param {function} onModelReady - Callback when model is processed, receives URLs object
- * @param {boolean} hasModel - Whether a model is currently loaded
- * @param {function} onReset - Callback to reset the model state in parent
+ * Features:
+ * - Canvas-based frame rendering for smooth animation
+ * - 400vh sticky scroll container
+ * - Text overlays at 0%, 30%, 60%, 90% scroll positions
  */
 function UploadPanel({ onModelReady, hasModel, onReset }) {
   const [isDragging, setIsDragging] = useState(false)
-  const [uploadState, setUploadState] = useState('idle') // idle, uploading, processing, error
+  const [uploadState, setUploadState] = useState('idle')
   const [progress, setProgress] = useState('')
   const [jobStage, setJobStage] = useState(null)
   const [error, setError] = useState(null)
 
+  // Scroll animation states
+  const [imagesLoaded, setImagesLoaded] = useState(false)
+  const [loadingProgress, setLoadingProgress] = useState(0)
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+  const [scrollProgress, setScrollProgress] = useState(0)
+  const [currentFrame, setCurrentFrame] = useState(0)
+
+  // Refs
+  const containerRef = useRef(null)
+  const heroRef = useRef(null)
+  const canvasRef = useRef(null)
+  const framesRef = useRef([])
+  const contextRef = useRef(null)
+
   const API_URL = 'http://localhost:8000'
+
+  // Generate frame path
+  const getFramePath = (index) => {
+    const num = String(index + 1).padStart(3, '0')
+    return `${FRAME_PATH}${num}.jpg`
+  }
+
+  // Check for reduced motion preference
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+    setPrefersReducedMotion(mq.matches)
+
+    const handler = (e) => setPrefersReducedMotion(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
+
+  // Check for mobile viewport
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768)
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+
+  // Enable/disable body scrolling based on landing page visibility
+  useEffect(() => {
+    if (hasModel) {
+      document.documentElement.style.overflow = 'hidden'
+      document.body.style.overflow = 'hidden'
+      const root = document.getElementById('root')
+      if (root) root.style.overflow = 'hidden'
+    } else {
+      document.documentElement.style.overflow = 'auto'
+      document.documentElement.style.height = 'auto'
+      document.body.style.overflow = 'auto'
+      document.body.style.height = 'auto'
+      const root = document.getElementById('root')
+      if (root) {
+        root.style.overflow = 'auto'
+        root.style.height = 'auto'
+      }
+    }
+
+    return () => {
+      document.documentElement.style.overflow = 'hidden'
+      document.body.style.overflow = 'hidden'
+      const root = document.getElementById('root')
+      if (root) root.style.overflow = 'hidden'
+    }
+  }, [hasModel])
+
+  // Preload all frames
+  useEffect(() => {
+    if (hasModel) return
+
+    const images = []
+    let loadedCount = 0
+
+    for (let i = 0; i < FRAME_COUNT; i++) {
+      const img = new Image()
+      img.src = getFramePath(i)
+      img.onload = () => {
+        loadedCount++
+        setLoadingProgress(Math.round((loadedCount / FRAME_COUNT) * 100))
+        if (loadedCount === FRAME_COUNT) {
+          setImagesLoaded(true)
+        }
+      }
+      img.onerror = () => {
+        loadedCount++
+        setLoadingProgress(Math.round((loadedCount / FRAME_COUNT) * 100))
+        if (loadedCount === FRAME_COUNT) {
+          setImagesLoaded(true)
+        }
+      }
+      images.push(img)
+    }
+    framesRef.current = images
+  }, [hasModel])
+
+  // Initialize canvas and set up context
+  useEffect(() => {
+    if (!canvasRef.current || !imagesLoaded) return
+
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    contextRef.current = ctx
+
+    // Set canvas size to match container
+    const resizeCanvas = () => {
+      const rect = canvas.parentElement.getBoundingClientRect()
+      const dpr = window.devicePixelRatio || 1
+
+      canvas.width = rect.width * dpr
+      canvas.height = rect.height * dpr
+      canvas.style.width = `${rect.width}px`
+      canvas.style.height = `${rect.height}px`
+
+      ctx.scale(dpr, dpr)
+
+      // Draw current frame after resize
+      drawFrame(currentFrame)
+    }
+
+    resizeCanvas()
+    window.addEventListener('resize', resizeCanvas)
+
+    // Draw initial frame
+    drawFrame(0)
+
+    return () => window.removeEventListener('resize', resizeCanvas)
+  }, [imagesLoaded])
+
+  // Draw frame to canvas
+  const drawFrame = (frameIndex) => {
+    const ctx = contextRef.current
+    const canvas = canvasRef.current
+    const frame = framesRef.current[frameIndex]
+
+    if (!ctx || !canvas || !frame || !frame.complete) return
+
+    const canvasWidth = canvas.width / (window.devicePixelRatio || 1)
+    const canvasHeight = canvas.height / (window.devicePixelRatio || 1)
+
+    // Clear canvas
+    ctx.clearRect(0, 0, canvasWidth, canvasHeight)
+
+    // Calculate aspect ratio fit (contain)
+    const imgAspect = frame.width / frame.height
+    const canvasAspect = canvasWidth / canvasHeight
+
+    let drawWidth, drawHeight, offsetX, offsetY
+
+    if (imgAspect > canvasAspect) {
+      // Image is wider - fit to width
+      drawWidth = canvasWidth
+      drawHeight = canvasWidth / imgAspect
+      offsetX = 0
+      offsetY = (canvasHeight - drawHeight) / 2
+    } else {
+      // Image is taller - fit to height
+      drawHeight = canvasHeight
+      drawWidth = canvasHeight * imgAspect
+      offsetX = (canvasWidth - drawWidth) / 2
+      offsetY = 0
+    }
+
+    // Draw with smooth interpolation
+    ctx.imageSmoothingEnabled = true
+    ctx.imageSmoothingQuality = 'high'
+    ctx.drawImage(frame, offsetX, offsetY, drawWidth, drawHeight)
+  }
+
+  // GSAP ScrollTrigger for canvas frame animation with pinning
+  useEffect(() => {
+    if (!imagesLoaded || prefersReducedMotion || hasModel || !heroRef.current) return
+
+    const ctx = gsap.context(() => {
+      const frameObj = { frame: 0 }
+
+      // Pin the hero section and scrub through all frames
+      // The hero stays pinned for 300vh of scroll, then unpins to reveal content below
+      gsap.to(frameObj, {
+        frame: FRAME_COUNT - 1,
+        snap: 'frame',
+        ease: 'none',
+        scrollTrigger: {
+          trigger: heroRef.current,
+          start: 'top top',
+          end: '+=300%', // Pin for 300vh of scroll distance
+          pin: true, // Pin the hero element
+          pinSpacing: true, // Add spacing so content below waits
+          scrub: 0.1, // Very smooth scrubbing (lower = more responsive)
+          anticipatePin: 1, // Prevent jank when pinning
+          onUpdate: (self) => {
+            setScrollProgress(self.progress)
+            const frameIndex = Math.round(frameObj.frame)
+            setCurrentFrame(frameIndex)
+            drawFrame(frameIndex)
+          }
+        },
+      })
+
+    }, containerRef)
+
+    return () => ctx.revert()
+  }, [imagesLoaded, prefersReducedMotion, hasModel])
+
+  // Calculate story beat visibility based on scroll progress
+  const getStoryBeatOpacity = (beat) => {
+    if (scrollProgress < beat.trigger - 0.05) return 0
+    if (scrollProgress > beat.end + 0.05) return 0
+
+    // Fade in
+    if (scrollProgress < beat.trigger + 0.05) {
+      return Math.min(1, (scrollProgress - (beat.trigger - 0.05)) / 0.1)
+    }
+    // Fade out
+    if (scrollProgress > beat.end - 0.05) {
+      return Math.max(0, 1 - (scrollProgress - (beat.end - 0.05)) / 0.1)
+    }
+    return 1
+  }
+
+  // Get story beat position styles
+  const getStoryBeatPosition = (position) => {
+    switch (position) {
+      case 'left':
+        return {
+          left: isMobile ? '20px' : '10%',
+          top: '50%',
+          transform: 'translateY(-50%)',
+          textAlign: 'left'
+        }
+      case 'right':
+        return {
+          right: isMobile ? '20px' : '10%',
+          top: '50%',
+          transform: 'translateY(-50%)',
+          textAlign: 'right'
+        }
+      case 'center':
+      default:
+        return {
+          left: '50%',
+          top: '50%',
+          transform: 'translate(-50%, -50%)',
+          textAlign: 'center'
+        }
+    }
+  }
 
   /**
    * Poll job status until complete
    */
   const pollJobStatus = useCallback(async (jobId) => {
-    const maxDurationMs = 30 * 60 * 1000 // 30 minutes max
+    const maxDurationMs = 30 * 60 * 1000
     const startTime = Date.now()
 
     while (Date.now() - startTime < maxDurationMs) {
@@ -128,7 +430,6 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
       setProgress(`Processing ${file.name}...`)
       setJobStage('queued')
 
-      // Poll for completion
       await pollJobStatus(job.job_id)
 
     } catch (err) {
@@ -143,32 +444,18 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
     }
   }, [API_URL, pollJobStatus])
 
-  /**
-   * Handle file drop
-   */
   const handleDrop = useCallback((e) => {
     e.preventDefault()
     setIsDragging(false)
-    
     const file = e.dataTransfer?.files?.[0]
-    if (file) {
-      uploadFile(file)
-    }
+    if (file) uploadFile(file)
   }, [uploadFile])
 
-  /**
-   * Handle file input change
-   */
   const handleFileChange = useCallback((e) => {
     const file = e.target.files?.[0]
-    if (file) {
-      uploadFile(file)
-    }
+    if (file) uploadFile(file)
   }, [uploadFile])
 
-  /**
-   * Handle drag events
-   */
   const handleDragOver = (e) => {
     e.preventDefault()
     setIsDragging(true)
@@ -179,9 +466,6 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
     setIsDragging(false)
   }
 
-  /**
-   * Reset to upload new model
-   */
   const handleReset = () => {
     setUploadState('idle')
     setError(null)
@@ -207,203 +491,207 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
   }
 
   return (
-    <div style={styles.page}>
-      {/* Minimal Navbar */}
-      <header style={styles.navbar}>
-        <div style={styles.navContent}>
-          {/* Logo */}
-          <div style={styles.logo}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#111827" strokeWidth="2">
-              <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2" />
-              <line x1="12" y1="22" x2="12" y2="15.5" />
-              <polyline points="22 8.5 12 15.5 2 8.5" />
-            </svg>
-            <span style={styles.logoText}>Digital Twin</span>
+    <div ref={containerRef} style={styles.scrollContainer}>
+      {/* Loading overlay */}
+      {!imagesLoaded && !prefersReducedMotion && (
+        <div style={styles.loadingOverlay}>
+          <div style={styles.loadingContent}>
+            <div style={styles.loadingSpinner}></div>
+            <p style={styles.loadingText}>Loading experience...</p>
+            <p style={styles.loadingProgress}>{loadingProgress}%</p>
           </div>
-
-          {/* Nav Links */}
-          <nav style={styles.navLinks}>
-            <a href="#" style={styles.navLink}>Overview</a>
-            <span style={styles.navDot}>·</span>
-            <a href="#" style={styles.navLink}>Details</a>
-            <span style={styles.navDot}>·</span>
-            <a href="#" style={styles.navLink}>Reports</a>
-            <span style={styles.navDot}>·</span>
-            <a href="#" style={styles.navLink}>Contact</a>
-          </nav>
         </div>
-      </header>
+      )}
 
-      {/* Hero Section */}
-      <main style={styles.hero}>
-        <div style={styles.heroContainer}>
-          {/* Left Column - Text */}
-          <div style={styles.textColumn}>
-            <span style={styles.eyebrow}>IFC Viewer</span>
-            <h1 style={styles.heading}>Building Insights</h1>
-            <p style={styles.subheading}>
-              Upload your IFC model to explore detailed 3D visualization, 
-              metadata inspection, and spatial hierarchy navigation.
-            </p>
-            <a href="#how" style={styles.howItWorks}>How it works →</a>
-          </div>
-
-          {/* Right Column - Image + Upload Card */}
-          <div style={styles.visualColumn}>
-            {/* Hero Image with glow effect */}
-            <div style={styles.imageWrapper}>
-              <div style={styles.imageGlow}></div>
-              <img 
-                src="/src/assets/images/landing_page.png" 
-                alt="Minimal arctic pavilion visualization"
-                style={styles.heroImage}
-              />
+      {/* Hero Section - Gets pinned during frame animation */}
+      <div ref={heroRef} style={styles.heroSection}>
+        {/* Navigation Header */}
+        <header style={styles.navbar}>
+          <div style={styles.navContent}>
+            <div style={styles.logo}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#111827" strokeWidth="2">
+                <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2" />
+                <line x1="12" y1="22" x2="12" y2="15.5" />
+                <polyline points="22 8.5 12 15.5 2 8.5" />
+              </svg>
+              <span style={styles.logoText}>Digital Twin</span>
             </div>
 
-            {/* Upload Card - Floating over image */}
-            <div style={styles.uploadCard}>
-              {uploadState === 'idle' && (
-                <>
-                  <h3 style={styles.cardTitle}>Upload IFC Model</h3>
-                  
-                  <div
-                    style={{
-                      ...styles.dropzone,
-                      ...(isDragging ? styles.dropzoneActive : {})
-                    }}
-                    onDrop={handleDrop}
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                  >
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="1.5" style={styles.dropIcon}>
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                      <polyline points="17 8 12 3 7 8" />
-                      <line x1="12" y1="3" x2="12" y2="15" />
-                    </svg>
-                    <p style={styles.dropText}>
-                      Drag & drop your <strong>.ifc</strong> file or
-                    </p>
-                    <label style={styles.browseBtn}>
-                      Browse Files
-                      <input
-                        type="file"
-                        accept=".ifc"
-                        onChange={handleFileChange}
-                        style={styles.fileInput}
-                      />
-                    </label>
-                  </div>
+            <nav style={styles.navLinks}>
+              <a href="#" style={styles.navLink}>Overview</a>
+              <span style={styles.navDot}>·</span>
+              <a href="#" style={styles.navLink}>Details</a>
+              <span style={styles.navDot}>·</span>
+              <a href="#" style={styles.navLink}>Reports</a>
+            </nav>
+          </div>
 
-                  <div style={styles.cardFooter}>
-                    <span style={styles.supportText}>Supports IFC 2x3 and IFC 4</span>
-                    <div style={styles.statusPill}>
-                      <span style={styles.statusDot}></span>
-                      Active
-                    </div>
-                  </div>
-                </>
-              )}
+          {/* Scroll Progress Bar */}
+          <div style={styles.scrollBar}>
+            <div style={{
+              ...styles.scrollBarFill,
+              width: `${scrollProgress * 100}%`
+            }}></div>
+          </div>
+        </header>
 
-              {uploadState === 'uploading' && (
-                <div style={styles.processing}>
-                  <div style={styles.spinner}></div>
-                  <p style={styles.progressText}>Uploading File...</p>
-                  <p style={styles.hint}>{progress}</p>
+        <div style={styles.canvasWrapper}>
+          <canvas
+            ref={canvasRef}
+            style={styles.canvas}
+            role="img"
+            aria-label="3D Building Construction Animation"
+          />
+
+          {/* Gradient Overlay for text readability */}
+          <div style={styles.canvasOverlay}></div>
+
+          {/* Story Beat Text Overlays */}
+          {STORY_BEATS.map((beat) => {
+            const opacity = getStoryBeatOpacity(beat)
+            const positionStyles = getStoryBeatPosition(beat.position)
+
+            return (
+              <div
+                key={beat.id}
+                style={{
+                  ...styles.storyBeat,
+                  ...positionStyles,
+                  opacity: prefersReducedMotion ? (scrollProgress >= beat.trigger && scrollProgress <= beat.end ? 1 : 0) : opacity,
+                  pointerEvents: opacity > 0 ? 'auto' : 'none',
+                }}
+              >
+                <h2 style={styles.storyBeatTitle}>{beat.title}</h2>
+                <p style={styles.storyBeatDesc}>{beat.desc}</p>
+              </div>
+            )
+          })}
+
+          {/* Upload Card - Centered and visible earlier */}
+          <div style={{
+            ...styles.uploadCard,
+            opacity: scrollProgress > 0.75 ? 1 : 0,
+            transform: scrollProgress > 0.75
+              ? 'translate(-50%, -50%) scale(1)'
+              : 'translate(-50%, -40%) scale(0.95)',
+            transition: prefersReducedMotion ? 'none' : 'opacity 0.5s ease, transform 0.5s ease',
+            pointerEvents: scrollProgress > 0.75 ? 'auto' : 'none',
+          }}>
+            {uploadState === 'idle' && (
+              <>
+                <div
+                  style={{
+                    ...styles.dropzone,
+                    ...(isDragging ? styles.dropzoneActive : {})
+                  }}
+                  onDrop={handleDrop}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                >
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="1.5" style={styles.dropIcon}>
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="17 8 12 3 7 8" />
+                    <line x1="12" y1="3" x2="12" y2="15" />
+                  </svg>
+                  <p style={styles.dropText}>
+                    Drop <strong>.ifc</strong> or
+                  </p>
+                  <label style={styles.browseBtn}>
+                    Browse
+                    <input
+                      type="file"
+                      accept=".ifc"
+                      onChange={handleFileChange}
+                      style={styles.fileInput}
+                    />
+                  </label>
                 </div>
-              )}
+              </>
+            )}
 
-              {uploadState === 'processing' && (
-                <div style={{ ...styles.processing, padding: '32px 24px' }}>
-                  <div style={styles.stageList}>
-                    {STAGE_ORDER.map((stageKey, index) => {
-                      const currentKey = normalizeStage(jobStage) || 'queued'
-                      let currentIndex = STAGE_ORDER.indexOf(currentKey)
-                      
-                      // If stage is 'completed' or unknown but active, mark all as done
-                      if (currentKey === 'completed' || (currentIndex === -1 && currentKey !== 'queued')) {
-                        currentIndex = STAGE_ORDER.length
-                      }
+            {uploadState === 'uploading' && (
+              <div style={styles.processing}>
+                <div style={styles.spinner}></div>
+                <p style={styles.progressText}>Uploading...</p>
+              </div>
+            )}
 
-                      const thisIndex = index
-                      
-                      let status = 'pending'
-                      if (thisIndex < currentIndex) status = 'completed'
-                      if (thisIndex === currentIndex) status = 'active'
-                      
-                      const isCompleted = status === 'completed'
-                      const isActive = status === 'active'
-                      const isLast = index === STAGE_ORDER.length - 1
+            {uploadState === 'processing' && (
+              <div style={styles.processing}>
+                <div style={styles.stageList}>
+                  {STAGE_ORDER.map((stageKey, index) => {
+                    const currentKey = normalizeStage(jobStage) || 'queued'
+                    let currentIndex = STAGE_ORDER.indexOf(currentKey)
+                    if (currentKey === 'completed' || (currentIndex === -1 && currentKey !== 'queued')) {
+                      currentIndex = STAGE_ORDER.length
+                    }
+                    const thisIndex = index
+                    let status = 'pending'
+                    if (thisIndex < currentIndex) status = 'completed'
+                    if (thisIndex === currentIndex) status = 'active'
+                    const isCompleted = status === 'completed'
+                    const isActive = status === 'active'
+                    const isLast = index === STAGE_ORDER.length - 1
 
-                      return (
-                        <div key={stageKey} style={styles.stageItem}>
-                          <div style={styles.stageIconCol}>
-                            {/* Dot / Indicator */}
-                            <div
-                              style={{
-                                ...styles.stageDot,
-                                background: isCompleted ? '#10B981' : isActive ? '#3B82F6' : '#E5E7EB',
-                                transform: isActive ? 'scale(1.2)' : 'scale(1)',
-                                boxShadow: isActive 
-                                  ? '0 0 0 4px rgba(59, 130, 246, 0.15), inset 1px 1px 2px rgba(255,255,255,0.8)' 
-                                  : styles.stageDot.boxShadow
-                              }}
-                            />
-                            {/* Connecting Line */}
-                            {!isLast && (
-                              <div
-                                style={{
-                                  ...styles.stageLine,
-                                  background: isCompleted ? '#10B981' : '#E5E7EB',
-                                  opacity: isCompleted ? 0.5 : 1
-                                }}
-                              />
-                            )}
-                          </div>
-
-                          <div style={styles.stageContent}>
-                            <div
-                              style={{
-                                ...styles.stageLabel,
-                                color: isCompleted || isActive ? '#1F2937' : '#9CA3AF',
-                              }}
-                            >
-                              {STAGE_LABELS[stageKey]}
-                            </div>
-                            <span
-                              style={{
-                                ...styles.stageSub,
-                                color: isActive ? '#6B7280' : 'transparent',
-                                height: isActive ? 'auto' : '0',
-                                opacity: isActive ? 1 : 0
-                              }}
-                            >
-                              {isActive ? STAGE_HINTS[stageKey] : ''}
-                            </span>
+                    return (
+                      <div key={stageKey} style={styles.stageItem}>
+                        <div style={styles.stageIconCol}>
+                          <div style={{
+                            ...styles.stageDot,
+                            background: isCompleted ? '#10B981' : isActive ? '#3B82F6' : '#E5E7EB',
+                            transform: isActive ? 'scale(1.2)' : 'scale(1)',
+                          }} />
+                          {!isLast && (
+                            <div style={{
+                              ...styles.stageLine,
+                              background: isCompleted ? '#10B981' : '#E5E7EB',
+                            }} />
+                          )}
+                        </div>
+                        <div style={styles.stageContent}>
+                          <div style={{
+                            ...styles.stageLabel,
+                            color: isCompleted || isActive ? '#1F2937' : '#9CA3AF',
+                          }}>
+                            {STAGE_LABELS[stageKey]}
                           </div>
                         </div>
-                      )
-                    })}
-                  </div>
+                      </div>
+                    )
+                  })}
                 </div>
-              )}
+              </div>
+            )}
 
-              {uploadState === 'error' && (
-                <div style={styles.errorBox}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2" style={styles.errorIcon}>
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="15" y1="9" x2="9" y2="15" />
-                    <line x1="9" y1="9" x2="15" y2="15" />
-                  </svg>
-                  <p style={styles.errorText}>{error}</p>
-                  <button style={styles.retryBtn} onClick={handleReset}>
-                    Try Again
-                  </button>
-                </div>
-              )}
-            </div>
+            {uploadState === 'error' && (
+              <div style={styles.errorBox}>
+                <p style={styles.errorText}>{error}</p>
+                <button style={styles.retryBtn} onClick={handleReset}>Try Again</button>
+              </div>
+            )}
           </div>
         </div>
-      </main>
+
+      </div>
+
+      {/* Feature Cards Section - After hero */}
+      <section id="features" style={styles.featureSection}>
+        <div style={styles.featureSectionHeader}>
+          <h2 style={styles.featureSectionTitle}>Everything you need</h2>
+          <p style={styles.featureSectionDesc}>Powerful tools for BIM analysis</p>
+        </div>
+        <div style={{
+          ...styles.featureGrid,
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
+        }}>
+          {FEATURES.map((feature, index) => (
+            <div key={index} style={styles.featureCard}>
+              <h3 style={styles.featureTitle}>{feature.title}</h3>
+              <p style={styles.featureDesc}>{feature.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   )
 }
@@ -412,30 +700,69 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
  * Arctic Zen Minimalist Styles
  */
 const softShadow = 'rgb(255, 255, 255) 1px 1px 1px 0px inset, rgba(0, 0, 0, 0.15) -1px -1px 1px 0px inset, rgba(0, 0, 0, 0.26) 0.444584px 0.444584px 0.628737px -1px, rgba(0, 0, 0, 0.22) 1.21324px 1.21324px 1.38357px -2px, rgba(0, 0, 0, 0.15) 2.60599px 2.60599px 2.68477px -3px, rgba(0, 0, 0, 0.04) 6px 6px 6px -4px';
-const softShadowPressed = 'inset 0.5px 0.5px 1px #fff, inset -0.5px -0.5px 1px #00000026, inset 0 0 2px #00000026, rgb(255, 255, 255) 1px 1px 1px 0px, rgba(0, 0, 0, 0.07) -1px -1px 1px 0px';
 
 const styles = {
-  // Page Container
-  page: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+  // Scroll Container - Simple wrapper, GSAP's pinSpacing handles the height
+  scrollContainer: {
+    position: 'relative',
     background: '#e8e8ec',
+    fontFamily: 'inherit',
+  },
+
+  // Hero Section - Full viewport, gets pinned by GSAP
+  heroSection: {
+    position: 'relative',
+    height: '100vh',
+    width: '100%',
     display: 'flex',
     flexDirection: 'column',
-    zIndex: 1000,
-    fontFamily: 'inherit',
-    overflowY: 'auto',
+    overflow: 'hidden',
+    background: '#e8e8ec',
+  },
+
+  // Loading overlay
+  loadingOverlay: {
+    position: 'fixed',
+    inset: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: '#e8e8ec',
+    zIndex: 9999,
+  },
+  loadingContent: {
+    textAlign: 'center',
+  },
+  loadingSpinner: {
+    width: '48px',
+    height: '48px',
+    border: '3px solid #F3F4F6',
+    borderTopColor: '#111827',
+    borderRadius: '50%',
+    margin: '0 auto 16px',
+    animation: 'spin 1s linear infinite',
+  },
+  loadingText: {
+    margin: '0 0 4px 0',
+    color: '#111827',
+    fontSize: '16px',
+    fontWeight: 500,
+  },
+  loadingProgress: {
+    margin: 0,
+    color: '#9CA3AF',
+    fontSize: '14px',
   },
 
   // Navbar
   navbar: {
-    position: 'sticky',
+    position: 'absolute',
     top: 0,
-    background: '#f4f4f4',
-    boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.05), 0 2px 8px rgba(0,0,0,0.08)',
+    left: 0,
+    right: 0,
+    background: 'rgba(244, 244, 244, 0.85)',
+    backdropFilter: 'blur(12px)',
+    WebkitBackdropFilter: 'blur(12px)',
     zIndex: 100,
   },
   navContent: {
@@ -454,7 +781,7 @@ const styles = {
   },
   logoText: {
     fontSize: '16px',
-    fontWeight: 400,
+    fontWeight: 500,
     color: '#111827',
     letterSpacing: '-0.01em',
   },
@@ -470,118 +797,81 @@ const styles = {
     fontWeight: 400,
     padding: '8px 12px',
     borderRadius: '6px',
-    transition: 'color 0.15s ease',
   },
   navDot: {
     color: '#D1D5DB',
     fontSize: '14px',
   },
+  scrollBar: {
+    height: '2px',
+    background: 'rgba(0,0,0,0.05)',
+    position: 'relative',
+  },
+  scrollBarFill: {
+    height: '100%',
+    background: '#3B82F6',
+    transition: 'width 0.1s ease-out',
+  },
 
-  // Hero Section
-  hero: {
+  // Canvas Wrapper
+  canvasWrapper: {
     flex: 1,
+    position: 'relative',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '60px 32px',
   },
-  heroContainer: {
-    maxWidth: '1200px',
+  canvas: {
     width: '100%',
-    display: 'grid',
-    gridTemplateColumns: '45% 55%',
-    gap: '60px',
-    alignItems: 'center',
+    height: '100%',
+    objectFit: 'contain',
+  },
+  canvasOverlay: {
+    position: 'absolute',
+    inset: 0,
+    background: 'radial-gradient(ellipse at center, transparent 30%, rgba(232, 232, 236, 0.6) 100%)',
+    pointerEvents: 'none',
   },
 
-  // Text Column
-  textColumn: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '16px',
+  // Story Beat Overlays
+  storyBeat: {
+    position: 'absolute',
+    zIndex: 20,
+    maxWidth: '400px',
+    padding: '24px 32px',
+    background: 'rgba(244, 244, 244, 0.92)',
+    backdropFilter: 'blur(16px)',
+    WebkitBackdropFilter: 'blur(16px)',
+    borderRadius: '16px',
+    boxShadow: softShadow,
+    border: '1px solid rgba(255,255,255,0.6)',
+    transition: 'opacity 0.4s ease-out',
   },
-  eyebrow: {
-    fontSize: '13px',
-    fontWeight: 500,
-    color: '#9CA3AF',
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-  },
-  heading: {
-    fontSize: '48px',
+  storyBeatTitle: {
+    fontSize: '28px',
     fontWeight: 600,
     color: '#111827',
-    margin: 0,
-    lineHeight: 1.1,
+    margin: '0 0 8px 0',
     letterSpacing: '-0.02em',
   },
-  subheading: {
-    fontSize: '17px',
+  storyBeatDesc: {
+    fontSize: '15px',
     color: '#6B7280',
-    margin: '8px 0 0 0',
-    lineHeight: 1.6,
-    maxWidth: '400px',
-  },
-  howItWorks: {
-    fontSize: '14px',
-    color: '#9CA3AF',
-    textDecoration: 'none',
-    marginTop: '8px',
-    transition: 'color 0.15s ease',
-  },
-
-  // Visual Column
-  visualColumn: {
-    position: 'relative',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-  },
-
-  // Hero Image
-  imageWrapper: {
-    position: 'relative',
-    width: '100%',
-    maxWidth: '560px',
-  },
-  imageGlow: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: 'translate(-50%, -50%)',
-    width: '80%',
-    height: '80%',
-    background: 'radial-gradient(ellipse at center, rgba(200, 210, 230, 0.4) 0%, transparent 70%)',
-    filter: 'blur(40px)',
-    zIndex: 0,
-  },
-  heroImage: {
-    position: 'relative',
-    width: '100%',
-    height: 'auto',
-    borderRadius: '16px',
-    boxShadow: '0 25px 80px -20px rgba(0, 0, 0, 0.12), 0 10px 40px -15px rgba(0, 0, 0, 0.08)',
-    zIndex: 1,
+    margin: 0,
+    lineHeight: 1.5,
   },
 
   // Upload Card
   uploadCard: {
-    position: 'relative',
-    marginTop: '-40px',
-    marginRight: '-20px',
-    alignSelf: 'flex-end',
-    width: '320px',
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    width: '280px',
     background: '#f4f4f4',
     borderRadius: '16px',
-    padding: '24px',
+    padding: '20px',
     boxShadow: softShadow,
-    zIndex: 2,
-  },
-  cardTitle: {
-    fontSize: '16px',
-    fontWeight: 600,
-    color: '#111827',
-    margin: '0 0 16px 0',
+    zIndex: 30,
   },
 
   // Dropzone
@@ -592,11 +882,11 @@ const styles = {
     textAlign: 'center',
     background: '#e8e8ec',
     cursor: 'pointer',
-    boxShadow: 'inset 1px 1px 3px rgba(0,0,0,0.1), inset -1px -1px 3px rgba(255,255,255,0.5)',
+    boxShadow: 'inset 1px 1px 3px rgba(0,0,0,0.08), inset -1px -1px 3px rgba(255,255,255,0.5)',
   },
   dropzoneActive: {
-    borderColor: '#111827',
-    background: '#e0e0e4',
+    borderColor: '#3B82F6',
+    background: '#e0e4ec',
   },
   dropIcon: {
     marginBottom: '8px',
@@ -608,159 +898,113 @@ const styles = {
   },
   browseBtn: {
     display: 'inline-block',
-    padding: '10px 20px',
-    background: '#e8e8ec',
-    color: '#111827',
+    padding: '10px 24px',
+    background: '#111827',
+    color: '#ffffff',
     borderRadius: '8px',
     cursor: 'pointer',
     fontSize: '14px',
     fontWeight: 500,
-    boxShadow: softShadow,
   },
   fileInput: {
     display: 'none',
   },
 
-  // Card Footer
-  cardFooter: {
-    marginTop: '16px',
-    paddingTop: '16px',
-    borderTop: '1px solid rgba(0, 0, 0, 0.06)',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  // Processing
+  processing: {
+    padding: '20px 8px',
+    textAlign: 'center',
   },
-  supportText: {
-    fontSize: '12px',
-    color: '#9CA3AF',
-  },
-  statusPill: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    padding: '4px 10px',
-    background: '#e8e8ec',
-    borderRadius: '100px',
-    fontSize: '12px',
-    fontWeight: 500,
-    color: '#166534',
-    boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.08)',
-  },
-  statusDot: {
-    width: '6px',
-    height: '6px',
+  spinner: {
+    width: '28px',
+    height: '28px',
+    border: '3px solid #F3F4F6',
+    borderTopColor: '#111827',
     borderRadius: '50%',
-    background: '#22C55E',
+    margin: '0 auto 12px',
+    animation: 'spin 1s linear infinite',
+  },
+  progressText: {
+    margin: 0,
+    color: '#111827',
+    fontSize: '14px',
+    fontWeight: 500,
   },
 
-  // Stage Indicator
+  // Stage List
   stageList: {
-    padding: '20px 8px',
     display: 'flex',
     flexDirection: 'column',
     textAlign: 'left',
-    maxWidth: '320px',
-    margin: '0 auto',
   },
   stageItem: {
     display: 'flex',
-    gap: '12px',
-    paddingBottom: '0',
-    position: 'relative',
-    minHeight: '44px',
+    gap: '10px',
+    minHeight: '36px',
   },
   stageIconCol: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    width: '24px',
+    width: '20px',
   },
   stageDot: {
-    width: '12px',
-    height: '12px',
+    width: '10px',
+    height: '10px',
     borderRadius: '50%',
-    zIndex: 2,
-    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-    boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.1)',
+    transition: 'all 0.3s ease',
   },
   stageLine: {
     width: '2px',
     flex: 1,
-    background: '#E5E7EB',
-    margin: '4px 0',
+    margin: '2px 0',
     borderRadius: '1px',
-    transition: 'background 0.4s ease',
   },
   stageContent: {
     flex: 1,
-    paddingTop: '-2px',
-    paddingBottom: '16px',
+    paddingBottom: '8px',
   },
   stageLabel: {
-    fontSize: '13px',
-    fontWeight: 500,
-    marginBottom: '2px',
-    transition: 'color 0.3s ease',
-  },
-  stageSub: {
-    fontSize: '11px',
-    lineHeight: '1.4',
-    transition: 'color 0.3s ease',
-    display: 'block',
-  },
-
-  // Processing State
-  processing: {
-    padding: '40px 16px',
-    textAlign: 'center',
-  },
-  spinner: {
-    width: '32px',
-    height: '32px',
-    border: '3px solid #F3F4F6',
-    borderTopColor: '#111827',
-    borderRadius: '50%',
-    margin: '0 auto 16px',
-    animation: 'spin 1s linear infinite',
-  },
-  progressText: {
-    margin: '0 0 4px 0',
-    color: '#111827',
-    fontSize: '14px',
+    fontSize: '12px',
     fontWeight: 500,
   },
-  hint: {
-    margin: 0,
-    color: '#9CA3AF',
-    fontSize: '13px',
-  },
 
-  // Error State
+  // Error
   errorBox: {
-    padding: '32px 16px',
+    padding: '16px',
     textAlign: 'center',
-  },
-  errorIcon: {
-    marginBottom: '12px',
   },
   errorText: {
-    margin: '0 0 16px 0',
+    margin: '0 0 12px 0',
     color: '#EF4444',
-    fontSize: '14px',
+    fontSize: '13px',
   },
   retryBtn: {
-    padding: '10px 20px',
-    background: '#e8e8ec',
+    padding: '8px 16px',
+    background: '#111827',
     border: 'none',
-    borderRadius: '8px',
-    color: '#111827',
+    borderRadius: '6px',
+    color: '#fff',
     cursor: 'pointer',
     fontSize: '13px',
     fontWeight: 500,
-    boxShadow: softShadow,
   },
 
-  // Mini Panel (when model is loaded)
+  // Frame Counter (debug)
+  frameCounter: {
+    position: 'absolute',
+    bottom: '16px',
+    right: '16px',
+    padding: '6px 12px',
+    background: 'rgba(0,0,0,0.6)',
+    color: '#fff',
+    borderRadius: '6px',
+    fontSize: '12px',
+    fontFamily: 'monospace',
+    zIndex: 50,
+  },
+
+  // Mini Panel
   miniPanel: {
     position: 'absolute',
     bottom: 20,
@@ -782,9 +1026,61 @@ const styles = {
     fontWeight: 500,
     boxShadow: softShadow,
   },
+
+  // Feature Section
+  featureSection: {
+    background: '#e8e8ec',
+    padding: '100px 32px 120px',
+  },
+  featureSectionHeader: {
+    textAlign: 'center',
+    marginBottom: '48px',
+  },
+  featureSectionTitle: {
+    fontSize: '32px',
+    fontWeight: 600,
+    color: '#111827',
+    margin: '0 0 12px 0',
+    letterSpacing: '-0.02em',
+  },
+  featureSectionDesc: {
+    fontSize: '16px',
+    color: '#6B7280',
+    margin: 0,
+  },
+  featureGrid: {
+    display: 'grid',
+    gap: '24px',
+    maxWidth: '900px',
+    margin: '0 auto',
+  },
+  featureCard: {
+    background: '#f4f4f4',
+    borderRadius: '16px',
+    padding: '28px',
+    boxShadow: softShadow,
+    border: '1px solid rgba(255,255,255,0.6)',
+  },
+  featureIcon: {
+    fontSize: '28px',
+    display: 'block',
+    marginBottom: '12px',
+  },
+  featureTitle: {
+    fontSize: '16px',
+    fontWeight: 600,
+    color: '#111827',
+    margin: '0 0 8px 0',
+  },
+  featureDesc: {
+    fontSize: '14px',
+    color: '#6B7280',
+    margin: 0,
+    lineHeight: 1.5,
+  },
 }
 
-// Add CSS animations and hover effects
+// Add CSS animations
 if (typeof document !== 'undefined') {
   const styleSheet = document.createElement('style')
   styleSheet.textContent = `
@@ -792,30 +1088,22 @@ if (typeof document !== 'undefined') {
       to { transform: rotate(360deg); }
     }
     
-    /* Hover effects for nav links */
     nav a:hover {
       color: #111827 !important;
     }
-    
-    /* Hover for "How it works" link */
-    a[href="#how"]:hover {
-      color: #6B7280 !important;
+
+    html {
+      scroll-behavior: smooth;
     }
-    
-    /* Browse button hover */
-    label[style*="Browse"]:hover {
-      background: #1F2937 !important;
-    }
-    
-    /* Retry button hover */
-    button:hover {
-      background: #F9FAFB !important;
-    }
-    
-    /* New model button hover */
-    button[style*="Load New"]:hover {
-      background: #F9FAFB !important;
-      border-color: #D1D5DB !important;
+
+    @media (prefers-reduced-motion: reduce) {
+      html {
+        scroll-behavior: auto;
+      }
+      * {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
     }
   `
   document.head.appendChild(styleSheet)
