@@ -28,6 +28,8 @@ function StructureTree({
   const [error, setError] = useState(null)
   const [expandedNodes, setExpandedNodes] = useState(new Set())
   const [isolatedBranch, setIsolatedBranch] = useState(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [typeFilter, setTypeFilter] = useState('')
   // Track current isolation mode and IDs
   const [contextMode, setContextMode] = useState('GHOST') // 'GHOST' | 'HIDE'
   const [currentIsolatedIds, setCurrentIsolatedIds] = useState([])
@@ -59,6 +61,80 @@ function StructureTree({
     if (!selectedId) return []
     return Array.isArray(selectedId) ? selectedId : [selectedId]
   }, [selectedId])
+
+  const availableTypes = useMemo(() => {
+    if (!hierarchy) return []
+    const elementsByType = hierarchy?.statistics?.elementsByType
+    if (elementsByType && typeof elementsByType === 'object') {
+      return Object.keys(elementsByType).sort()
+    }
+
+    const types = new Set()
+    const traverse = (node) => {
+      if (node?.type?.startsWith?.('Ifc')) {
+        types.add(node.type)
+      }
+      if (node?.category?.startsWith?.('Ifc')) {
+        types.add(node.category)
+      }
+      if (node?.children) {
+        node.children.forEach(traverse)
+      }
+    }
+    traverse(hierarchy)
+    return Array.from(types).sort()
+  }, [hierarchy])
+
+  const filterActive = searchQuery.trim() !== '' || typeFilter !== ''
+
+  const filteredHierarchy = useMemo(() => {
+    if (!hierarchy) return null
+
+    const query = searchQuery.trim().toLowerCase()
+    const typeValue = typeFilter.trim()
+
+    const matchesQuery = (node) => {
+      if (!query) return true
+      const haystack = [
+        node.name,
+        node.type,
+        node.category,
+        node.globalId,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      return haystack.includes(query)
+    }
+
+    const matchesType = (node) => {
+      if (!typeValue) return true
+      if (node.type === typeValue) return true
+      if (node.category === typeValue) return true
+      return false
+    }
+
+    const filterNode = (node) => {
+      if (!node) return null
+      const children = (node.children || [])
+        .map(filterNode)
+        .filter(Boolean)
+
+      const selfMatches = matchesQuery(node) && matchesType(node)
+      if (selfMatches || children.length > 0) {
+        const nextNode = { ...node }
+        if (children.length > 0) {
+          nextNode.children = children
+        } else {
+          delete nextNode.children
+        }
+        return nextNode
+      }
+      return null
+    }
+
+    return filterNode(hierarchy)
+  }, [hierarchy, searchQuery, typeFilter])
 
   // Load hierarchy JSON on mount
   useEffect(() => {
@@ -358,19 +434,60 @@ function StructureTree({
         )}
 
         {!loading && !error && hierarchy && (
-          <div style={styles.tree} ref={treeContainerRef}>
-            <TreeNode
-              node={hierarchy}
-              depth={0}
-              expandedNodes={expandedNodes}
-              toggleExpand={toggleExpand}
-              onIsolate={handleIsolate}
-              onSelect={handleSelectElement}
-              selectedIds={selectedIds}
-              isolatedBranch={isolatedBranch}
-              selectedNodeRef={selectedNodeRef}
-            />
-          </div>
+          <>
+            <div style={styles.filterBar}>
+              <input
+                style={styles.searchInput}
+                type="text"
+                value={searchQuery}
+                placeholder="Search structure..."
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <select
+                style={styles.filterSelect}
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+              >
+                <option value="">All IFC Types</option>
+                {availableTypes.map((type) => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+              </select>
+              {filterActive && (
+                <button
+                  style={styles.clearBtn}
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('')
+                    setTypeFilter('')
+                  }}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+
+            {filteredHierarchy ? (
+              <div style={styles.tree} ref={treeContainerRef}>
+                <TreeNode
+                  node={filteredHierarchy}
+                  depth={0}
+                  expandedNodes={expandedNodes}
+                  toggleExpand={toggleExpand}
+                  onIsolate={handleIsolate}
+                  onSelect={handleSelectElement}
+                  selectedIds={selectedIds}
+                  isolatedBranch={isolatedBranch}
+                  selectedNodeRef={selectedNodeRef}
+                  forceExpand={filterActive}
+                />
+              </div>
+            ) : (
+              <div style={styles.message}>
+                <p>No matches found.</p>
+              </div>
+            )}
+          </>
         )}
 
         {/* Statistics */}
@@ -417,11 +534,12 @@ function TreeNode({
   onSelect,
   selectedIds = [],
   isolatedBranch,
-  selectedNodeRef
+  selectedNodeRef,
+  forceExpand = false
 }) {
   const nodeId = node.globalId || `${node.type}-${node.name}-${depth}`
   const hasChildren = node.children && node.children.length > 0
-  const isExpanded = expandedNodes.has(nodeId)
+  const isExpanded = forceExpand ? true : expandedNodes.has(nodeId)
   const isSelected = node.globalId && selectedIds.includes(node.globalId)
   const isIsolated = isolatedBranch === nodeId
   const isLeaf = !hasChildren && node.globalId && node.type !== 'Category'
@@ -440,7 +558,7 @@ function TreeNode({
       >
         {/* Fixed left section: indent + expand button */}
         <div style={{ ...styles.nodeLeft, paddingLeft: `${depth * 14}px` }}>
-          {hasChildren ? (
+          {hasChildren && !forceExpand ? (
             <button 
               style={styles.expandBtn}
               onClick={() => toggleExpand(nodeId)}
@@ -520,6 +638,7 @@ function TreeNode({
               selectedIds={selectedIds}
               isolatedBranch={isolatedBranch}
               selectedNodeRef={selectedNodeRef}
+              forceExpand={forceExpand}
             />
           ))}
         </div>
@@ -606,6 +725,46 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     background: 'rgba(255, 255, 255, 0.3)',
+  },
+  filterBar: {
+    display: 'flex',
+    gap: '8px',
+    padding: '12px 12px 8px 12px',
+    background: 'rgba(255, 255, 255, 0.4)',
+    borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+  },
+  searchInput: {
+    flex: 1,
+    padding: '6px 10px',
+    borderRadius: '8px',
+    border: 'none',
+    background: '#e8e8ec',
+    fontSize: '12px',
+    color: '#1d1d1f',
+    boxShadow: 'inset 1px 1px 2px rgba(0,0,0,0.08), inset -1px -1px 2px rgba(255,255,255,0.6)',
+    outline: 'none',
+  },
+  filterSelect: {
+    width: '110px',
+    padding: '6px 8px',
+    borderRadius: '8px',
+    border: 'none',
+    background: '#e8e8ec',
+    fontSize: '12px',
+    color: '#1d1d1f',
+    boxShadow: 'inset 1px 1px 2px rgba(0,0,0,0.08), inset -1px -1px 2px rgba(255,255,255,0.6)',
+    outline: 'none',
+  },
+  clearBtn: {
+    padding: '6px 10px',
+    borderRadius: '8px',
+    border: 'none',
+    background: '#f4f4f4',
+    fontSize: '11px',
+    fontWeight: 600,
+    color: '#6B7280',
+    cursor: 'pointer',
+    boxShadow: softShadow,
   },
   message: {
     padding: '20px',

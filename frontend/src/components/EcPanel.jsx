@@ -12,6 +12,7 @@ function EcPanel({ isOpen, onClose, jobId, selectedId, onSelectContributor, focu
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
   const [showDetails, setShowDetails] = useState(false)
+  const [selectedMaterialClass, setSelectedMaterialClass] = useState(null)
   
   // Overrides state
   const [overrides, setOverrides] = useState({
@@ -374,15 +375,124 @@ function EcPanel({ isOpen, onClose, jobId, selectedId, onSelectContributor, focu
                       </tr>
                     </thead>
                     <tbody>
-                      {result.summary.by_material_class.map((item, idx) => (
-                        <tr key={idx} style={styles.tr}>
-                          <td style={styles.td}>{item.material_class}</td>
-                          <td style={styles.td}>{item.ec_avg_kgCO2e.toFixed(2)}</td>
-                        </tr>
-                      ))}
+                      {result.summary.by_material_class.map((item, idx) => {
+                        const isSelected = selectedMaterialClass === item.material_class
+                        return (
+                          <tr 
+                            key={idx} 
+                            style={{
+                              ...styles.tr,
+                              ...styles.materialRow,
+                              ...(isSelected ? styles.materialRowSelected : {})
+                            }}
+                            className="ec-material-row"
+                            onClick={() => {
+                              setSelectedMaterialClass(prev => (
+                                prev === item.material_class ? null : item.material_class
+                              ))
+                            }}
+                          >
+                            <td style={styles.td}>
+                              <span style={styles.materialToggle}>{isSelected ? '-' : '+'}</span>
+                              {item.material_class}
+                            </td>
+                            <td style={styles.td}>{item.ec_avg_kgCO2e.toFixed(2)}</td>
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
+
+                {selectedMaterialClass && (
+                  <div style={styles.drilldownContainer}>
+                    <div style={styles.drilldownHeader}>
+                      <h4 style={styles.subtitle}>Components in {selectedMaterialClass}</h4>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedMaterialClass(null)}
+                        style={styles.linkButton}
+                        className="ec-link-btn"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                    {(() => {
+                      const componentsMap = new Map()
+                      result.details.elements.forEach((el, index) => {
+                        if (el.MaterialClass !== selectedMaterialClass) return
+                        const key = el.GlobalId || `${el.Name || 'Unnamed'}-${el.IfcType || ''}-${index}`
+                        const existing = componentsMap.get(key)
+                        if (existing) {
+                          existing.ec_avg_kgCO2e += el.EC_avg_kgCO2e || 0
+                          return
+                        }
+                        componentsMap.set(key, {
+                          key,
+                          GlobalId: el.GlobalId || null,
+                          Name: el.Name || 'Unnamed',
+                          IfcType: el.IfcType || '',
+                          ec_avg_kgCO2e: el.EC_avg_kgCO2e || 0
+                        })
+                      })
+
+                      const components = Array.from(componentsMap.values())
+                        .sort((a, b) => b.ec_avg_kgCO2e - a.ec_avg_kgCO2e)
+
+                      if (components.length === 0) {
+                        return (
+                          <p style={styles.drilldownEmpty}>
+                            No components in the current detail list.
+                          </p>
+                        )
+                      }
+
+                      const ecValues = components
+                        .map(item => item.ec_avg_kgCO2e || 0)
+                        .filter(v => v > 0)
+                      const minEc = ecValues.length ? Math.min(...ecValues) : 0
+                      const maxEc = ecValues.length ? Math.max(...ecValues) : 0
+
+                      return (
+                        <div style={styles.tableContainer}>
+                          <table style={styles.table}>
+                            <thead>
+                              <tr>
+                                <th style={styles.th}>Component</th>
+                                <th style={styles.th}>EC (kgCO2e)</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {components.map((component) => (
+                                <tr
+                                  key={component.key}
+                                  style={styles.tr}
+                                  className={component.GlobalId ? "ec-row-hover" : ""}
+                                  onClick={(e) => {
+                                    if (!component.GlobalId) return
+                                    e.stopPropagation()
+                                    onSelectContributor && onSelectContributor(component.GlobalId, {
+                                      ecValue: component.ec_avg_kgCO2e,
+                                      minEc,
+                                      maxEc
+                                    })
+                                  }}
+                                  title={component.GlobalId ? "Click to select in model" : "No model mapping"}
+                                >
+                                  <td style={styles.td}>
+                                    {component.Name}
+                                    {component.IfcType ? ` (${component.IfcType.replace('Ifc', '')})` : ''}
+                                  </td>
+                                  <td style={styles.td}>{component.ec_avg_kgCO2e.toFixed(2)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )
+                    })()}
+                  </div>
+                )}
 
                 <h4 style={{...styles.subtitle, marginTop: '16px'}}>By IFC Type</h4>
                 <div style={styles.tableContainer}>
@@ -753,6 +863,36 @@ const styles = {
     gap: '8px',
     animation: 'fadeIn 0.3s ease-in-out',
   },
+  materialRow: {
+    cursor: 'pointer',
+  },
+  materialRowSelected: {
+    background: 'rgba(0, 113, 227, 0.08)',
+  },
+  materialToggle: {
+    display: 'inline-block',
+    width: '12px',
+    marginRight: '6px',
+    color: '#86868b',
+    fontWeight: 600,
+  },
+  drilldownContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+    marginTop: '8px',
+  },
+  drilldownHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '8px',
+  },
+  drilldownEmpty: {
+    fontSize: '11px',
+    color: '#86868b',
+    margin: 0,
+  },
   qualityContainer: {
     backgroundColor: '#e8e8ec',
     padding: '12px',
@@ -935,6 +1075,10 @@ styleSheet.textContent = `
   }
   .ec-row-hover:hover {
     background-color: rgba(0, 113, 227, 0.1) !important;
+    cursor: pointer;
+  }
+  .ec-material-row:hover {
+    background-color: rgba(0, 113, 227, 0.08) !important;
     cursor: pointer;
   }
   

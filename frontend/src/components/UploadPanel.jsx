@@ -41,8 +41,8 @@ const getStageLabel = (stage, status) => {
 }
 
 // Frame animation configuration
-const FRAME_COUNT = 120
-const FRAME_PATH = '/media/frames_max/ezgif-frame-'
+const FRAME_COUNT = 191
+const FRAME_PATH = '/media/frames_max2/ezgif-frame-'
 
 // Story beats configuration - Updated for new scroll pattern
 const STORY_BEATS = [
@@ -113,22 +113,24 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
   const [loadingProgress, setLoadingProgress] = useState(0)
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
-  const [scrollProgress, setScrollProgress] = useState(0)
-  const [currentFrame, setCurrentFrame] = useState(0)
-
-  // Refs
+  
+  // Refs for performance optimizations (removing state from scroll loop)
+  const currentFrameRef = useRef(0)
   const containerRef = useRef(null)
   const heroRef = useRef(null)
   const canvasRef = useRef(null)
   const framesRef = useRef([])
   const contextRef = useRef(null)
+  const storyBeatRefs = useRef([])
+  const uploadCardRef = useRef(null)
+  const scrollBarRef = useRef(null)
 
   const API_URL = 'http://localhost:8000'
 
   // Generate frame path
   const getFramePath = (index) => {
     const num = String(index + 1).padStart(3, '0')
-    return `${FRAME_PATH}${num}.jpg`
+    return `${FRAME_PATH}${num}.png`
   }
 
   // Check for reduced motion preference
@@ -226,7 +228,7 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
       ctx.scale(dpr, dpr)
 
       // Draw current frame after resize
-      drawFrame(currentFrame)
+      drawFrame(currentFrameRef.current)
     }
 
     resizeCanvas()
@@ -282,6 +284,19 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
   useEffect(() => {
     if (!imagesLoaded || prefersReducedMotion || hasModel || !heroRef.current) return
 
+    // Helper to calculate opacity based on progress (internal to avoid render loop)
+    const getOpacity = (beat, p) => {
+      if (p < beat.trigger - 0.05) return 0
+      if (p > beat.end + 0.05) return 0
+      if (p >= beat.trigger - 0.05 && p < beat.trigger + 0.05) {
+        return (p - (beat.trigger - 0.05)) / 0.1
+      }
+      if (p > beat.end - 0.05) {
+        return Math.max(0, 1 - ((p - (beat.end - 0.05)) / 0.1))
+      }
+      return 1
+    }
+
     const ctx = gsap.context(() => {
       const frameObj = { frame: 0 }
 
@@ -289,21 +304,49 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
       // The hero stays pinned for 300vh of scroll, then unpins to reveal content below
       gsap.to(frameObj, {
         frame: FRAME_COUNT - 1,
-        snap: 'frame',
         ease: 'none',
         scrollTrigger: {
           trigger: heroRef.current,
           start: 'top top',
-          end: '+=300%', // Pin for 300vh of scroll distance
+          end: '+=100%', // One screen of scroll
           pin: true, // Pin the hero element
           pinSpacing: true, // Add spacing so content below waits
-          scrub: 0.1, // Very smooth scrubbing (lower = more responsive)
+          scrub: 0.3, // Smoother scrubbing to reduce stutter
           anticipatePin: 1, // Prevent jank when pinning
           onUpdate: (self) => {
-            setScrollProgress(self.progress)
+            const p = self.progress
+
+            // Update Scroll Bar
+            if (scrollBarRef.current) {
+              scrollBarRef.current.style.width = `${p * 100}%`
+            }
+
+            // Draw Frame
             const frameIndex = Math.round(frameObj.frame)
-            setCurrentFrame(frameIndex)
-            drawFrame(frameIndex)
+            if (currentFrameRef.current !== frameIndex) {
+              currentFrameRef.current = frameIndex
+              drawFrame(frameIndex)
+            }
+
+            // Update Story Beats
+            STORY_BEATS.forEach((beat, i) => {
+              const el = storyBeatRefs.current[i]
+              if (el) {
+                const opacity = getOpacity(beat, p)
+                el.style.opacity = opacity
+                el.style.pointerEvents = opacity > 0 ? 'auto' : 'none'
+              }
+            })
+
+            // Update Upload Card
+            if (uploadCardRef.current) {
+              const shouldShow = p > 0.75
+              uploadCardRef.current.style.opacity = shouldShow ? 1 : 0
+              uploadCardRef.current.style.transform = shouldShow 
+                ? 'translate(-50%, -50%) scale(1)' 
+                : 'translate(-50%, -40%) scale(0.95)'
+              uploadCardRef.current.style.pointerEvents = shouldShow ? 'auto' : 'none'
+            }
           }
         },
       })
@@ -313,18 +356,19 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
     return () => ctx.revert()
   }, [imagesLoaded, prefersReducedMotion, hasModel])
 
-  // Calculate story beat visibility based on scroll progress
-  const getStoryBeatOpacity = (beat) => {
-    if (scrollProgress < beat.trigger - 0.05) return 0
-    if (scrollProgress > beat.end + 0.05) return 0
+  // Calculate story beat visibility based on scroll progress (Legacy / Fallback usage if needed)
+  const getStoryBeatOpacity = (beat, progress = 0) => {
+    // Kept for prop calculation if needed, but animation is now handled via refs
+    if (progress < beat.trigger - 0.05) return 0
+    if (progress > beat.end + 0.05) return 0
 
     // Fade in
-    if (scrollProgress < beat.trigger + 0.05) {
-      return Math.min(1, (scrollProgress - (beat.trigger - 0.05)) / 0.1)
+    if (progress < beat.trigger + 0.05) {
+      return Math.min(1, (progress - (beat.trigger - 0.05)) / 0.1)
     }
     // Fade out
-    if (scrollProgress > beat.end - 0.05) {
-      return Math.max(0, 1 - (scrollProgress - (beat.end - 0.05)) / 0.1)
+    if (progress > beat.end - 0.05) {
+      return Math.max(0, 1 - (progress - (beat.end - 0.05)) / 0.1)
     }
     return 1
   }
@@ -528,9 +572,11 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
 
           {/* Scroll Progress Bar */}
           <div style={styles.scrollBar}>
-            <div style={{
+            <div 
+              ref={scrollBarRef}
+              style={{
               ...styles.scrollBarFill,
-              width: `${scrollProgress * 100}%`
+              width: '0%'
             }}></div>
           </div>
         </header>
@@ -547,18 +593,18 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
           <div style={styles.canvasOverlay}></div>
 
           {/* Story Beat Text Overlays */}
-          {STORY_BEATS.map((beat) => {
-            const opacity = getStoryBeatOpacity(beat)
+          {STORY_BEATS.map((beat, index) => {
             const positionStyles = getStoryBeatPosition(beat.position)
 
             return (
               <div
                 key={beat.id}
+                ref={el => storyBeatRefs.current[index] = el}
                 style={{
                   ...styles.storyBeat,
                   ...positionStyles,
-                  opacity: prefersReducedMotion ? (scrollProgress >= beat.trigger && scrollProgress <= beat.end ? 1 : 0) : opacity,
-                  pointerEvents: opacity > 0 ? 'auto' : 'none',
+                  opacity: 0,
+                  pointerEvents: 'none',
                 }}
               >
                 <h2 style={styles.storyBeatTitle}>{beat.title}</h2>
@@ -568,15 +614,16 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
           })}
 
           {/* Upload Card - Centered and visible earlier */}
-          <div style={{
-            ...styles.uploadCard,
-            opacity: scrollProgress > 0.75 ? 1 : 0,
-            transform: scrollProgress > 0.75
-              ? 'translate(-50%, -50%) scale(1)'
-              : 'translate(-50%, -40%) scale(0.95)',
-            transition: prefersReducedMotion ? 'none' : 'opacity 0.5s ease, transform 0.5s ease',
-            pointerEvents: scrollProgress > 0.75 ? 'auto' : 'none',
-          }}>
+          <div
+            ref={uploadCardRef}
+            style={{
+              ...styles.uploadCard,
+              opacity: 0,
+              transform: 'translate(-50%, -40%) scale(0.95)',
+              transition: prefersReducedMotion ? 'none' : 'opacity 0.5s ease, transform 0.5s ease',
+              pointerEvents: 'none',
+            }}
+          >
             {uploadState === 'idle' && (
               <>
                 <div
