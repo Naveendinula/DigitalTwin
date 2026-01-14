@@ -69,7 +69,6 @@ async def calculate_ec(job_id: str, request: Optional[CalculateEcRequest] = None
         result = compute_ec_from_ifc(
             ifc_path=ifc_path,
             ec_db_path=EC_DB_PATH,
-            max_detail_rows=200,
             overrides=overrides_dict
         )
     except Exception as e:

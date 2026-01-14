@@ -12,10 +12,23 @@ const getSpaceLabel = (space) => {
   return label || space.name || space.globalId || 'Unknown'
 }
 
+const getSpaceKey = (space) => {
+  if (!space) return 'fallback:unknown'
+  if (space.globalId) return space.globalId
+  const parts = []
+  if (space.storey) parts.push(`storey:${space.storey}`)
+  if (space.room_no) parts.push(`room_no:${space.room_no}`)
+  if (space.room_name) parts.push(`room_name:${space.room_name}`)
+  if (space.name) parts.push(`name:${space.name}`)
+  return parts.length ? `fallback:${parts.join('|')}` : 'fallback:unknown'
+}
+
 const getTerminalLabel = (terminal) => {
   if (!terminal) return 'Unknown'
   return terminal.name || terminal.tag || terminal.globalId || 'Unknown'
 }
+
+const TERMINAL_PREVIEW_COUNT = 6
 
 /**
  * HvacFmPanel Component
@@ -29,6 +42,7 @@ function HvacFmPanel({ isOpen, onClose, jobId, selectedId, onSelectEquipment, fo
   const [error, setError] = useState(null)
   const [selectedEquipmentId, setSelectedEquipmentId] = useState(null)
   const [showEquipmentSpaces, setShowEquipmentSpaces] = useState(true)
+  const [showAllTerminals, setShowAllTerminals] = useState(false)
   const [storeyFilter, setStoreyFilter] = useState('All')
   const [systemFilter, setSystemFilter] = useState('All')
   const [activeTab, setActiveTab] = useState('equipment')
@@ -199,6 +213,12 @@ function HvacFmPanel({ isOpen, onClose, jobId, selectedId, onSelectEquipment, fo
     () => equipmentList.find(item => item.globalId === selectedEquipmentId),
     [equipmentList, selectedEquipmentId]
   )
+  const terminalList = selectedEquipment?.servedTerminals || []
+  const visibleTerminals = showAllTerminals
+    ? terminalList
+    : terminalList.slice(0, TERMINAL_PREVIEW_COUNT)
+  const canToggleTerminals = terminalList.length > TERMINAL_PREVIEW_COUNT
+  const remainingTerminalCount = terminalList.length - TERMINAL_PREVIEW_COUNT
 
   const spacesMap = useMemo(() => {
     const map = {}
@@ -207,22 +227,24 @@ function HvacFmPanel({ isOpen, onClose, jobId, selectedId, onSelectEquipment, fo
     result.equipment.forEach(equip => {
       if (!equip.servedSpaces) return
       equip.servedSpaces.forEach(space => {
-        if (!map[space.globalId]) {
-          map[space.globalId] = {
+        const spaceKey = getSpaceKey(space)
+        if (!map[spaceKey]) {
+          map[spaceKey] = {
+            spaceKey,
             spaceInfo: space,
             servedBy: [],
             terminals: []
           }
         }
         // Add equipment
-        if (!map[space.globalId].servedBy.find(e => e.globalId === equip.globalId)) {
-          map[space.globalId].servedBy.push(equip)
+        if (!map[spaceKey].servedBy.find(e => e.globalId === equip.globalId)) {
+          map[spaceKey].servedBy.push(equip)
         }
         // Add terminals from this equipment
         if (equip.servedTerminals) {
            equip.servedTerminals.forEach(term => {
-               if (!map[space.globalId].terminals.find(t => t.globalId === term.globalId)) {
-                   map[space.globalId].terminals.push(term)
+               if (!map[spaceKey].terminals.find(t => t.globalId === term.globalId)) {
+                   map[spaceKey].terminals.push(term)
                }
            })
         }
@@ -259,6 +281,10 @@ function HvacFmPanel({ isOpen, onClose, jobId, selectedId, onSelectEquipment, fo
         setActiveTab('spaces')
     }
   }, [selectedId, result, spacesMap])
+
+  useEffect(() => {
+    setShowAllTerminals(false)
+  }, [selectedEquipmentId])
 
   if (!isOpen) return null
 
@@ -458,7 +484,7 @@ function HvacFmPanel({ isOpen, onClose, jobId, selectedId, onSelectEquipment, fo
                     {selectedEquipment.servedSpaces?.length ? (
                       <ul style={styles.list}>
                         {selectedEquipment.servedSpaces.map((space) => (
-                          <li key={space.globalId || space.name} style={styles.listItem}>
+                          <li key={getSpaceKey(space)} style={styles.listItem}>
                             {getSpaceLabel(space)}
                           </li>
                         ))}
@@ -468,14 +494,25 @@ function HvacFmPanel({ isOpen, onClose, jobId, selectedId, onSelectEquipment, fo
                     )}
 
                     <h4 style={{ ...styles.subtitle, marginTop: '12px' }}>Impacted terminals</h4>
-                    {selectedEquipment.servedTerminals?.length ? (
-                      <ul style={styles.list}>
-                        {selectedEquipment.servedTerminals.map((terminal) => (
-                          <li key={terminal.globalId} style={styles.listItem}>
-                            {getTerminalLabel(terminal)}
-                          </li>
-                        ))}
-                      </ul>
+                    {terminalList.length ? (
+                      <>
+                        <ul style={styles.list}>
+                          {visibleTerminals.map((terminal) => (
+                            <li key={terminal.globalId} style={styles.listItem}>
+                              {getTerminalLabel(terminal)}
+                            </li>
+                          ))}
+                        </ul>
+                        {canToggleTerminals && (
+                          <button
+                            type="button"
+                            style={styles.viewMoreButton}
+                            onClick={() => setShowAllTerminals(prev => !prev)}
+                          >
+                            {showAllTerminals ? 'View less' : `View more (${remainingTerminalCount})`}
+                          </button>
+                        )}
+                      </>
                     ) : (
                       <p style={styles.emptyText}>No terminals linked.</p>
                     )}
@@ -502,10 +539,10 @@ function HvacFmPanel({ isOpen, onClose, jobId, selectedId, onSelectEquipment, fo
                     </thead>
                     <tbody>
                       {filteredSpaces.map((item) => {
-                        const isSelected = item.spaceInfo.globalId === selectedSpaceId
+                        const isSelected = item.spaceKey === selectedSpaceId
                         return (
                           <tr
-                            key={item.spaceInfo.globalId}
+                            key={item.spaceKey}
                             style={{
                               ...styles.tr,
                               backgroundColor: isSelected ? 'rgba(0, 212, 255, 0.15)' : 'transparent',
@@ -514,14 +551,14 @@ function HvacFmPanel({ isOpen, onClose, jobId, selectedId, onSelectEquipment, fo
                             className="hvac-row-hover"
                             onClick={(e) => {
                               e.stopPropagation()
-                              setSelectedSpaceId(item.spaceInfo.globalId)
+                              setSelectedSpaceId(item.spaceKey)
                               onSelectEquipment?.({
                                 equipmentId: null,
                                 terminalIds: [
                                   ...item.servedBy.map(e => e.globalId),
                                   ...item.terminals.map(t => t.globalId)
                                 ].filter(Boolean),
-                                spaceIds: [item.spaceInfo.globalId],
+                                spaceIds: [item.spaceInfo.globalId].filter(Boolean),
                               })
                             }}
                           >
@@ -799,6 +836,16 @@ const styles = {
   },
   listItem: {
     marginBottom: '4px',
+  },
+  viewMoreButton: {
+    alignSelf: 'flex-start',
+    background: 'none',
+    border: 'none',
+    color: '#008299',
+    cursor: 'pointer',
+    fontSize: '11px',
+    fontWeight: 600,
+    padding: 0,
   },
   emptyText: {
     margin: 0,

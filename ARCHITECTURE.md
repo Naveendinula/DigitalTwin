@@ -1,10 +1,13 @@
 # Architecture Documentation
 
 > **Status**: Living Document  
-> **Last Updated**: January 11, 2026  
+> **Last Updated**: January 13, 2026  
 > **Owner**: Naveen Panditharatne
 
 ## Recent additions / changes
+
+- **Date:** 2026-01-13
+- **EC Detail Coverage:** EC calculation now returns all element rows with computed EC values (no top-200 cap) to support full drilldowns in the UI.
 
 - **Date:** 2026-01-11
 - **IFC Validation:** Added a minimal `ifc_validation.py` module so `/validation/{job_id}` endpoints can return reports again.

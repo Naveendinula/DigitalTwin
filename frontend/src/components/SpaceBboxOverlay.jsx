@@ -289,10 +289,10 @@ function SpaceBboxOverlay({ enabled, jobId, onSpaceSelect, highlightedSpaceIds =
 
         // Determine material: occupancy color > highlight > default
         let meshMaterial = defaultMaterial
-        if (occupancyMaterials && occupancyMaterials.has(space.globalId)) {
+        const hasOccupancy = occupancyMaterials && occupancyMaterials.has(space.globalId)
+        if (hasOccupancy) {
           meshMaterial = occupancyMaterials.get(space.globalId)
-        }
-        if (isHighlighted) {
+        } else if (isHighlighted) {
           meshMaterial = highlightMaterial
         }
 

@@ -222,7 +222,7 @@ def load_ec_db(csv_path: str | Path) -> pd.DataFrame:
 def compute_ec_from_ifc(
     ifc_path: str | Path,
     ec_db_path: str | Path,
-    max_detail_rows: int = 200,
+    max_detail_rows: Optional[int] = None,
     overrides: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
@@ -232,6 +232,10 @@ def compute_ec_from_ifc(
       3) Apply overrides (MaterialClass, IfcType, Element)
       4) Compute mass + EC
       5) Return JSON-serializable summary + (optionally) per-element rows
+
+    max_detail_rows:
+      - None to return all rows with computed EC values
+      - integer to limit detail rows
     """
     ifc_path = Path(ifc_path)
     ec_db_path = Path(ec_db_path)
@@ -430,16 +434,18 @@ def compute_ec_from_ifc(
         for ifc_type, row in by_ifc.iterrows()
     ]
 
-    # --- Per-element details (limited) ---
-    # Top N rows by EC contribution – useful for a table in the UI
-    top = (
-        df_ec.sort_values("EC_avg_kgCO2e", ascending=False)
-        .head(max_detail_rows)
+    # --- Per-element details ---
+    # Elements with computed EC values, sorted by contribution.
+    detail_rows = (
+        df_ec[df_ec["EC_avg_kgCO2e"].notna()]
+        .sort_values("EC_avg_kgCO2e", ascending=False)
         .copy()
     )
+    if max_detail_rows is not None:
+        detail_rows = detail_rows.head(max_detail_rows)
     
     # Fill NaN values with 0 or empty string to ensure JSON compliance
-    top = top.fillna({
+    detail_rows = detail_rows.fillna({
         "Volume_m3": 0.0,
         "Mass_kg": 0.0,
         "EC_min_kgCO2e": 0.0,
@@ -463,7 +469,7 @@ def compute_ec_from_ifc(
         "EC_max_kgCO2e",
     ]
 
-    top_elements = top[detail_cols].to_dict(orient="records")
+    top_elements = detail_rows[detail_cols].to_dict(orient="records")
 
     result: Dict[str, Any] = {
         "warnings": warnings,
