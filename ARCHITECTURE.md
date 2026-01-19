@@ -92,7 +92,7 @@ The system bridges the gap between complex BIM files and accessible web visualiz
 *   `src/components/OccupancyPanel.jsx`: Draggable panel with sortable/filterable occupancy breakdown.
 *   `src/hooks/useOccupancy.js`: Hook managing occupancy polling and state.
 *   `src/components/PropertyPanel.jsx`: Displays element-specific metadata.
-*   `src/components/UploadPanel.jsx`: Handles file selection and upload progress.
+*   `src/components/UploadPanel.jsx`: Landing-page scrollytelling canvas (GSAP) plus file selection and upload progress.
 
 ## 4. Component Boundaries & Data Flow
 

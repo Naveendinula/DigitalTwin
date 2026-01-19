@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react'
+﻿import React, { useState, useCallback, useEffect, useRef } from 'react'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 
@@ -116,6 +116,8 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
   
   // Refs for performance optimizations (removing state from scroll loop)
   const currentFrameRef = useRef(0)
+  const pendingFrameRef = useRef(0)
+  const rafRef = useRef(null)
   const containerRef = useRef(null)
   const heroRef = useRef(null)
   const canvasRef = useRef(null)
@@ -182,13 +184,32 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
   useEffect(() => {
     if (hasModel) return
 
-    const images = []
+    const images = new Array(FRAME_COUNT)
     let loadedCount = 0
+    framesRef.current = images
 
     for (let i = 0; i < FRAME_COUNT; i++) {
       const img = new Image()
       img.src = getFramePath(i)
-      img.onload = () => {
+      img.onload = async () => {
+        let frame = img
+
+        if (typeof createImageBitmap === 'function') {
+          try {
+            frame = await createImageBitmap(img)
+          } catch {
+            try {
+              await img.decode()
+            } catch {}
+            frame = img
+          }
+        } else {
+          try {
+            await img.decode()
+          } catch {}
+        }
+
+        images[i] = frame
         loadedCount++
         setLoadingProgress(Math.round((loadedCount / FRAME_COUNT) * 100))
         if (loadedCount === FRAME_COUNT) {
@@ -202,9 +223,7 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
           setImagesLoaded(true)
         }
       }
-      images.push(img)
     }
-    framesRef.current = images
   }, [hasModel])
 
   // Initialize canvas and set up context
@@ -246,7 +265,11 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
     const canvas = canvasRef.current
     const frame = framesRef.current[frameIndex]
 
-    if (!ctx || !canvas || !frame || !frame.complete) return
+    if (!ctx || !canvas || !frame) return
+
+    const frameWidth = frame.width || frame.naturalWidth
+    const frameHeight = frame.height || frame.naturalHeight
+    if (!frameWidth || !frameHeight) return
 
     const canvasWidth = canvas.width / (window.devicePixelRatio || 1)
     const canvasHeight = canvas.height / (window.devicePixelRatio || 1)
@@ -255,7 +278,7 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
     ctx.clearRect(0, 0, canvasWidth, canvasHeight)
 
     // Calculate aspect ratio fit (contain)
-    const imgAspect = frame.width / frame.height
+    const imgAspect = frameWidth / frameHeight
     const canvasAspect = canvasWidth / canvasHeight
 
     let drawWidth, drawHeight, offsetX, offsetY
@@ -280,6 +303,30 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
     ctx.drawImage(frame, offsetX, offsetY, drawWidth, drawHeight)
   }
 
+  const requestDrawFrame = (nextFrame) => {
+    pendingFrameRef.current = nextFrame
+
+    if (rafRef.current) return
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null
+
+      const frameIndex = pendingFrameRef.current
+      if (currentFrameRef.current !== frameIndex) {
+        currentFrameRef.current = frameIndex
+        drawFrame(frameIndex)
+      }
+    })
+  }
+
+  useEffect(() => {
+    return () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current)
+        rafRef.current = null
+      }
+    }
+  }, [])
+
   // GSAP ScrollTrigger for canvas frame animation with pinning
   useEffect(() => {
     if (!imagesLoaded || prefersReducedMotion || hasModel || !heroRef.current) return
@@ -301,14 +348,14 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
       const frameObj = { frame: 0 }
 
       // Pin the hero section and scrub through all frames
-      // The hero stays pinned for 300vh of scroll, then unpins to reveal content below
+      // The hero stays pinned for multiple viewports of scroll, then unpins to reveal content below
       gsap.to(frameObj, {
         frame: FRAME_COUNT - 1,
         ease: 'none',
         scrollTrigger: {
           trigger: heroRef.current,
           start: 'top top',
-          end: '+=100%', // One screen of scroll
+          end: '+=350%', // Multiple screens of scroll for smoother pacing
           pin: true, // Pin the hero element
           pinSpacing: true, // Add spacing so content below waits
           scrub: 0.3, // Smoother scrubbing to reduce stutter
@@ -323,10 +370,7 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
 
             // Draw Frame
             const frameIndex = Math.round(frameObj.frame)
-            if (currentFrameRef.current !== frameIndex) {
-              currentFrameRef.current = frameIndex
-              drawFrame(frameIndex)
-            }
+            requestDrawFrame(frameIndex)
 
             // Update Story Beats
             STORY_BEATS.forEach((beat, i) => {
@@ -560,14 +604,6 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
               </svg>
               <span style={styles.logoText}>Digital Twin</span>
             </div>
-
-            <nav style={styles.navLinks}>
-              <a href="#" style={styles.navLink}>Overview</a>
-              <span style={styles.navDot}>·</span>
-              <a href="#" style={styles.navLink}>Details</a>
-              <span style={styles.navDot}>·</span>
-              <a href="#" style={styles.navLink}>Reports</a>
-            </nav>
           </div>
 
           {/* Scroll Progress Bar */}
@@ -685,13 +721,13 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
                         <div style={styles.stageIconCol}>
                           <div style={{
                             ...styles.stageDot,
-                            background: isCompleted ? '#10B981' : isActive ? '#3B82F6' : '#E5E7EB',
+                            background: isCompleted || isActive ? '#111827' : '#E5E7EB',
                             transform: isActive ? 'scale(1.2)' : 'scale(1)',
                           }} />
                           {!isLast && (
                             <div style={{
                               ...styles.stageLine,
-                              background: isCompleted ? '#10B981' : '#E5E7EB',
+                              background: isCompleted ? '#111827' : '#E5E7EB',
                             }} />
                           )}
                         </div>
@@ -1157,3 +1193,4 @@ if (typeof document !== 'undefined') {
 }
 
 export default UploadPanel
+
