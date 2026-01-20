@@ -13,6 +13,7 @@ build/
 # Project specific
 backend/output/
 backend/uploads/
+media_sources/
 HELICOPTER_VIEW.md
 
 # OS
