@@ -12,40 +12,53 @@ Architecture docs: `ARCHITECTURE.md` and `SYSTEM_MAP.md`.
 
 ## Demo (videos)
 
-- **View Presets** — Seamlessly switch between Top, Front, Side, and Free Orbit views to navigate the model efficiently.
-
+- **Upload + Structure + Properties** - Upload an IFC model, explore the structure panel (including tools like X‑ray and isolation to focus on specific parts), and view detailed element information in the properties panel as you click items in the model or tree.
   
 
-https://github.com/user-attachments/assets/fd9dc671-8727-4203-ad1a-35b3a2dcab0b
+
+https://github.com/user-attachments/assets/5caacdaf-e5f5-4609-9d76-c7590edba9b3
 
 
-- **Spatial Tree & Properties** — Browse the BIM hierarchy in the structure tree and inspect metadata for any selected element.
-
-
-
-https://github.com/user-attachments/assets/d86d45f3-8f72-48b9-bc86-1c71edf0c468
-
-
-- **X-Ray Visualization** — Toggle ghosted transparency to see through the model and focus on specific components.
-
-
-https://github.com/user-attachments/assets/dac63ecb-087d-411e-8207-ea8177473f0a
-
-
-
-- **Sectioning Tools** — Create and adjust section planes (size, position, visibility) to reveal internal details.
-
-
-
-https://github.com/user-attachments/assets/ca7e57e8-f8cd-462f-93fc-4dc9269db3f9
-
-
-- **Carbon Analysis** — Compute embodied carbon, surface high-impact materials, and apply data overrides when needed.
+- **Views + Section Tools** — Use the view buttons to jump between standard camera angles, then activate the section tools to cut through the model and reveal interior details by adjusting the section planes.
 
 
 
 
-https://github.com/user-attachments/assets/13ed555d-da2b-4b52-ab9b-3861132c5abe
+https://github.com/user-attachments/assets/9c3861dc-4bb2-4867-a476-722d60ca3815
+
+
+
+
+- **Embodied Carbon Calculator** — Run the carbon analysis to estimate material impacts, highlight high‑impact components, and apply overrides when you have better material data.
+
+
+
+https://github.com/user-attachments/assets/e25e34d2-4185-449d-afad-c4aa15fcf472
+
+
+
+- **Spaces Overlay** — Turn on the spaces feature to see translucent room boxes, then step through spaces to quickly locate and understand areas within the building.
+
+
+
+https://github.com/user-attachments/assets/04fcfb27-0578-4980-8f95-00eed78bf4fb
+
+
+
+
+- **HVAC/FM Analysis** —  Run the HVAC/FM analysis to review served systems and terminals, use filters to narrow results, and click items to highlight related elements in the model.
+
+
+
+https://github.com/user-attachments/assets/3f89bbb1-c049-4563-ae02-9d0836781753
+
+
+- **Occupancy Simulation** —  Show the simulated people flow and room usage over time, which helps teams validate space planning and spot potential congestion or underused areas before making real‑world changes.
+
+
+
+
+https://github.com/user-attachments/assets/0e63b918-75be-4829-ab4d-d15c80d37fd1
 
 
 
