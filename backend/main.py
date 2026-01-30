@@ -1,4 +1,4 @@
-"""
+﻿"""
 Digital Twin API Server
 
 FastAPI server that handles IFC file uploads and triggers
@@ -27,6 +27,7 @@ from ec_api import router as ec_router
 from fm_api import router as fm_router
 from validation_api import router as validation_router
 from config import UPLOAD_DIR, OUTPUT_DIR
+from fm_sidecar_merger import find_fm_sidecar, merge_fm_sidecar
 
 
 # Ensure directories exist
@@ -83,6 +84,7 @@ class ConversionJob(BaseModel):
     metadata_url: Optional[str] = None
     hierarchy_url: Optional[str] = None
     error: Optional[str] = None
+    fm_params_filename: Optional[str] = None  # FM sidecar filename if provided
 
 
 # In-memory job storage (use Redis/DB in production)
@@ -107,10 +109,15 @@ def check_metadata_schema(metadata_path: Path) -> int:
         return 0
 
 
-async def process_ifc_file(job_id: str, ifc_path: Path) -> None:
+async def process_ifc_file(job_id: str, ifc_path: Path, sidecar_path: Optional[Path] = None) -> None:
     """
     Background task to process IFC file.
     Converts to GLB and extracts metadata.
+    
+    Args:
+        job_id: The job ID
+        ifc_path: Path to the uploaded IFC file
+        sidecar_path: Optional path to FM sidecar JSON file
     """
     job = jobs.get(job_id)
     if not job:
@@ -168,6 +175,33 @@ async def process_ifc_file(job_id: str, ifc_path: Path) -> None:
                 metadata,
                 str(metadata_path)
             )
+            
+            # 2b. Merge FM sidecar if present (explicit path or auto-discovered)
+            fm_sidecar = sidecar_path  # Use explicit path if provided
+            if not fm_sidecar:
+                # Fallback: auto-discover sidecar in upload directory
+                fm_sidecar = find_fm_sidecar(job.ifc_filename, ifc_path.parent)
+            
+            if fm_sidecar and fm_sidecar.exists():
+                print(f"[{job_id}] Found FM sidecar: {fm_sidecar.name}")
+                try:
+                    merge_result = await loop.run_in_executor(
+                        None,
+                        merge_fm_sidecar,
+                        metadata_path,
+                        fm_sidecar
+                    )
+                    print(f"[{job_id}] FM sidecar merged: {merge_result['elements_merged']} elements")
+                    print(f"[{job_id}]   - Elements in sidecar: {merge_result['elements_in_sidecar']}")
+                    print(f"[{job_id}]   - Elements not found in IFC: {merge_result['elements_not_found']}")
+                    
+                    # Save merge report for debugging
+                    merge_report_path = job_output_dir / "fm_merge_report.json"
+                    with open(merge_report_path, 'w', encoding='utf-8') as f:
+                        json.dump(merge_result, f, indent=2)
+                except Exception as fm_err:
+                    print(f"[{job_id}] FM sidecar merge failed (non-fatal): {fm_err}")
+                    # Continue processing - sidecar errors should not fail the job
         except Exception as meta_err:
             print(f"[{job_id}] Metadata extraction failed (non-fatal): {meta_err}")
             # Save minimal fallback metadata
@@ -247,10 +281,15 @@ async def process_ifc_file(job_id: str, ifc_path: Path) -> None:
 @app.post("/upload", response_model=ConversionJob)
 async def upload_ifc(
     background_tasks: BackgroundTasks,
-    file: UploadFile = File(..., description="IFC file to process")
+    file: UploadFile = File(..., description="IFC file to process"),
+    fm_params: Optional[UploadFile] = File(None, description="Optional FM sidecar JSON file")
 ):
     """
     Upload an IFC file for processing.
+    
+    Optionally include an FM sidecar JSON file (*.fm_params.json) to merge
+    FM Readiness parameters into the metadata. The sidecar should be keyed
+    by IFC GlobalId with FMReadiness and FMReadinessType property sets.
     
     Returns a job object with ID to track progress.
     The processing happens in the background.
@@ -258,7 +297,7 @@ async def upload_ifc(
     # Generate unique job ID
     job_id = str(uuid.uuid4())[:8]
     
-    # Save uploaded file
+    # Save uploaded IFC file
     ifc_filename = f"{job_id}_{file.filename}"
     ifc_path = UPLOAD_DIR / ifc_filename
     
@@ -266,21 +305,45 @@ async def upload_ifc(
         with open(ifc_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save file: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to save IFC file: {e}")
     finally:
         file.file.close()
+    
+    # Save FM sidecar if provided
+    sidecar_path = None
+    fm_params_filename = None
+    if fm_params and fm_params.filename:
+        # Validate file extension
+        if not (fm_params.filename.endswith('.json') or fm_params.filename.endswith('.fm_params.json')):
+            raise HTTPException(status_code=400, detail="FM sidecar must be a .json file")
+        
+        fm_params_filename = fm_params.filename
+        sidecar_filename = f"{job_id}_{fm_params.filename}"
+        sidecar_path = UPLOAD_DIR / sidecar_filename
+        
+        try:
+            with open(sidecar_path, "wb") as buffer:
+                shutil.copyfileobj(fm_params.file, buffer)
+            print(f"[{job_id}] FM sidecar saved: {fm_params.filename}")
+        except Exception as e:
+            print(f"[{job_id}] Warning: Failed to save FM sidecar: {e}")
+            sidecar_path = None
+            fm_params_filename = None
+        finally:
+            fm_params.file.close()
     
     # Create job record
     job = ConversionJob(
         job_id=job_id,
         status=JobStatus.PENDING,
         stage=JobStage.QUEUED,
-        ifc_filename=file.filename
+        ifc_filename=file.filename,
+        fm_params_filename=fm_params_filename
     )
     jobs[job_id] = job
     
     # Start background processing
-    background_tasks.add_task(process_ifc_file, job_id, ifc_path)
+    background_tasks.add_task(process_ifc_file, job_id, ifc_path, sidecar_path)
     
     return job
 
@@ -400,6 +463,52 @@ async def health_check():
 
 
 # Development server
+@app.post("/job/{job_id}/fm-sidecar")
+async def upload_fm_sidecar(job_id: str, file: UploadFile = File(...)):
+    """
+    Upload an FM sidecar file to merge with existing metadata.
+
+    The sidecar file should be a .fm_params.json file exported from
+    the Revit FM Readiness plugin.
+
+    This will merge FM parameters into the metadata.json for the specified job,
+    making them visible in the Property Panel.
+    """
+    job = jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if job.status != JobStatus.COMPLETED:
+        raise HTTPException(status_code=400, detail="Job must be completed before uploading sidecar")
+
+    metadata_path = OUTPUT_DIR / job_id / "metadata.json"
+    if not metadata_path.exists():
+        raise HTTPException(status_code=404, detail="Metadata not found for this job")
+
+    # Save sidecar file temporarily
+    sidecar_path = OUTPUT_DIR / job_id / file.filename
+    try:
+        with open(sidecar_path, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+    finally:
+        file.file.close()
+
+    # Merge sidecar into metadata
+    try:
+        result = merge_fm_sidecar(metadata_path, sidecar_path)
+        return {
+            "job_id": job_id,
+            "message": "FM sidecar merged successfully",
+            "elements_merged": result["elements_merged"],
+            "elements_not_found": result["elements_not_found"],
+            "errors": result.get("errors", [])
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to merge sidecar: {e}")
+    finally:
+        # Keep sidecar file for reference
+        pass
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

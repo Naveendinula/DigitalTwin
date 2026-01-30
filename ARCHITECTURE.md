@@ -1,10 +1,15 @@
 # Architecture Documentation
 
 > **Status**: Living Document  
-> **Last Updated**: January 13, 2026  
+> **Last Updated**: January 30, 2026  
 > **Owner**: Naveen Panditharatne
 
 ## Recent additions / changes
+
+- **Date:** 2026-01-30
+- **FM Sidecar Integration:** Added support for uploading FM parameter sidecar JSON files alongside IFC files. This allows Revit FM parameters to appear in the PropertyPanel without relying on IFC property-set export. The sidecar is merged into `metadata.json` during processing.
+- **Backend updates:** Extended `/upload` endpoint to accept optional `fm_params` file; added `fm_params_filename` to `ConversionJob` model; enhanced `fm_sidecar_merger.py` with validation and detailed logging.
+- **Frontend updates:** Added optional FM sidecar file picker to `UploadPanel.jsx` with visual feedback.
 
 - **Date:** 2026-01-13
 - **EC Detail Coverage:** EC calculation now returns all element rows with computed EC values (no top-200 cap) to support full drilldowns in the UI.
@@ -190,6 +195,49 @@ graph TB
 4.  **Poll Loop**: Frontend sends `POST /api/occupancy/tick/{jobId}` every 2 seconds.
 5.  **Update**: Backend applies random walk with mean reversion toward time-adjusted targets; returns new snapshot.
 6.  **Render**: `SpaceBboxOverlay` colors spaces green→yellow→red based on occupancy percentage; `OccupancyLegend` shows totals; `OccupancyPanel` shows detail.
+
+### Data Flow: FM Sidecar Merge
+1.  **Export from Revit**: User exports an FM sidecar JSON file (`.fm_params.json`) from the Revit FMReadiness plugin. This file is keyed by IFC GlobalId.
+2.  **Upload**: User uploads the IFC file and optionally selects the FM sidecar in `UploadPanel.jsx`.
+3.  **Save**: Backend saves both files to `uploads/` with job ID prefix.
+4.  **Process**: During IFC processing, after metadata extraction, `fm_sidecar_merger.py` merges FM parameters into `metadata.json`.
+5.  **Merge Logic**:
+    - Load sidecar JSON and validate structure (keys should be valid IFC GlobalIds).
+    - For each GlobalId in sidecar: merge `FMReadiness` and `FMReadinessType` into `elements[GlobalId].properties`.
+    - Track statistics: merged count, not-found count, errors.
+6.  **Report**: A merge report is saved to `output/{jobId}/fm_merge_report.json` for debugging.
+7.  **Display**: `PropertyPanel.jsx` displays the merged FM properties like any other Pset when an element is selected.
+
+#### FM Sidecar JSON Contract
+```json
+{
+  "<IFC_GlobalId>": {
+    "FMReadiness": {
+      "FM_Barcode": "string or null",
+      "FM_UniqueAssetId": "string or null",
+      "FM_Criticality": "string or null",
+      "FM_InstallationDate": "string or null"
+    },
+    "FMReadinessType": {
+      "Manufacturer": "string or null",
+      "Model": "string or null",
+      "TypeMark": "string or null"
+    },
+    "_meta": {
+      "RevitElementId": 12345,
+      "RevitUniqueId": "abc-123",
+      "Category": "Mechanical Equipment",
+      "Family": "...",
+      "TypeName": "..."
+    }
+  }
+}
+```
+
+#### FM Sidecar File Locations
+- **Input**: `backend/uploads/{job_id}_{filename}.fm_params.json`
+- **Output**: Merged into `backend/output/{job_id}/metadata.json`
+- **Debug**: `backend/output/{job_id}/fm_merge_report.json`
 
 ## 5. Dependencies
 

@@ -107,6 +107,9 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
   const [progress, setProgress] = useState('')
   const [jobStage, setJobStage] = useState(null)
   const [error, setError] = useState(null)
+  
+  // FM Sidecar state
+  const [fmSidecarFile, setFmSidecarFile] = useState(null)
 
   // Scroll animation states
   const [imagesLoaded, setImagesLoaded] = useState(false)
@@ -502,6 +505,12 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
     try {
       const formData = new FormData()
       formData.append('file', file)
+      
+      // Include FM sidecar if provided
+      if (fmSidecarFile) {
+        formData.append('fm_params', fmSidecarFile)
+        setProgress('Uploading IFC + FM parameters...')
+      }
 
       const response = await fetch(`${API_URL}/upload`, {
         method: 'POST',
@@ -515,7 +524,8 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
 
       const job = await response.json()
       setUploadState('processing')
-      setProgress(`Processing ${file.name}...`)
+      const fmNote = job.fm_params_filename ? ' (with FM parameters)' : ''
+      setProgress(`Processing ${file.name}${fmNote}...`)
       setJobStage('queued')
 
       await pollJobStatus(job.job_id)
@@ -530,7 +540,7 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
       setUploadState('error')
       setJobStage(null)
     }
-  }, [API_URL, pollJobStatus])
+  }, [API_URL, pollJobStatus, fmSidecarFile])
 
   const handleDrop = useCallback((e) => {
     e.preventDefault()
@@ -559,8 +569,25 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
     setError(null)
     setProgress('')
     setJobStage(null)
+    setFmSidecarFile(null)  // Clear FM sidecar
     if (onReset) onReset()
   }
+  
+  // Handle FM sidecar file selection
+  const handleFmSidecarChange = useCallback((e) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      if (file.name.endsWith('.json')) {
+        setFmSidecarFile(file)
+      } else {
+        setError('FM sidecar must be a .json file')
+      }
+    }
+  }, [])
+  
+  const clearFmSidecar = useCallback(() => {
+    setFmSidecarFile(null)
+  }, [])
 
   // If model is loaded, show minimal floating button
   if (hasModel) {
@@ -688,6 +715,33 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
                       style={styles.fileInput}
                     />
                   </label>
+                </div>
+                
+                {/* Optional FM Sidecar File */}
+                <div style={styles.fmSidecarSection}>
+                  {fmSidecarFile ? (
+                    <div style={styles.fmSidecarSelected}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                        <polyline points="22 4 12 14.01 9 11.01" />
+                      </svg>
+                      <span style={styles.fmSidecarName}>{fmSidecarFile.name}</span>
+                      <button style={styles.fmSidecarClear} onClick={clearFmSidecar}>×</button>
+                    </div>
+                  ) : (
+                    <label style={styles.fmSidecarLabel}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M12 5v14M5 12h14" />
+                      </svg>
+                      Add FM Parameters (optional)
+                      <input
+                        type="file"
+                        accept=".json,.fm_params.json"
+                        onChange={handleFmSidecarChange}
+                        style={styles.fileInput}
+                      />
+                    </label>
+                  )}
                 </div>
               </>
             )}
@@ -991,6 +1045,52 @@ const styles = {
   },
   fileInput: {
     display: 'none',
+  },
+  
+  // FM Sidecar Section
+  fmSidecarSection: {
+    marginTop: '12px',
+    paddingTop: '12px',
+    borderTop: '1px solid rgba(0, 0, 0, 0.06)',
+  },
+  fmSidecarLabel: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '6px',
+    color: '#9CA3AF',
+    fontSize: '12px',
+    cursor: 'pointer',
+    padding: '6px 8px',
+    borderRadius: '6px',
+    transition: 'all 0.15s ease',
+  },
+  fmSidecarSelected: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '6px',
+    padding: '6px 10px',
+    background: 'rgba(16, 185, 129, 0.08)',
+    borderRadius: '6px',
+    fontSize: '12px',
+  },
+  fmSidecarName: {
+    color: '#059669',
+    fontWeight: 500,
+    maxWidth: '160px',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  fmSidecarClear: {
+    background: 'none',
+    border: 'none',
+    color: '#9CA3AF',
+    cursor: 'pointer',
+    padding: '0 4px',
+    fontSize: '16px',
+    lineHeight: 1,
   },
 
   // Processing
