@@ -90,7 +90,6 @@ Camera/view controls:
 Defined in `frontend/src/hooks/useKeyboardShortcuts.js`:
 - `Esc`: clear selection and X-ray.
 - `F`: focus the camera on current selection.
-- `C`: log camera state to the console.
 - `1-7`: view presets (free, top, front, right, left, back, bottom).
 
 ## Backend API Usage

@@ -129,6 +129,9 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
   const storyBeatRefs = useRef([])
   const uploadCardRef = useRef(null)
   const scrollBarRef = useRef(null)
+  const featureSectionRef = useRef(null)
+  const featureHeaderRef = useRef(null)
+  const featureCardRefs = useRef([])
 
   const API_URL = 'http://localhost:8000'
 
@@ -361,7 +364,7 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
           end: '+=350%', // Multiple screens of scroll for smoother pacing
           pin: true, // Pin the hero element
           pinSpacing: true, // Add spacing so content below waits
-          scrub: 0.3, // Smoother scrubbing to reduce stutter
+          scrub: 1.5, // Higher value = smoother momentum/deceleration when scrolling stops
           anticipatePin: 1, // Prevent jank when pinning
           onUpdate: (self) => {
             const p = self.progress
@@ -402,6 +405,59 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
 
     return () => ctx.revert()
   }, [imagesLoaded, prefersReducedMotion, hasModel])
+
+  // Minimal scroll reveal for feature section
+  useEffect(() => {
+    if (prefersReducedMotion || hasModel || !featureSectionRef.current) return
+
+    const ctx = gsap.context(() => {
+      const headerEl = featureHeaderRef.current
+      const cards = featureCardRefs.current.filter(Boolean)
+
+      if (!headerEl && cards.length === 0) return
+
+      const timeline = gsap.timeline({
+        scrollTrigger: {
+          trigger: featureSectionRef.current,
+          start: 'top 80%',
+          toggleActions: 'play reverse play reverse',
+        },
+      })
+
+      if (headerEl) {
+        timeline.fromTo(
+          headerEl,
+          { opacity: 0, y: 22, filter: 'blur(6px)' },
+          {
+            opacity: 1,
+            y: 0,
+            filter: 'blur(0px)',
+            duration: 0.7,
+            ease: 'power3.out',
+          }
+        )
+      }
+
+      if (cards.length > 0) {
+        timeline.fromTo(
+          cards,
+          { opacity: 0, y: 26, scale: 0.98, filter: 'blur(6px)' },
+          {
+            opacity: 1,
+            y: 0,
+            scale: 1,
+            filter: 'blur(0px)',
+            duration: 0.7,
+            ease: 'power3.out',
+            stagger: 0.08,
+          },
+          '-=0.35'
+        )
+      }
+    }, featureSectionRef)
+
+    return () => ctx.revert()
+  }, [prefersReducedMotion, hasModel])
 
   // Calculate story beat visibility based on scroll progress (Legacy / Fallback usage if needed)
   const getStoryBeatOpacity = (beat, progress = 0) => {
@@ -812,8 +868,8 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
       </div>
 
       {/* Feature Cards Section - After hero */}
-      <section id="features" style={styles.featureSection}>
-        <div style={styles.featureSectionHeader}>
+      <section id="features" style={styles.featureSection} ref={featureSectionRef}>
+        <div style={styles.featureSectionHeader} ref={featureHeaderRef}>
           <h2 style={styles.featureSectionTitle}>Everything you need</h2>
           <p style={styles.featureSectionDesc}>Powerful tools for BIM analysis</p>
         </div>
@@ -822,7 +878,13 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
           gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
         }}>
           {FEATURES.map((feature, index) => (
-            <div key={index} style={styles.featureCard}>
+            <div
+              key={index}
+              ref={(el) => {
+                featureCardRefs.current[index] = el
+              }}
+              style={styles.featureCard}
+            >
               <h3 style={styles.featureTitle}>{feature.title}</h3>
               <p style={styles.featureDesc}>{feature.desc}</p>
             </div>
@@ -1218,6 +1280,7 @@ const styles = {
   featureSectionHeader: {
     textAlign: 'center',
     marginBottom: '48px',
+    willChange: 'transform, opacity, filter',
   },
   featureSectionTitle: {
     fontSize: '32px',
@@ -1243,6 +1306,7 @@ const styles = {
     padding: '28px',
     boxShadow: softShadow,
     border: '1px solid rgba(255,255,255,0.6)',
+    willChange: 'transform, opacity, filter',
   },
   featureIcon: {
     fontSize: '28px',
