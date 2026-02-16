@@ -654,7 +654,7 @@ const softShadow = 'rgb(255, 255, 255) 1px 1px 1px 0px inset, rgba(0, 0, 0, 0.15
 
 const styles = {
   panel: {
-    width: '280px',
+    width: '100%',
     height: '100%',
     background: '#f4f4f4',
     borderRadius: '12px',
@@ -665,8 +665,7 @@ const styles = {
     color: '#1d1d1f',
     flexShrink: 0,
     overflow: 'hidden',
-    margin: '8px',
-    marginRight: '0',
+    margin: 0,
   },
   header: {
     padding: '12px 16px',

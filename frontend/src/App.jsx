@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import AppHeader from './components/AppHeader'
 import PropertyPanel from './components/PropertyPanel'
 import StructureTree from './components/StructureTree'
@@ -35,6 +35,9 @@ function App() {
   // Panel visibility state
   const [structureTreeVisible, setStructureTreeVisible] = useState(true)
   const [propertiesPanelVisible, setPropertiesPanelVisible] = useState(true)
+  const [structurePanelWidth, setStructurePanelWidth] = useState(280)
+  const [propertiesPanelWidth, setPropertiesPanelWidth] = useState(320)
+  const dragStateRef = useRef(null)
 
   const selection = useSelection()
   const visibility = useVisibility()
@@ -163,6 +166,49 @@ function App() {
     setGeometryHidden(prev => !prev)
   }, [])
 
+  const handleStartResize = useCallback((side, event) => {
+    event.preventDefault()
+    dragStateRef.current = {
+      side,
+      startX: event.clientX,
+      startWidth: side === 'left' ? structurePanelWidth : propertiesPanelWidth
+    }
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+  }, [structurePanelWidth, propertiesPanelWidth])
+
+  useEffect(() => {
+    const minWidth = 220
+    const maxWidth = 520
+
+    const handleMouseMove = (event) => {
+      const dragState = dragStateRef.current
+      if (!dragState) return
+      const delta = event.clientX - dragState.startX
+      const direction = dragState.side === 'left' ? 1 : -1
+      const nextWidth = Math.min(maxWidth, Math.max(minWidth, dragState.startWidth + (direction * delta)))
+      if (dragState.side === 'left') {
+        setStructurePanelWidth(nextWidth)
+      } else {
+        setPropertiesPanelWidth(nextWidth)
+      }
+    }
+
+    const handleMouseUp = () => {
+      if (!dragStateRef.current) return
+      dragStateRef.current = null
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [])
+
   // Show upload panel if no model loaded
   if (!modelUrls) {
     return <UploadPanel onModelReady={handleModelReady} hasModel={false} />
@@ -244,14 +290,30 @@ function App() {
         )}
 
         {structureTreeVisible && (
-          <StructureTree 
-            hierarchyUrl={modelUrls.hierarchyUrl}
-            onIsolate={handleIsolate}
-            onSelect={handleTreeSelect}
-            selectedId={selection.selectedId}
-            focusLock={focusLock}
-            onToggleFocusLock={() => setFocusLock(prev => !prev)}
-          />
+          <div style={{ width: structurePanelWidth, position: 'relative', display: 'flex', flexShrink: 0 }}>
+            <StructureTree 
+              hierarchyUrl={modelUrls.hierarchyUrl}
+              onIsolate={handleIsolate}
+              onSelect={handleTreeSelect}
+              selectedId={selection.selectedId}
+              focusLock={focusLock}
+              onToggleFocusLock={() => setFocusLock(prev => !prev)}
+            />
+            <div
+              onMouseDown={(event) => handleStartResize('left', event)}
+              style={{
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                width: '6px',
+                height: '100%',
+                cursor: 'col-resize',
+                background: 'rgba(0, 0, 0, 0.03)',
+                zIndex: 5,
+              }}
+              title="Drag to resize"
+            />
+          </div>
         )}
 
         <ViewerShell
@@ -260,10 +322,26 @@ function App() {
         />
 
         {propertiesPanelVisible && (
-          <PropertyPanel 
-            selectedId={selection.selectedId}
-            metadataUrl={modelUrls.metadataUrl}
-          />
+          <div style={{ width: propertiesPanelWidth, position: 'relative', display: 'flex', flexShrink: 0 }}>
+            <div
+              onMouseDown={(event) => handleStartResize('right', event)}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '6px',
+                height: '100%',
+                cursor: 'col-resize',
+                background: 'rgba(0, 0, 0, 0.03)',
+                zIndex: 5,
+              }}
+              title="Drag to resize"
+            />
+            <PropertyPanel 
+              selectedId={selection.selectedId}
+              metadataUrl={modelUrls.metadataUrl}
+            />
+          </div>
         )}
       </div>
 

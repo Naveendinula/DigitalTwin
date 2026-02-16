@@ -113,7 +113,6 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
 
   // Scroll animation states
   const [imagesLoaded, setImagesLoaded] = useState(false)
-  const [loadingProgress, setLoadingProgress] = useState(0)
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   
@@ -186,6 +185,13 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
     }
   }, [hasModel])
 
+  // Always start at top when opening the upload panel
+  useEffect(() => {
+    if (hasModel) return
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+    ScrollTrigger.refresh()
+  }, [hasModel])
+
   // Preload all frames
   useEffect(() => {
     if (hasModel) return
@@ -217,14 +223,12 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
 
         images[i] = frame
         loadedCount++
-        setLoadingProgress(Math.round((loadedCount / FRAME_COUNT) * 100))
         if (loadedCount === FRAME_COUNT) {
           setImagesLoaded(true)
         }
       }
       img.onerror = () => {
         loadedCount++
-        setLoadingProgress(Math.round((loadedCount / FRAME_COUNT) * 100))
         if (loadedCount === FRAME_COUNT) {
           setImagesLoaded(true)
         }
@@ -361,11 +365,12 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
         scrollTrigger: {
           trigger: heroRef.current,
           start: 'top top',
-          end: '+=350%', // Multiple screens of scroll for smoother pacing
+          end: '+=300%', // Multiple screens of scroll for smoother pacing
           pin: true, // Pin the hero element
-          pinSpacing: true, // Add spacing so content below waits
+          pinSpacing: 'margin', // Use margin to avoid border-box padding issues
           scrub: 1.5, // Higher value = smoother momentum/deceleration when scrolling stops
           anticipatePin: 1, // Prevent jank when pinning
+          invalidateOnRefresh: true,
           onUpdate: (self) => {
             const p = self.progress
 
@@ -406,6 +411,12 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
     return () => ctx.revert()
   }, [imagesLoaded, prefersReducedMotion, hasModel])
 
+  // Refresh ScrollTrigger after frames are ready to ensure correct layout
+  useEffect(() => {
+    if (!imagesLoaded || prefersReducedMotion || hasModel) return
+    ScrollTrigger.refresh()
+  }, [imagesLoaded, prefersReducedMotion, hasModel])
+
   // Minimal scroll reveal for feature section
   useEffect(() => {
     if (prefersReducedMotion || hasModel || !featureSectionRef.current) return
@@ -416,32 +427,28 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
 
       if (!headerEl && cards.length === 0) return
 
-      const timeline = gsap.timeline({
-        scrollTrigger: {
-          trigger: featureSectionRef.current,
-          start: 'top 80%',
-          toggleActions: 'play reverse play reverse',
-        },
-      })
+      if (headerEl) {
+        gsap.set(headerEl, { opacity: 0, y: 22, filter: 'blur(6px)' })
+      }
+      if (cards.length > 0) {
+        gsap.set(cards, { opacity: 0, y: 26, scale: 0.98, filter: 'blur(6px)' })
+      }
+
+      const timeline = gsap.timeline({ paused: true })
 
       if (headerEl) {
-        timeline.fromTo(
-          headerEl,
-          { opacity: 0, y: 22, filter: 'blur(6px)' },
-          {
-            opacity: 1,
-            y: 0,
-            filter: 'blur(0px)',
-            duration: 0.7,
-            ease: 'power3.out',
-          }
-        )
+        timeline.to(headerEl, {
+          opacity: 1,
+          y: 0,
+          filter: 'blur(0px)',
+          duration: 0.7,
+          ease: 'power3.out',
+        })
       }
 
       if (cards.length > 0) {
-        timeline.fromTo(
+        timeline.to(
           cards,
-          { opacity: 0, y: 26, scale: 0.98, filter: 'blur(6px)' },
           {
             opacity: 1,
             y: 0,
@@ -454,6 +461,16 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
           '-=0.35'
         )
       }
+
+      ScrollTrigger.create({
+        trigger: featureSectionRef.current,
+        start: 'top 85%',
+        end: 'bottom 20%',
+        onEnter: () => timeline.play(0),
+        onEnterBack: () => timeline.play(0),
+        onLeaveBack: () => timeline.reverse(),
+        invalidateOnRefresh: true,
+      })
     }, featureSectionRef)
 
     return () => ctx.revert()
@@ -668,8 +685,7 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
         <div style={styles.loadingOverlay}>
           <div style={styles.loadingContent}>
             <div style={styles.loadingSpinner}></div>
-            <p style={styles.loadingText}>Loading experience...</p>
-            <p style={styles.loadingProgress}>{loadingProgress}%</p>
+            <p style={styles.loadingText}>Loading</p>
           </div>
         </div>
       )}
@@ -946,11 +962,6 @@ const styles = {
     color: '#111827',
     fontSize: '16px',
     fontWeight: 500,
-  },
-  loadingProgress: {
-    margin: 0,
-    color: '#9CA3AF',
-    fontSize: '14px',
   },
 
   // Navbar

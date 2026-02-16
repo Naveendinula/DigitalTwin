@@ -294,7 +294,7 @@ function formatValue(value) {
  */
 const styles = {
   panel: {
-    width: '320px',
+    width: '100%',
     height: '100%',
     background: '#f4f4f4',
     boxShadow: `rgb(255, 255, 255) 1px 1px 1px 0px inset,
@@ -326,7 +326,10 @@ const styles = {
   },
   content: {
     flex: 1,
-    overflow: 'auto',
+    overflowY: 'auto',
+    overflowX: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
     padding: '16px 0',
     background: 'rgba(255, 255, 255, 0.3)',
   },
@@ -433,9 +436,9 @@ const styles = {
     boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.08)',
   },
   propertyRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    display: 'grid',
+    gridTemplateColumns: 'minmax(140px, 1fr) minmax(0, 1.2fr)',
+    alignItems: 'start',
     padding: '10px 12px',
     borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
     gap: '12px',
@@ -465,24 +468,36 @@ const styles = {
     boxShadow: 'inset 0.5px 0.5px 1px rgba(0,0,0,0.05)',
   },
   nestedProperty: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    display: 'grid',
+    gridTemplateColumns: 'minmax(120px, 1fr) minmax(0, 1fr)',
+    alignItems: 'start',
     padding: '6px 10px',
     borderBottom: '1px solid rgba(0, 0, 0, 0.04)',
     fontSize: '12px',
+    gap: '10px',
   },
   nestedLabel: {
     color: '#86868b',
+    minWidth: 0,
+    whiteSpace: 'normal',
+    wordBreak: 'break-word',
+    overflowWrap: 'anywhere',
   },
   nestedValue: {
     color: '#1d1d1f',
     fontWeight: 500,
+    minWidth: 0,
+    textAlign: 'right',
+    wordBreak: 'break-word',
+    overflowWrap: 'anywhere',
   },
   propertyLabel: {
     fontSize: '13px',
     color: '#86868b',
-    flexShrink: 0,
+    minWidth: 0,
+    whiteSpace: 'normal',
+    wordBreak: 'break-word',
+    overflowWrap: 'anywhere',
   },
   propertyValue: {
     fontSize: '13px',
@@ -490,6 +505,8 @@ const styles = {
     textAlign: 'right',
     wordBreak: 'break-word',
     fontWeight: 500,
+    minWidth: 0,
+    overflowWrap: 'anywhere',
   },
   monoText: {
     fontFamily: 'inherit',
