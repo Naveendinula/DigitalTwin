@@ -147,12 +147,20 @@ function ViewerApp() {
     setJobId(null)
     floatingPanels.handleCloseEcPanel()
     floatingPanels.handleCloseHvacPanel()
+    floatingPanels.handleCloseWorkOrdersPanel()
     spaceOverlay.disableSpaceOverlay()
     occupancy.disable()
     setOccupancyPanelOpen(false)
     setGeometryHidden(false)
     handleClearAll()
-  }, [floatingPanels.handleCloseEcPanel, floatingPanels.handleCloseHvacPanel, spaceOverlay.disableSpaceOverlay, occupancy.disable, handleClearAll])
+  }, [
+    floatingPanels.handleCloseEcPanel,
+    floatingPanels.handleCloseHvacPanel,
+    floatingPanels.handleCloseWorkOrdersPanel,
+    spaceOverlay.disableSpaceOverlay,
+    occupancy.disable,
+    handleClearAll
+  ])
 
   /**
    * Toggle occupancy mode and panel

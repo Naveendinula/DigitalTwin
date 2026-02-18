@@ -5,6 +5,7 @@ import IdsValidationPanel from './IdsValidationPanel'
 import KeyboardHints from './KeyboardHints'
 import OccupancyLegend from './OccupancyLegend'
 import OccupancyPanel from './OccupancyPanel'
+import WorkOrdersPanel from './WorkOrdersPanel'
 import SectionPlaneHelper from './SectionPlaneHelper'
 import SectionPlanePanel from './SectionPlanePanel'
 import SelectableModel from './SelectableModelWithVisibility'
@@ -59,6 +60,7 @@ export default function ViewerShell({
     onFitToModel: viewModeState.fitToModel,
     onOpenEcPanel: floatingPanels.handleToggleEcPanel,
     onOpenHvacPanel: floatingPanels.handleToggleHvacPanel,
+    onOpenWorkOrdersPanel: floatingPanels.handleToggleWorkOrdersPanel,
     onOpenIdsValidationPanel: floatingPanels.handleToggleIdsValidationPanel,
     onToggleSpaceOverlay: spaceOverlay.toggleSpaceOverlay,
     spaceOverlayEnabled: spaceOverlay.spaceOverlayEnabled,
@@ -160,6 +162,16 @@ export default function ViewerShell({
     zIndex: floatingPanels.idsValidationPanelZIndex
   }
 
+  const workOrdersPanelProps = {
+    isOpen: floatingPanels.workOrdersPanelOpen,
+    onClose: floatingPanels.handleCloseWorkOrdersPanel,
+    jobId,
+    selectedId: selection.selectedId,
+    onSelectWorkOrder: handleTreeSelect,
+    focusToken: floatingPanels.workOrdersPanelZIndex,
+    zIndex: floatingPanels.workOrdersPanelZIndex
+  }
+
   const spaceNavigatorProps = spaceOverlay.spaceNavigatorProps
   const { visible: showSpaceNavigator, ...navigatorProps } = spaceNavigatorProps || {}
 
@@ -234,6 +246,7 @@ export default function ViewerShell({
       <EcPanel {...ecPanelProps} />
       <HvacFmPanel {...hvacPanelProps} />
       <IdsValidationPanel {...idsValidationPanelProps} />
+      <WorkOrdersPanel {...workOrdersPanelProps} />
       <OccupancyPanel {...occupancyPanelProps} />
 
       {showSpaceNavigator && <SpaceNavigator {...navigatorProps} />}

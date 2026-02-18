@@ -5,6 +5,7 @@ export default function useFloatingPanels(disableXRay) {
   const [ecPanelOpen, setEcPanelOpen] = useState(false)
   const [hvacPanelOpen, setHvacPanelOpen] = useState(false)
   const [idsValidationPanelOpen, setIdsValidationPanelOpen] = useState(false)
+  const [workOrdersPanelOpen, setWorkOrdersPanelOpen] = useState(false)
   const panelStacking = usePanelStacking()
 
   const handleCloseEcPanel = useCallback(() => {
@@ -19,6 +20,10 @@ export default function useFloatingPanels(disableXRay) {
 
   const handleCloseIdsValidationPanel = useCallback(() => {
     setIdsValidationPanelOpen(false)
+  }, [])
+
+  const handleCloseWorkOrdersPanel = useCallback(() => {
+    setWorkOrdersPanelOpen(false)
   }, [])
 
   const handleToggleEcPanel = useCallback(() => {
@@ -51,18 +56,32 @@ export default function useFloatingPanels(disableXRay) {
     })
   }, [panelStacking.togglePanel, panelStacking.idsValidationPanelZIndex, panelStacking.setIdsValidationPanelZIndex, idsValidationPanelOpen, handleCloseIdsValidationPanel])
 
+  const handleToggleWorkOrdersPanel = useCallback(() => {
+    panelStacking.togglePanel({
+      isOpen: workOrdersPanelOpen,
+      panelZIndex: panelStacking.workOrdersPanelZIndex,
+      setIsOpen: setWorkOrdersPanelOpen,
+      setPanelZIndex: panelStacking.setWorkOrdersPanelZIndex,
+      onClose: handleCloseWorkOrdersPanel
+    })
+  }, [panelStacking.togglePanel, panelStacking.workOrdersPanelZIndex, panelStacking.setWorkOrdersPanelZIndex, workOrdersPanelOpen, handleCloseWorkOrdersPanel])
+
   return {
     ecPanelOpen,
     hvacPanelOpen,
     idsValidationPanelOpen,
+    workOrdersPanelOpen,
     ecPanelZIndex: panelStacking.ecPanelZIndex,
     hvacPanelZIndex: panelStacking.hvacPanelZIndex,
     idsValidationPanelZIndex: panelStacking.idsValidationPanelZIndex,
+    workOrdersPanelZIndex: panelStacking.workOrdersPanelZIndex,
     handleCloseEcPanel,
     handleCloseHvacPanel,
     handleCloseIdsValidationPanel,
+    handleCloseWorkOrdersPanel,
     handleToggleEcPanel,
     handleToggleHvacPanel,
-    handleToggleIdsValidationPanel
+    handleToggleIdsValidationPanel,
+    handleToggleWorkOrdersPanel
   }
 }

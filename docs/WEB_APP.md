@@ -4,7 +4,7 @@ This document describes the frontend web app for the Digital Twin viewer, how it
 
 ## Overview
 
-The web app is a React + Three.js viewer for IFC models. It handles upload, renders a 3D model, and provides tools for selection, isolation, section planes, and domain panels (embodied carbon, HVAC/FM, and per-element maintenance logging). Authentication is handled by cookie-based JWT auth with dedicated login/signup pages.
+The web app is a React + Three.js viewer for IFC models. It handles upload, renders a 3D model, and provides tools for selection, isolation, section planes, and domain panels (embodied carbon, HVAC/FM, work orders, and per-element maintenance logging). Authentication is handled by cookie-based JWT auth with dedicated login/signup pages.
 
 Primary entry points:
 - App orchestration: `frontend/src/App.jsx`
@@ -50,7 +50,7 @@ Key hooks:
 - Selection/isolation logic: `frontend/src/hooks/useViewerSelection.js`
 - Section plane picking: `frontend/src/hooks/useSectionPick.js`
 - Space overlay state/toasts: `frontend/src/hooks/useSpaceOverlay.js`
-- Floating panels (EC/HVAC) stacking: `frontend/src/hooks/useFloatingPanels.js`
+- Floating panels (EC/HVAC/Work Orders) stacking: `frontend/src/hooks/useFloatingPanels.js`
 - Keyboard shortcuts: `frontend/src/hooks/useKeyboardShortcuts.js`
 
 ## Core Data Flow
@@ -74,6 +74,7 @@ Key hooks:
 - HVAC/FM: `frontend/src/components/HvacFmPanel.jsx` calls `POST /api/fm/hvac/analyze/{job_id}` then `GET /api/fm/hvac/{job_id}`.
   - `servedTerminals` are physically connected terminals from traversal.
   - `systemAssociatedTerminals` are returned separately for same-system inference and are not mixed into `servedTerminals`.
+- Work orders: `frontend/src/components/WorkOrdersPanel.jsx` calls `/api/work-orders/{job_id}` CRUD + summary endpoints, with model selection linking in both directions.
 - Maintenance log: `frontend/src/components/MaintenanceLog.jsx` calls maintenance CRUD endpoints scoped by `jobId` and selected `globalId`.
 
 5) Authentication
@@ -133,6 +134,11 @@ Endpoints used:
 - `PATCH /api/maintenance/{job_id}/{log_id}`
 - `DELETE /api/maintenance/{job_id}/{log_id}`
 - `GET /api/maintenance/{job_id}/summary`
+- `GET /api/work-orders/{job_id}`
+- `POST /api/work-orders/{job_id}`
+- `PATCH /api/work-orders/{job_id}/{wo_id}`
+- `DELETE /api/work-orders/{job_id}/{wo_id}`
+- `GET /api/work-orders/{job_id}/summary`
 
 ## File Map (Frontend)
 
@@ -156,6 +162,7 @@ Domain panels and overlays:
 - `frontend/src/components/DraggablePanel.jsx`
 - `frontend/src/components/EcPanel.jsx`
 - `frontend/src/components/HvacFmPanel.jsx`
+- `frontend/src/components/WorkOrdersPanel.jsx`
 - `frontend/src/components/MaintenanceLog.jsx`
 - `frontend/src/components/SpaceBboxOverlay.jsx`
 - `frontend/src/components/SpaceNavigator.jsx`

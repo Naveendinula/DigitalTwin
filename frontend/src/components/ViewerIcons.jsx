@@ -301,3 +301,24 @@ export function ValidationIcon({ size = 20, stroke = '#1d1d1f', strokeWidth = 1.
     </svg>
   )
 }
+
+export function WorkOrdersIcon({ size = 20, stroke = '#1d1d1f', strokeWidth = 1.5 }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={stroke}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="4" y="3" width="16" height="18" rx="2" />
+      <line x1="8" y1="8" x2="16" y2="8" />
+      <line x1="8" y1="12" x2="16" y2="12" />
+      <line x1="8" y1="16" x2="13" y2="16" />
+      <circle cx="16.5" cy="16.5" r="1.5" />
+    </svg>
+  )
+}

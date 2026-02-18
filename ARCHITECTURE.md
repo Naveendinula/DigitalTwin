@@ -7,6 +7,11 @@
 ## Recent additions / changes
 
 - **Date:** 2026-02-18
+- **Work Orders module (phase 1):** Added geometry-native CMMS work orders with a dedicated floating panel and secured API endpoints under `/api/work-orders/*`.
+- **Backend updates:** Added `backend/work_order_models.py` and `backend/work_order_api.py`; extended `backend/db.py` with `work_orders` schema, indexes, and idempotent migration from `maintenance_logs`.
+- **Frontend updates:** Added `frontend/src/components/WorkOrdersPanel.jsx`; wired toolbar toggle and floating panel stacking for model-wide work order queue + locate-in-model interaction.
+
+- **Date:** 2026-02-18
 - **Security hardening (phase 1):** Added authenticated job ownership checks across upload/job/EC/FM/validation/maintenance routes, protected `/files/{job_id}/{filename}` access, hardened upload size/filename validation, and added baseline security headers.
 - **Backend updates:** Added `backend/job_security.py` and `model_jobs` table in `backend/db.py` for persistent job-to-user ownership and file-token checks.
 - **Frontend updates:** Updated backend fetch calls to send credentials so authenticated endpoints continue to work from the Vite app.
@@ -83,6 +88,7 @@ The system bridges the gap between complex BIM files and accessible web visualiz
 *   **Space Overlay**: Users toggle translucent space bounding boxes for quick room context in the 3D view.
 *   **Authentication**: Users sign up/sign in to access the viewer, with cookie-based sessions and CSRF protection.
 *   **Maintenance Logging**: Users capture per-element FM actions/notes (inspection, repair, issue) with server-side timestamps and status lifecycle updates.
+*   **Work Order Queue**: Users manage model-wide work orders in a dedicated panel and jump to the related element in 3D.
 *   **Live Occupancy**: Users enable occupancy simulation to visualize synthetic headcounts per room with a color-coded heatmap (green→yellow→red) and a real-time legend/panel.
 
 ## 3. Repository Tour
@@ -104,6 +110,8 @@ The system bridges the gap between complex BIM files and accessible web visualiz
 *   `fm_api.py`: API router for HVAC/FM analysis, space bbox, and occupancy simulation endpoints.
 *   `maintenance_api.py`: API router for maintenance logs CRUD and summary queries.
 *   `maintenance_models.py`: Pydantic models for maintenance log requests/responses.
+*   `work_order_api.py`: API router for work orders CRUD/list/summary endpoints.
+*   `work_order_models.py`: Pydantic models for work order requests/responses.
 *   `fm_hvac_core.py`: HVAC/FM core logic (equipment -> physically connected terminals -> spaces), plus separate system-associated terminal inference.
 *   `validation_api.py`: API router for IFC validation and IDS file workflows.
 *   `ifc_validation.py`: Minimal IFC rule checks and report summaries used by validation endpoints.
@@ -130,6 +138,7 @@ The system bridges the gap between complex BIM files and accessible web visualiz
 *   `src/components/DraggablePanel.jsx`: Shared wrapper that handles drag/resize/focus behavior for floating tool panels.
 *   `src/components/EcPanel.jsx`: UI for triggering and displaying EC analysis results.
 *   `src/components/HvacFmPanel.jsx`: UI for HVAC/FM analysis results and filters.
+*   `src/components/WorkOrdersPanel.jsx`: Floating CMMS-style work order queue linked to geometry selection.
 *   `src/components/SpaceBboxOverlay.jsx`: Renders space bbox overlays in the viewer (with optional occupancy heatmap).
 *   `src/components/SpaceNavigator.jsx`: Cycles and highlights spaces when overlays are enabled.
 *   `src/components/OccupancyLegend.jsx`: Floating legend showing live occupancy totals and color scale.
@@ -258,6 +267,14 @@ graph TB
 6.  **Delete log**: Frontend deletes logs with `DELETE /api/maintenance/{jobId}/{logId}`.
 7.  **Summary badges**: Frontend can call `GET /api/maintenance/{jobId}/summary` for status/priority counts.
 
+### Data Flow: Work Orders
+1.  **Open queue**: User opens the Work Orders toolbar panel to view model-wide tasks.
+2.  **Fetch queue**: `WorkOrdersPanel.jsx` calls `GET /api/work-orders/{jobId}` and `GET /api/work-orders/{jobId}/summary`.
+3.  **Create from selection**: Frontend posts `POST /api/work-orders/{jobId}` using the currently selected IFC `GlobalId`.
+4.  **Status lifecycle**: Frontend patches `PATCH /api/work-orders/{jobId}/{woId}` to progress status.
+5.  **Locate in model**: Clicking a work order triggers viewer selection/focus using `global_id`.
+6.  **Soft delete**: Frontend removes an item via `DELETE /api/work-orders/{jobId}/{woId}`.
+
 #### FM Sidecar JSON Contract
 ```json
 {
@@ -294,7 +311,7 @@ graph TB
 ### Backend
 *   **FastAPI**: Web framework.
 *   **IfcOpenShell**: Parsing and manipulating IFC files.
-*   **SQLite + aiosqlite**: Lightweight async persistence for maintenance logs.
+*   **SQLite + aiosqlite**: Lightweight async persistence for maintenance logs, work orders, auth, and job ownership.
 *   **Pandas**: Data manipulation for the EC database and material merging.
 *   **IfcConvert**: External executable (must be present in `backend/`) for geometry conversion.
 

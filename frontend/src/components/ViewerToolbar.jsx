@@ -12,6 +12,7 @@ import {
   ResetIcon,
   SectionIcon,
   ValidationIcon,
+  WorkOrdersIcon,
   ViewCubeIcon,
   EyeIcon,
   SidebarLeftIcon,
@@ -47,6 +48,7 @@ function ViewerToolbar({
   onFitToModel,
   onOpenEcPanel,
   onOpenHvacPanel,
+  onOpenWorkOrdersPanel,
   onOpenIdsValidationPanel,
   onToggleSpaceOverlay,
   spaceOverlayEnabled,
@@ -138,6 +140,14 @@ function ViewerToolbar({
       title: 'IDS Validation',
       icon: <ValidationIcon />,
       label: 'Validate'
+    },
+    {
+      key: 'work-orders',
+      show: hasModel,
+      onClick: onOpenWorkOrdersPanel,
+      title: 'Open Work Orders',
+      icon: <WorkOrdersIcon />,
+      label: 'CMMS'
     },
     {
       key: 'spaces',
