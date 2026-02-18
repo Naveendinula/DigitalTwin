@@ -12,8 +12,8 @@ from ifcopenshell.util import element as ifc_element
 from ifcopenshell.util import system as ifc_system
 
 
-DEFAULT_MAX_DEPTH = 15
-DEFAULT_MAX_NODES = 1500
+DEFAULT_MAX_DEPTH = 35
+DEFAULT_MAX_NODES = 3000
 
 # Heuristic keywords for proxy-based HVAC equipment (e.g., HRUs).
 HVAC_KEYWORDS = (
@@ -293,6 +293,69 @@ def _build_terminal_info(terminal) -> dict[str, Any]:
     }
 
 
+def _get_model_from_element(element) -> Optional[ifcopenshell.file]:
+    wrapped_data = getattr(element, "wrapped_data", None)
+    model = getattr(wrapped_data, "file", None) if wrapped_data else None
+    if model:
+        return model
+
+    model_attr = getattr(element, "file", None)
+    if callable(model_attr):
+        try:
+            return model_attr()
+        except Exception:
+            return None
+    return model_attr
+
+
+def _collect_system_associated_terminals(
+    equipment,
+    connected_terminal_ids: set[str],
+) -> list[dict[str, Any]]:
+    """
+    Collect terminals that share at least one IFC system with equipment, but are not physically connected.
+    """
+    try:
+        equipment_systems = ifc_system.get_element_systems(equipment) or []
+    except Exception:
+        equipment_systems = []
+    if not equipment_systems:
+        return []
+
+    model = _get_model_from_element(equipment)
+    if not model:
+        return []
+
+    equipment_system_ids = {_element_key(system) for system in equipment_systems}
+
+    all_terminals = []
+    for ifc_type in TERMINAL_TYPE_HINTS:
+        try:
+            all_terminals.extend(model.by_type(ifc_type))
+        except Exception:
+            pass
+
+    associated_terminals = {}
+    for terminal in _unique_elements(all_terminals):
+        terminal_id = _element_key(terminal)
+        if terminal_id in connected_terminal_ids:
+            continue
+
+        try:
+            terminal_systems = ifc_system.get_element_systems(terminal) or []
+        except Exception:
+            terminal_systems = []
+
+        if any(_element_key(system) in equipment_system_ids for system in terminal_systems):
+            info = _build_terminal_info(terminal)
+            associated_terminals[info["globalId"]] = info
+
+    return sorted(
+        associated_terminals.values(),
+        key=lambda t: (_clean_text(t.get("name")).lower(), t.get("globalId", "")),
+    )
+
+
 def _derive_served_spaces(terminals: list[dict[str, Any]]) -> list[dict[str, Any]]:
     spaces = {}
     space_systems: dict[str, set[str]] = {}
@@ -339,10 +402,7 @@ def _traverse_terminals(
     max_nodes: int,
 ) -> tuple[list[dict[str, Any]], bool]:
     """
-    Traverse from equipment to find all connected terminals.
-    
-    Uses bidirectional port traversal to ensure all Supply/Return/Exhaust branches are explored.
-    Explicitly seeds the queue with all elements connected to each port of the equipment.
+    Traverse from equipment to find physically connected terminals.
     """
     visited = {_element_key(equipment)}
     queue = deque()
@@ -373,7 +433,7 @@ def _traverse_terminals(
                 for rel in getattr(port, "ConnectedFrom", []):
                     related_port = rel.RelatingPort if hasattr(rel, "RelatingPort") else None
                     if related_port:
-                        owner = ifc_system.get_element(related_port)
+                        owner = ifc_system.get_port_element(related_port)
                         if owner:
                             initial_neighbors.add(owner)
             except Exception:
@@ -383,7 +443,7 @@ def _traverse_terminals(
                 for rel in getattr(port, "ConnectedTo", []):
                     related_port = rel.RelatedPort if hasattr(rel, "RelatedPort") else None
                     if related_port:
-                        owner = ifc_system.get_element(related_port)
+                        owner = ifc_system.get_port_element(related_port)
                         if owner:
                             initial_neighbors.add(owner)
             except Exception:
@@ -439,7 +499,7 @@ def _traverse_terminals(
                     for rel in getattr(port, "ConnectedFrom", []):
                         related_port = rel.RelatingPort if hasattr(rel, "RelatingPort") else None
                         if related_port:
-                            owner = ifc_system.get_element(related_port)
+                            owner = ifc_system.get_port_element(related_port)
                             if owner:
                                 neighbors.add(owner)
                 except Exception:
@@ -449,7 +509,7 @@ def _traverse_terminals(
                     for rel in getattr(port, "ConnectedTo", []):
                         related_port = rel.RelatedPort if hasattr(rel, "RelatedPort") else None
                         if related_port:
-                            owner = ifc_system.get_element(related_port)
+                            owner = ifc_system.get_port_element(related_port)
                             if owner:
                                 neighbors.add(owner)
                 except Exception:
@@ -487,48 +547,10 @@ def _traverse_terminals(
             visited.add(key)
             queue.append((neighbor, depth + 1))
 
-    terminal_list = sorted(terminals.values(), key=lambda t: (_clean_text(t.get("name")).lower(), t.get("globalId", "")))
-    
-    # FALLBACK: Find terminals assigned to same IFC Systems as the equipment
-    # This catches terminals that are logically grouped but physically disconnected
-    try:
-        equipment_systems = ifc_system.get_element_systems(equipment) or []
-        if equipment_systems:
-            model = equipment.wrapped_data.file if hasattr(equipment, 'wrapped_data') else None
-            if not model and hasattr(equipment, 'file'):
-                model = equipment.file()
-            
-            if model:
-                # Get all terminals in the model
-                all_terminals = []
-                for ifc_type in TERMINAL_TYPE_HINTS:
-                    try:
-                        all_terminals.extend(model.by_type(ifc_type))
-                    except Exception:
-                        pass
-                
-                # Check which terminals share systems with the equipment
-                for terminal in all_terminals:
-                    terminal_key = _element_key(terminal)
-                    if terminal_key in terminals:
-                        continue  # Already found via port traversal
-                    
-                    try:
-                        terminal_systems = ifc_system.get_element_systems(terminal) or []
-                        # If terminal shares any system with equipment, include it
-                        for eq_sys in equipment_systems:
-                            eq_sys_id = _element_key(eq_sys)
-                            for term_sys in terminal_systems:
-                                if _element_key(term_sys) == eq_sys_id:
-                                    info = _build_terminal_info(terminal)
-                                    terminals[info["globalId"]] = info
-                                    break
-                    except Exception:
-                        pass
-    except Exception:
-        pass
-    
-    terminal_list = sorted(terminals.values(), key=lambda t: (_clean_text(t.get("name")).lower(), t.get("globalId", "")))
+    terminal_list = sorted(
+        terminals.values(),
+        key=lambda t: (_clean_text(t.get("name")).lower(), t.get("globalId", "")),
+    )
     return terminal_list, hit_max_nodes
 
 
@@ -607,6 +629,7 @@ def analyze_hvac_fm(
     equipment_results = []
     warnings = []
     all_terminal_ids = set()
+    all_system_associated_terminal_ids = set()
     all_space_keys = set()
     terminals_without_space = 0
 
@@ -618,6 +641,10 @@ def analyze_hvac_fm(
             equipment,
             max_depth=max_depth,
             max_nodes=max_nodes,
+        )
+        system_associated_terminals = _collect_system_associated_terminals(
+            equipment,
+            connected_terminal_ids={terminal["globalId"] for terminal in terminals},
         )
         served_spaces = _derive_served_spaces(terminals)
 
@@ -633,6 +660,8 @@ def analyze_hvac_fm(
             elif terminal.get("storey"):
                 all_space_keys.add(f"storey:{terminal.get('storey')}")
                 terminals_without_space += 1
+        for terminal in system_associated_terminals:
+            all_system_associated_terminal_ids.add(terminal["globalId"])
 
         equipment_results.append(
             {
@@ -643,6 +672,7 @@ def analyze_hvac_fm(
                 "systems": systems,
                 "systems_grouped": systems_grouped,
                 "servedTerminals": terminals,
+                "systemAssociatedTerminals": system_associated_terminals,
                 "servedSpaces": served_spaces,
             }
         )
@@ -651,6 +681,7 @@ def analyze_hvac_fm(
         "equipment_count": int(len(equipment_results)),
         "equipment_with_terminals": int(sum(1 for item in equipment_results if item["servedTerminals"])),
         "served_terminal_count": int(len(all_terminal_ids)),
+        "system_associated_terminal_count": int(len(all_system_associated_terminal_ids)),
         "served_space_count": int(len(all_space_keys)),
         "terminals_without_space": int(terminals_without_space),
         "limits": {

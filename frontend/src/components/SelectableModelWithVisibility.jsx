@@ -52,7 +52,7 @@ function SelectableModel({
       return
     }
     
-    fetch(metadataUrl)
+    fetch(metadataUrl, { credentials: 'include' })
       .then(res => {
         if (!res.ok) throw new Error('Failed to load metadata')
         return res.json()

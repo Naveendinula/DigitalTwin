@@ -5,16 +5,15 @@ FastAPI server that handles IFC file uploads and triggers
 geometry conversion (GLB) and metadata extraction (JSON).
 """
 
-import os
 import uuid
 import json
 import shutil
+from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Optional
-from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
+from typing import Any, Optional
+from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Depends, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import asyncio
 from enum import Enum
@@ -26,37 +25,77 @@ from ifc_spatial_hierarchy import extract_spatial_hierarchy, save_hierarchy
 from ec_api import router as ec_router
 from fm_api import router as fm_router
 from validation_api import router as validation_router
-from config import UPLOAD_DIR, OUTPUT_DIR
+from maintenance_api import router as maintenance_router
+from auth_api import router as auth_router
+from auth_deps import get_current_user, get_current_user_optional
+from config import (
+    FRONTEND_ORIGINS,
+    MAX_FM_SIDECAR_UPLOAD_BYTES,
+    MAX_IFC_UPLOAD_BYTES,
+    UPLOAD_DIR,
+    OUTPUT_DIR,
+)
+from job_security import (
+    create_file_access_token,
+    create_job_record,
+    delete_job_record,
+    ensure_job_access,
+    is_valid_job_file_token,
+    list_user_job_ids,
+    require_job_access_user,
+    user_can_access_job,
+)
 from fm_sidecar_merger import find_fm_sidecar, merge_fm_sidecar
+from db import init_db
 
 
 # Ensure directories exist
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    await init_db()
+    yield
+
+
 # Create FastAPI app
 app = FastAPI(
     title="Digital Twin API",
     description="API for converting IFC files to GLB and extracting BIM metadata",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan,
 )
 
 # Include EC router
 app.include_router(ec_router)
 app.include_router(fm_router)
 app.include_router(validation_router)
+app.include_router(maintenance_router)
+app.include_router(auth_router)
 
 # Enable CORS for frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=FRONTEND_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Serve output files statically
-app.mount("/files", StaticFiles(directory=str(OUTPUT_DIR)), name="files")
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    response.headers.setdefault(
+        "Content-Security-Policy",
+        "default-src 'self'; frame-ancestors 'none'; base-uri 'self'",
+    )
+    return response
 
 
 class JobStatus(str, Enum):
@@ -91,6 +130,42 @@ class ConversionJob(BaseModel):
 jobs: dict[str, ConversionJob] = {}
 
 
+def _sanitize_filename(filename: str) -> str:
+    cleaned = Path(filename).name.strip()
+    if not cleaned:
+        raise HTTPException(status_code=400, detail="Filename is required")
+    if cleaned in {".", ".."}:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    return cleaned
+
+
+def _build_protected_file_url(job_id: str, filename: str, file_access_token: str) -> str:
+    return f"/files/{job_id}/{filename}?t={file_access_token}"
+
+
+async def _save_upload_stream(upload: UploadFile, destination: Path, max_bytes: int) -> None:
+    """
+    Save an uploaded file to disk with a maximum size limit.
+    """
+    def _copy() -> None:
+        total_size = 0
+        with open(destination, "wb") as buffer:
+            while True:
+                chunk = upload.file.read(1024 * 1024)
+                if not chunk:
+                    break
+                total_size += len(chunk)
+                if total_size > max_bytes:
+                    raise ValueError("File exceeds upload size limit")
+                buffer.write(chunk)
+
+    try:
+        await asyncio.to_thread(_copy)
+    except Exception:
+        destination.unlink(missing_ok=True)
+        raise
+
+
 def check_metadata_schema(metadata_path: Path) -> int:
     """
     Check the schema version of an existing metadata.json file.
@@ -109,7 +184,12 @@ def check_metadata_schema(metadata_path: Path) -> int:
         return 0
 
 
-async def process_ifc_file(job_id: str, ifc_path: Path, sidecar_path: Optional[Path] = None) -> None:
+async def process_ifc_file(
+    job_id: str,
+    ifc_path: Path,
+    sidecar_path: Optional[Path] = None,
+    file_access_token: Optional[str] = None,
+) -> None:
     """
     Background task to process IFC file.
     Converts to GLB and extracts metadata.
@@ -258,11 +338,18 @@ async def process_ifc_file(job_id: str, ifc_path: Path, sidecar_path: Optional[P
         job.stage = JobStage.COMPLETED
         # Only include GLB URL if conversion succeeded
         if glb_conversion_success:
-            job.glb_url = f"/files/{job_id}/model.glb"
+            if file_access_token:
+                job.glb_url = _build_protected_file_url(job_id, "model.glb", file_access_token)
+            else:
+                job.glb_url = f"/files/{job_id}/model.glb"
         else:
             job.glb_url = None  # No geometry available
-        job.metadata_url = f"/files/{job_id}/metadata.json"
-        job.hierarchy_url = f"/files/{job_id}/hierarchy.json"
+        if file_access_token:
+            job.metadata_url = _build_protected_file_url(job_id, "metadata.json", file_access_token)
+            job.hierarchy_url = _build_protected_file_url(job_id, "hierarchy.json", file_access_token)
+        else:
+            job.metadata_url = f"/files/{job_id}/metadata.json"
+            job.hierarchy_url = f"/files/{job_id}/hierarchy.json"
         
         print(f"[{job_id}] Processing completed successfully")
         
@@ -281,8 +368,9 @@ async def process_ifc_file(job_id: str, ifc_path: Path, sidecar_path: Optional[P
 @app.post("/upload", response_model=ConversionJob)
 async def upload_ifc(
     background_tasks: BackgroundTasks,
+    current_user: dict[str, Any] = Depends(get_current_user),
     file: UploadFile = File(..., description="IFC file to process"),
-    fm_params: Optional[UploadFile] = File(None, description="Optional FM sidecar JSON file")
+    fm_params: Optional[UploadFile] = File(None, description="Optional FM sidecar JSON file"),
 ):
     """
     Upload an IFC file for processing.
@@ -294,37 +382,52 @@ async def upload_ifc(
     Returns a job object with ID to track progress.
     The processing happens in the background.
     """
-    # Generate unique job ID
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="IFC filename is required")
+    ifc_original_filename = _sanitize_filename(file.filename)
+    if not ifc_original_filename.lower().endswith(".ifc"):
+        raise HTTPException(status_code=400, detail="Only .ifc files are supported")
+
     job_id = str(uuid.uuid4())[:8]
-    
-    # Save uploaded IFC file
-    ifc_filename = f"{job_id}_{file.filename}"
-    ifc_path = UPLOAD_DIR / ifc_filename
-    
+    file_access_token = create_file_access_token()
+    ifc_stored_filename = f"{job_id}_{ifc_original_filename}"
+    ifc_path = UPLOAD_DIR / ifc_stored_filename
+
     try:
-        with open(ifc_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        await _save_upload_stream(file, ifc_path, max_bytes=MAX_IFC_UPLOAD_BYTES)
+    except ValueError as exc:
+        raise HTTPException(status_code=413, detail=str(exc))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save IFC file: {e}")
     finally:
         file.file.close()
-    
-    # Save FM sidecar if provided
+
     sidecar_path = None
     fm_params_filename = None
     if fm_params and fm_params.filename:
-        # Validate file extension
-        if not (fm_params.filename.endswith('.json') or fm_params.filename.endswith('.fm_params.json')):
-            raise HTTPException(status_code=400, detail="FM sidecar must be a .json file")
-        
-        fm_params_filename = fm_params.filename
-        sidecar_filename = f"{job_id}_{fm_params.filename}"
-        sidecar_path = UPLOAD_DIR / sidecar_filename
-        
         try:
-            with open(sidecar_path, "wb") as buffer:
-                shutil.copyfileobj(fm_params.file, buffer)
+            fm_params_filename = _sanitize_filename(fm_params.filename)
+            if not (
+                fm_params_filename.lower().endswith(".json")
+                or fm_params_filename.lower().endswith(".fm_params.json")
+            ):
+                raise HTTPException(status_code=400, detail="FM sidecar must be a .json file")
+
+            sidecar_filename = f"{job_id}_{fm_params_filename}"
+            sidecar_path = UPLOAD_DIR / sidecar_filename
+
+            await _save_upload_stream(
+                fm_params,
+                sidecar_path,
+                max_bytes=MAX_FM_SIDECAR_UPLOAD_BYTES,
+            )
             print(f"[{job_id}] FM sidecar saved: {fm_params.filename}")
+        except ValueError as exc:
+            sidecar_path = None
+            fm_params_filename = None
+            raise HTTPException(status_code=413, detail=str(exc))
+        except HTTPException:
+            raise
         except Exception as e:
             print(f"[{job_id}] Warning: Failed to save FM sidecar: {e}")
             sidecar_path = None
@@ -332,24 +435,46 @@ async def upload_ifc(
         finally:
             fm_params.file.close()
     
-    # Create job record
+    owner_user_id = int(current_user["id"])
+    try:
+        await create_job_record(
+            job_id=job_id,
+            owner_user_id=owner_user_id,
+            original_filename=ifc_original_filename,
+            stored_ifc_name=ifc_stored_filename,
+            file_access_token=file_access_token,
+        )
+    except Exception as exc:
+        ifc_path.unlink(missing_ok=True)
+        if sidecar_path:
+            sidecar_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=500, detail=f"Failed to create job record: {exc}")
+
     job = ConversionJob(
         job_id=job_id,
         status=JobStatus.PENDING,
         stage=JobStage.QUEUED,
-        ifc_filename=file.filename,
-        fm_params_filename=fm_params_filename
+        ifc_filename=ifc_original_filename,
+        fm_params_filename=fm_params_filename,
     )
     jobs[job_id] = job
-    
-    # Start background processing
-    background_tasks.add_task(process_ifc_file, job_id, ifc_path, sidecar_path)
-    
+
+    background_tasks.add_task(
+        process_ifc_file,
+        job_id,
+        ifc_path,
+        sidecar_path,
+        file_access_token,
+    )
+
     return job
 
 
 @app.get("/job/{job_id}", response_model=ConversionJob)
-async def get_job_status(job_id: str):
+async def get_job_status(
+    job_id: str,
+    _: dict[str, Any] = Depends(require_job_access_user),
+):
     """
     Get the status of a conversion job.
     
@@ -362,33 +487,39 @@ async def get_job_status(job_id: str):
 
 
 @app.get("/jobs", response_model=list[ConversionJob])
-async def list_jobs():
-    """List all conversion jobs."""
-    return list(jobs.values())
+async def list_jobs(current_user: dict[str, Any] = Depends(get_current_user)):
+    """List conversion jobs owned by the authenticated user."""
+    visible_job_ids = await list_user_job_ids(int(current_user["id"]))
+    return [job for job_id, job in jobs.items() if job_id in visible_job_ids]
 
 
 @app.delete("/job/{job_id}")
-async def delete_job(job_id: str):
+async def delete_job(job_id: str, current_user: dict[str, Any] = Depends(get_current_user)):
     """
     Delete a job and its output files.
     """
-    job = jobs.get(job_id)
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
-    
+    user_id = int(current_user["id"])
+    await ensure_job_access(job_id, user_id)
+
     # Delete output directory
     job_output_dir = OUTPUT_DIR / job_id
     if job_output_dir.exists():
         shutil.rmtree(job_output_dir)
     
     # Remove from jobs dict
-    del jobs[job_id]
+    if job_id in jobs:
+        del jobs[job_id]
+
+    await delete_job_record(job_id, user_id)
     
     return {"message": f"Job {job_id} deleted"}
 
 
 @app.get("/job/{job_id}/metadata/schema")
-async def get_metadata_schema_info(job_id: str):
+async def get_metadata_schema_info(
+    job_id: str,
+    _: dict[str, Any] = Depends(require_job_access_user),
+):
     """
     Get schema version info for a job's metadata.
     
@@ -410,7 +541,10 @@ async def get_metadata_schema_info(job_id: str):
 
 
 @app.post("/job/{job_id}/metadata/upgrade")
-async def upgrade_metadata_schema(job_id: str):
+async def upgrade_metadata_schema(
+    job_id: str,
+    _: dict[str, Any] = Depends(require_job_access_user),
+):
     """
     Upgrade metadata to latest schema version.
     
@@ -456,6 +590,32 @@ async def upgrade_metadata_schema(job_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to upgrade metadata: {e}")
 
 
+@app.get("/files/{job_id}/{filename}")
+async def get_job_file(
+    job_id: str,
+    filename: str,
+    t: str | None = Query(default=None),
+    current_user: dict[str, Any] | None = Depends(get_current_user_optional),
+):
+    safe_filename = Path(filename).name
+    if safe_filename != filename:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    is_authorized = False
+    if current_user:
+        is_authorized = await user_can_access_job(job_id, int(current_user["id"]))
+    if not is_authorized and t:
+        is_authorized = await is_valid_job_file_token(job_id, t)
+    if not is_authorized:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    file_path = OUTPUT_DIR / job_id / safe_filename
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    return FileResponse(path=str(file_path))
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
@@ -464,7 +624,11 @@ async def health_check():
 
 # Development server
 @app.post("/job/{job_id}/fm-sidecar")
-async def upload_fm_sidecar(job_id: str, file: UploadFile = File(...)):
+async def upload_fm_sidecar(
+    job_id: str,
+    _: dict[str, Any] = Depends(require_job_access_user),
+    file: UploadFile = File(...),
+):
     """
     Upload an FM sidecar file to merge with existing metadata.
 
@@ -485,11 +649,22 @@ async def upload_fm_sidecar(job_id: str, file: UploadFile = File(...)):
     if not metadata_path.exists():
         raise HTTPException(status_code=404, detail="Metadata not found for this job")
 
-    # Save sidecar file temporarily
-    sidecar_path = OUTPUT_DIR / job_id / file.filename
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="FM sidecar filename is required")
+
+    safe_name = _sanitize_filename(file.filename)
+    if not (safe_name.lower().endswith(".json") or safe_name.lower().endswith(".fm_params.json")):
+        raise HTTPException(status_code=400, detail="FM sidecar must be a .json file")
+
+    sidecar_path = OUTPUT_DIR / job_id / safe_name
     try:
-        with open(sidecar_path, "wb") as f:
-            shutil.copyfileobj(file.file, f)
+        await _save_upload_stream(
+            file,
+            sidecar_path,
+            max_bytes=MAX_FM_SIDECAR_UPLOAD_BYTES,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=413, detail=str(exc))
     finally:
         file.file.close()
 

@@ -8,12 +8,14 @@ from pathlib import Path
 import glob
 from typing import Dict, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 import traceback
 
+from auth_deps import get_current_user
 from ec_core import compute_ec_from_ifc
 from config import UPLOAD_DIR, EC_DB_PATH
+from job_security import ensure_job_access
 
 router = APIRouter()
 
@@ -40,7 +42,12 @@ class CalculateEcRequest(BaseModel):
     overrides: Optional[EcOverrides] = None
 
 @router.post("/api/ec/calculate/{job_id}")
-async def calculate_ec(job_id: str, request: Optional[CalculateEcRequest] = None):
+async def calculate_ec(
+    job_id: str,
+    request: Optional[CalculateEcRequest] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    await ensure_job_access(job_id, int(current_user["id"]))
     if not EC_DB_PATH.exists():
         raise HTTPException(
             status_code=500,

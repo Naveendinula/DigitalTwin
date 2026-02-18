@@ -107,6 +107,8 @@ npm run dev
 - `GET /api/occupancy/demo/{job_id}` - fetch the pre-generated demo loop.
 
 Notes:
+- HVAC/FM output keeps `servedTerminals` strictly physical (port-connected traversal).
+- HVAC/FM output includes `systemAssociatedTerminals` as a separate inferred list (same IFC system, not merged into `servedTerminals`).
 - HVAC/FM output includes served spaces with `room_no`, `room_name`, and grouped system names when available.
 - Space bbox output includes world-space `bbox`/footprints; `transform` is currently null.
 - Occupancy simulation uses absolute headcount as canonical data; percentage is derived for UX display.

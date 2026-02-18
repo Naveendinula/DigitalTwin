@@ -1,10 +1,36 @@
 # Architecture Documentation
 
 > **Status**: Living Document  
-> **Last Updated**: January 30, 2026  
+> **Last Updated**: February 18, 2026  
 > **Owner**: Naveen Panditharatne
 
 ## Recent additions / changes
+
+- **Date:** 2026-02-18
+- **Security hardening (phase 1):** Added authenticated job ownership checks across upload/job/EC/FM/validation/maintenance routes, protected `/files/{job_id}/{filename}` access, hardened upload size/filename validation, and added baseline security headers.
+- **Backend updates:** Added `backend/job_security.py` and `model_jobs` table in `backend/db.py` for persistent job-to-user ownership and file-token checks.
+- **Frontend updates:** Updated backend fetch calls to send credentials so authenticated endpoints continue to work from the Vite app.
+
+- **Date:** 2026-02-17
+- **Authentication:** Added JWT cookie auth with refresh-token rotation, CSRF double-submit protection, audit logging, and auth endpoints under `/auth/*`.
+- **Backend updates:** Added `backend/auth_api.py`, `backend/auth_deps.py`, and `backend/auth_models.py`; extended `db.py` schema with `users`, `refresh_tokens`, and `audit_logs`.
+- **Frontend updates:** Added route-based auth flow (`react-router-dom`), `useAuth` context, `LoginPage`, `SignupPage`, and shared API wrapper with CSRF header + credentialed requests.
+
+- **Date:** 2026-02-16
+- **Floating panel interaction refactor:** Added `frontend/src/components/DraggablePanel.jsx` to centralize drag/resize/focus behavior used by EC, HVAC/FM, IDS Validation, and Occupancy panels.
+- **Maintenance impact:** Drag/resize bug fixes now apply across all floating panels from one component instead of four duplicated implementations.
+
+- **Date:** 2026-02-16
+- **Maintenance log feature:** Added server-side per-element maintenance logging with SQLite (`backend/maintenance.db`) and REST endpoints under `/api/maintenance/*`.
+- **Backend updates:** Added `backend/db.py` (SQLite init/PRAGMA/schema), `backend/maintenance_models.py` (Pydantic request/response models), and `backend/maintenance_api.py` (CRUD + summary router).
+- **Frontend updates:** Added `frontend/src/components/MaintenanceLog.jsx` and embedded it in `PropertyPanel` so FM users can create, update, and delete logs directly from selected elements.
+
+- **Date:** 2026-02-16
+- **HVAC terminal-link accuracy:** `servedTerminals` now contains only physically connected terminals discovered by port traversal (BFS).
+- **HVAC inferred links:** Added `systemAssociatedTerminals` as a separate field for same-system inference so physical vs inferred links are not mixed.
+- **Traversal defaults:** Increased HVAC traversal defaults from depth 15/node cap 1500 to depth 35/node cap 3000 for better coverage on longer branch runs.
+- **Global search (viewer header):** Added model-wide search in the top header (`GlobalSearch`) that queries `metadata.json` across element IDs, names, IFC type/object type, storey, materials, and property keys/values, independent of the Structure panel state.
+- **Selection integration:** Global search selection reuses the same tree-selection focus path (`handleTreeSelect`) and triggers space overlay highlighting when the selected result is an `IfcSpace`.
 
 - **Date:** 2026-01-30
 - **FM Sidecar Integration:** Added support for uploading FM parameter sidecar JSON files alongside IFC files. This allows Revit FM parameters to appear in the PropertyPanel without relying on IFC property-set export. The sidecar is merged into `metadata.json` during processing.
@@ -52,9 +78,11 @@ The system bridges the gap between complex BIM files and accessible web visualiz
 *   **3D Visualization**: The user views the 3D model in the browser, navigating via orbit/pan/zoom controls.
 *   **Element Inspection**: Clicking a 3D element reveals its specific BIM properties (Psets, quantities, materials) in a side panel.
 *   **Embodied Carbon Analysis**: The user triggers an EC calculation. The system maps model materials to a backend database (`prac-database.csv`) and visualizes the carbon footprint (kgCO2e) per element and in aggregate.
-*   **HVAC/FM Analysis**: The user runs HVAC/FM analysis to derive served terminals and served spaces from equipment.
+*   **HVAC/FM Analysis**: The user runs HVAC/FM analysis to derive physically served terminals and served spaces from equipment.
 *   **Spatial Navigation**: Users can isolate parts of the building (e.g., specific floors or rooms) using the spatial hierarchy tree.
 *   **Space Overlay**: Users toggle translucent space bounding boxes for quick room context in the 3D view.
+*   **Authentication**: Users sign up/sign in to access the viewer, with cookie-based sessions and CSRF protection.
+*   **Maintenance Logging**: Users capture per-element FM actions/notes (inspection, repair, issue) with server-side timestamps and status lifecycle updates.
 *   **Live Occupancy**: Users enable occupancy simulation to visualize synthetic headcounts per room with a color-coded heatmap (green→yellow→red) and a real-time legend/panel.
 
 ## 3. Repository Tour
@@ -67,10 +95,16 @@ The system bridges the gap between complex BIM files and accessible web visualiz
 ### Backend (`/backend`)
 *   `main.py`: **Entrypoint**. Configures the FastAPI app, CORS, and routes.
 *   `config.py`: Centralized configuration (paths, constants).
+*   `auth_api.py`: API router for registration/login/logout/me/refresh/password-reset-stub.
+*   `auth_deps.py`: Reusable auth dependencies for resolving current user from access-cookie JWT.
+*   `auth_models.py`: Pydantic request/response models for auth endpoints.
+*   `db.py`: SQLite helpers and schema initialization for server-side maintenance logs.
 *   `ec_api.py`: API router specifically for Embodied Carbon endpoints.
 *   `ec_core.py`: Orchestrator for EC calculations.
 *   `fm_api.py`: API router for HVAC/FM analysis, space bbox, and occupancy simulation endpoints.
-*   `fm_hvac_core.py`: HVAC/FM core logic (equipment -> terminals -> spaces).
+*   `maintenance_api.py`: API router for maintenance logs CRUD and summary queries.
+*   `maintenance_models.py`: Pydantic models for maintenance log requests/responses.
+*   `fm_hvac_core.py`: HVAC/FM core logic (equipment -> physically connected terminals -> spaces), plus separate system-associated terminal inference.
 *   `validation_api.py`: API router for IFC validation and IDS file workflows.
 *   `ifc_validation.py`: Minimal IFC rule checks and report summaries used by validation endpoints.
 *   `ids_manager.py`: IDS file management and two-gate validation (Gate 1 XSD schema, Gate 2 ifctester).
@@ -88,7 +122,12 @@ The system bridges the gap between complex BIM files and accessible web visualiz
 
 ### Frontend (`/frontend`)
 *   `src/main.jsx`: **Entrypoint**. Bootstraps the React application.
+*   `src/pages/LoginPage.jsx`: Login screen for cookie-based auth.
+*   `src/pages/SignupPage.jsx`: Signup screen for new local users.
+*   `src/hooks/useAuth.js`: Auth context provider and auth action hooks.
+*   `src/utils/api.js`: Credentialed fetch wrapper with CSRF header and refresh retry behavior.
 *   `src/components/Viewer.jsx`: The core 3D canvas using `@react-three/fiber`.
+*   `src/components/DraggablePanel.jsx`: Shared wrapper that handles drag/resize/focus behavior for floating tool panels.
 *   `src/components/EcPanel.jsx`: UI for triggering and displaying EC analysis results.
 *   `src/components/HvacFmPanel.jsx`: UI for HVAC/FM analysis results and filters.
 *   `src/components/SpaceBboxOverlay.jsx`: Renders space bbox overlays in the viewer (with optional occupancy heatmap).
@@ -97,6 +136,7 @@ The system bridges the gap between complex BIM files and accessible web visualiz
 *   `src/components/OccupancyPanel.jsx`: Draggable panel with sortable/filterable occupancy breakdown.
 *   `src/hooks/useOccupancy.js`: Hook managing occupancy polling and state.
 *   `src/components/PropertyPanel.jsx`: Displays element-specific metadata.
+*   `src/components/MaintenanceLog.jsx`: Per-element maintenance log UI embedded in the property panel.
 *   `src/components/UploadPanel.jsx`: Landing-page scrollytelling canvas (GSAP) plus file selection and upload progress.
 
 ## 4. Component Boundaries & Data Flow
@@ -177,10 +217,11 @@ graph TB
 ### Data Flow: HVAC/FM Analysis
 1.  **Request**: Frontend sends `POST /api/fm/hvac/analyze/{jobId}`.
 2.  **Load**: Backend locates the `.ifc` file in `uploads/`.
-3.  **Traverse**: `fm_hvac_core.py` discovers equipment, traverses ports, and maps terminals to spaces.
-4.  **Enrich**: Served spaces include `room_no`, `room_name`, and grouped system names when available.
-5.  **Cache**: Result JSON is written to `output/{jobId}/hvac_fm.json`.
-6.  **Fetch**: Frontend calls `GET /api/fm/hvac/{jobId}` to render results in `HvacFmPanel`.
+3.  **Traverse**: `fm_hvac_core.py` discovers equipment, traverses ports (BFS), and finds physically connected terminals.
+4.  **Enrich**: Served spaces are derived from physically connected terminals and include `room_no`, `room_name`, and grouped system names when available.
+5.  **Infer (separate field)**: Additional same-system terminals are returned in `systemAssociatedTerminals` and are not merged into `servedTerminals`.
+6.  **Cache**: Result JSON is written to `output/{jobId}/hvac_fm.json`.
+7.  **Fetch**: Frontend calls `GET /api/fm/hvac/{jobId}` to render results in `HvacFmPanel`.
 
 ### Data Flow: Space BBox Overlay
 1.  **Request**: Frontend sends `GET /api/spaces/bboxes/{jobId}`.
@@ -207,6 +248,15 @@ graph TB
     - Track statistics: merged count, not-found count, errors.
 6.  **Report**: A merge report is saved to `output/{jobId}/fm_merge_report.json` for debugging.
 7.  **Display**: `PropertyPanel.jsx` displays the merged FM properties like any other Pset when an element is selected.
+
+### Data Flow: Maintenance Logs
+1.  **Select element**: User selects an element in the viewer/tree; frontend has `jobId` and `globalId`.
+2.  **Fetch logs**: `MaintenanceLog.jsx` calls `GET /api/maintenance/{jobId}?global_id={globalId}`.
+3.  **Store/query**: `maintenance_api.py` runs parameterized SQLite queries against `maintenance_logs`.
+4.  **Create log**: Frontend posts `POST /api/maintenance/{jobId}` with element context and note fields.
+5.  **Update log**: Frontend patches `PATCH /api/maintenance/{jobId}/{logId}` for status and edits.
+6.  **Delete log**: Frontend deletes logs with `DELETE /api/maintenance/{jobId}/{logId}`.
+7.  **Summary badges**: Frontend can call `GET /api/maintenance/{jobId}/summary` for status/priority counts.
 
 #### FM Sidecar JSON Contract
 ```json
@@ -244,6 +294,7 @@ graph TB
 ### Backend
 *   **FastAPI**: Web framework.
 *   **IfcOpenShell**: Parsing and manipulating IFC files.
+*   **SQLite + aiosqlite**: Lightweight async persistence for maintenance logs.
 *   **Pandas**: Data manipulation for the EC database and material merging.
 *   **IfcConvert**: External executable (must be present in `backend/`) for geometry conversion.
 

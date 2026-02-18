@@ -4,7 +4,7 @@ This document describes the frontend web app for the Digital Twin viewer, how it
 
 ## Overview
 
-The web app is a React + Three.js viewer for IFC models. It handles upload, renders a 3D model, and provides tools for selection, isolation, section planes, and domain panels (embodied carbon and HVAC/FM).
+The web app is a React + Three.js viewer for IFC models. It handles upload, renders a 3D model, and provides tools for selection, isolation, section planes, and domain panels (embodied carbon, HVAC/FM, and per-element maintenance logging). Authentication is handled by cookie-based JWT auth with dedicated login/signup pages.
 
 Primary entry points:
 - App orchestration: `frontend/src/App.jsx`
@@ -12,6 +12,8 @@ Primary entry points:
 - Viewer rendering: `frontend/src/components/Viewer.jsx`
 - Model selection/visibility: `frontend/src/components/SelectableModelWithVisibility.jsx`
 - Upload flow: `frontend/src/components/UploadPanel.jsx`
+- Auth state/context: `frontend/src/hooks/useAuth.js`
+- Auth fetch wrapper: `frontend/src/utils/api.js`
 
 ## Local Development
 
@@ -41,6 +43,7 @@ Key extracted UI blocks:
 - Viewer shell (toolbar, viewer, overlays, panels): `frontend/src/components/ViewerShell.jsx`
 - Left panel: `frontend/src/components/StructureTree.jsx`
 - Right panel: `frontend/src/components/PropertyPanel.jsx`
+- Shared floating panel wrapper: `frontend/src/components/DraggablePanel.jsx`
 
 Key hooks:
 - Viewer lifecycle + scene wiring: `frontend/src/hooks/useViewerScene.js`
@@ -69,8 +72,17 @@ Key hooks:
 4) Domain panels
 - Embodied carbon: `frontend/src/components/EcPanel.jsx` calls `POST /api/ec/calculate/{job_id}`.
 - HVAC/FM: `frontend/src/components/HvacFmPanel.jsx` calls `POST /api/fm/hvac/analyze/{job_id}` then `GET /api/fm/hvac/{job_id}`.
+  - `servedTerminals` are physically connected terminals from traversal.
+  - `systemAssociatedTerminals` are returned separately for same-system inference and are not mixed into `servedTerminals`.
+- Maintenance log: `frontend/src/components/MaintenanceLog.jsx` calls maintenance CRUD endpoints scoped by `jobId` and selected `globalId`.
 
-5) Space overlay
+5) Authentication
+- Routes are guarded in `App.jsx` using `react-router-dom`.
+- `LoginPage.jsx` and `SignupPage.jsx` call `/auth/login` and `/auth/register`.
+- `useAuth.js` bootstraps session state via `/auth/me` and exposes `login/logout/signup`.
+- `api.js` sends `credentials: 'include'` and `X-CSRF-Token` for state-changing requests.
+
+6) Space overlay
 - `frontend/src/components/SpaceBboxOverlay.jsx` requests `GET /api/spaces/bboxes/{job_id}` and renders translucent room boxes.
 - `SpaceNavigator.jsx` lets users step through spaces when no subset is highlighted.
 
@@ -99,14 +111,28 @@ The frontend expects a backend running at `http://localhost:8000`. The base URL 
 - `frontend/src/components/EcPanel.jsx`
 - `frontend/src/components/HvacFmPanel.jsx`
 - `frontend/src/components/SpaceBboxOverlay.jsx`
+- `frontend/src/components/MaintenanceLog.jsx`
+- `frontend/src/hooks/useAuth.js`
+- `frontend/src/utils/api.js`
 
 Endpoints used:
+- `POST /auth/register`
+- `POST /auth/login`
+- `POST /auth/logout`
+- `GET /auth/me`
+- `POST /auth/refresh`
+- `POST /auth/password-reset-request`
 - `POST /upload`
 - `GET /job/{job_id}`
 - `POST /api/ec/calculate/{job_id}`
 - `POST /api/fm/hvac/analyze/{job_id}`
 - `GET /api/fm/hvac/{job_id}`
 - `GET /api/spaces/bboxes/{job_id}`
+- `GET /api/maintenance/{job_id}`
+- `POST /api/maintenance/{job_id}`
+- `PATCH /api/maintenance/{job_id}/{log_id}`
+- `DELETE /api/maintenance/{job_id}/{log_id}`
+- `GET /api/maintenance/{job_id}/summary`
 
 ## File Map (Frontend)
 
@@ -127,10 +153,18 @@ Viewer and UI:
 - `frontend/src/components/AxisViewWidget.jsx`
 
 Domain panels and overlays:
+- `frontend/src/components/DraggablePanel.jsx`
 - `frontend/src/components/EcPanel.jsx`
 - `frontend/src/components/HvacFmPanel.jsx`
+- `frontend/src/components/MaintenanceLog.jsx`
 - `frontend/src/components/SpaceBboxOverlay.jsx`
 - `frontend/src/components/SpaceNavigator.jsx`
+
+Auth UI and state:
+- `frontend/src/pages/LoginPage.jsx`
+- `frontend/src/pages/SignupPage.jsx`
+- `frontend/src/hooks/useAuth.js`
+- `frontend/src/utils/api.js`
 
 Hooks and utilities:
 - `frontend/src/hooks/useViewerScene.js`

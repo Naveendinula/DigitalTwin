@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
+import DraggablePanel from './DraggablePanel'
 
 const getSpaceLabel = (space) => {
   if (!space) return 'Unknown'
@@ -49,105 +50,9 @@ function HvacFmPanel({ isOpen, onClose, jobId, selectedId, onSelectEquipment, fo
   const [spaceSearch, setSpaceSearch] = useState('')
   const [selectedSpaceId, setSelectedSpaceId] = useState(null)
 
-  // Draggable state
+  // Floating panel state
   const [position, setPosition] = useState({ x: 420, y: 80 })
   const [size, setSize] = useState({ width: 360, height: 500 })
-  const [isDragging, setIsDragging] = useState(false)
-  const [isResizing, setIsResizing] = useState(false)
-
-  const dragStart = useRef({ x: 0, y: 0 })
-  const startPos = useRef({ x: 0, y: 0 })
-  const resizeStart = useRef({ x: 0, y: 0 })
-  const startSize = useRef({ width: 0, height: 0 })
-  const panelRef = useRef(null)
-
-  useEffect(() => {
-    const handleResize = () => {}
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
-
-  useEffect(() => {
-    if (!panelRef.current) return
-
-    setPosition(prev => {
-      const maxX = Math.max(20, window.innerWidth - size.width - 20)
-      const maxY = Math.max(20, window.innerHeight - size.height - 20)
-      const x = Math.min(Math.max(20, prev.x), maxX)
-      const y = Math.min(Math.max(20, prev.y), maxY)
-      return { x, y }
-    })
-
-    const el = panelRef.current
-    const original = el.style.boxShadow
-    el.style.boxShadow = '0 12px 40px rgba(0,0,0,0.18)'
-    const t = setTimeout(() => { el.style.boxShadow = original }, 280)
-    return () => clearTimeout(t)
-  }, [focusToken, size.width, size.height])
-
-  const handleMouseDown = (e) => {
-    if (panelRef.current && e.target.closest('.drag-handle')) {
-      setIsDragging(true)
-      dragStart.current = { x: e.clientX, y: e.clientY }
-      startPos.current = { x: position.x, y: position.y }
-    }
-  }
-
-  const handleMouseMove = (e) => {
-    if (isDragging) {
-      e.preventDefault()
-      const dx = e.clientX - dragStart.current.x
-      const dy = e.clientY - dragStart.current.y
-      setPosition({ x: startPos.current.x + dx, y: startPos.current.y + dy })
-    }
-  }
-
-  const handleMouseUp = () => {
-    setIsDragging(false)
-  }
-
-  const handleResizeMouseDown = (e) => {
-    e.stopPropagation()
-    setIsResizing(true)
-    resizeStart.current = { x: e.clientX, y: e.clientY }
-    startSize.current = { width: size.width, height: size.height }
-  }
-
-  const handleResizeMouseMove = (e) => {
-    if (isResizing) {
-      e.preventDefault()
-      const dx = e.clientX - resizeStart.current.x
-      const dy = e.clientY - resizeStart.current.y
-      setSize({
-        width: Math.max(300, startSize.current.width + dx),
-        height: Math.max(300, startSize.current.height + dy)
-      })
-    }
-  }
-
-  const handleResizeMouseUp = () => {
-    setIsResizing(false)
-  }
-
-  useEffect(() => {
-    if (isDragging) {
-      window.addEventListener('mousemove', handleMouseMove)
-      window.addEventListener('mouseup', handleMouseUp)
-      document.body.style.userSelect = 'none'
-    } else if (isResizing) {
-      window.addEventListener('mousemove', handleResizeMouseMove)
-      window.addEventListener('mouseup', handleResizeMouseUp)
-      document.body.style.userSelect = 'none'
-    }
-
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove)
-      window.removeEventListener('mouseup', handleMouseUp)
-      window.removeEventListener('mousemove', handleResizeMouseMove)
-      window.removeEventListener('mouseup', handleResizeMouseUp)
-      document.body.style.userSelect = ''
-    }
-  }, [isDragging, isResizing])
 
   const handleAnalyze = async () => {
     if (!jobId) {
@@ -159,14 +64,17 @@ function HvacFmPanel({ isOpen, onClose, jobId, selectedId, onSelectEquipment, fo
     setError(null)
     try {
       const analyzeRes = await fetch(`http://localhost:8000/api/fm/hvac/analyze/${jobId}`, {
-        method: 'POST'
+        method: 'POST',
+        credentials: 'include',
       })
       if (!analyzeRes.ok) {
         const err = await analyzeRes.json()
         throw new Error(err.detail || 'Analysis failed')
       }
 
-      const resultRes = await fetch(`http://localhost:8000/api/fm/hvac/${jobId}`)
+      const resultRes = await fetch(`http://localhost:8000/api/fm/hvac/${jobId}`, {
+        credentials: 'include',
+      })
       if (!resultRes.ok) {
         const err = await resultRes.json()
         throw new Error(err.detail || 'Failed to load HVAC/FM results')
@@ -289,19 +197,18 @@ function HvacFmPanel({ isOpen, onClose, jobId, selectedId, onSelectEquipment, fo
   if (!isOpen) return null
 
   return (
-    <div
-      ref={panelRef}
-      style={{
-        ...styles.panel,
-        left: `${position.x}px`,
-        top: `${position.y}px`,
-        width: `${size.width}px`,
-        height: `${size.height}px`,
-        cursor: isDragging ? 'grabbing' : 'default',
-        zIndex: zIndex || styles.panel.zIndex
-      }}
-      onMouseDown={handleMouseDown}
-      onPointerDown={(e) => e.stopPropagation()}
+    <DraggablePanel
+      position={position}
+      setPosition={setPosition}
+      size={size}
+      setSize={setSize}
+      minWidth={300}
+      minHeight={300}
+      panelStyle={styles.panel}
+      resizeHandleStyle={styles.resizeHandle}
+      zIndex={zIndex}
+      focusToken={focusToken}
+      stopPointerDown
     >
       <div style={styles.header} className="drag-handle">
         <div style={styles.titleContainer}>
@@ -597,11 +504,7 @@ function HvacFmPanel({ isOpen, onClose, jobId, selectedId, onSelectEquipment, fo
         )}
       </div>
 
-      <div
-        style={styles.resizeHandle}
-        onMouseDown={handleResizeMouseDown}
-      />
-    </div>
+    </DraggablePanel>
   )
 }
 

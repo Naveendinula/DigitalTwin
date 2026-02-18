@@ -133,6 +133,25 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
   const featureCardRefs = useRef([])
 
   const API_URL = 'http://localhost:8000'
+  const HEALTH_TIMEOUT_MS = 5000
+  const UPLOAD_TIMEOUT_MS = 180000
+
+  const fetchWithTimeout = useCallback(async (url, options = {}, timeoutMs = 30000) => {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), timeoutMs)
+    try {
+      return await fetch(url, { credentials: 'include', ...options, signal: controller.signal })
+    } finally {
+      clearTimeout(timeout)
+    }
+  }, [])
+
+  const checkBackendHealth = useCallback(async () => {
+    const response = await fetchWithTimeout(`${API_URL}/health`, {}, HEALTH_TIMEOUT_MS)
+    if (!response.ok) {
+      throw new Error(`Backend health check failed (${response.status})`)
+    }
+  }, [API_URL, fetchWithTimeout])
 
   // Generate frame path
   const getFramePath = (index) => {
@@ -530,7 +549,7 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
 
     while (Date.now() - startTime < maxDurationMs) {
       try {
-        const response = await fetch(`${API_URL}/job/${jobId}`)
+        const response = await fetch(`${API_URL}/job/${jobId}`, { credentials: 'include' })
         const job = await response.json()
 
         if (job.status === 'completed') {
@@ -576,6 +595,8 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
     setJobStage(null)
 
     try {
+      await checkBackendHealth()
+
       const formData = new FormData()
       formData.append('file', file)
       
@@ -585,10 +606,10 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
         setProgress('Uploading IFC + FM parameters...')
       }
 
-      const response = await fetch(`${API_URL}/upload`, {
+      const response = await fetchWithTimeout(`${API_URL}/upload`, {
         method: 'POST',
         body: formData
-      })
+      }, UPLOAD_TIMEOUT_MS)
 
       if (!response.ok) {
         const err = await response.json()
@@ -606,6 +627,9 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
     } catch (err) {
       console.error('Upload error:', err)
       let msg = err.message || 'Upload failed'
+      if (err.name === 'AbortError') {
+        msg = 'Upload timed out. Backend may be unavailable or still busy.'
+      }
       if (msg.includes('NetworkError') || msg.includes('Failed to fetch')) {
         msg += '. Is the backend server running?'
       }
@@ -613,7 +637,7 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
       setUploadState('error')
       setJobStage(null)
     }
-  }, [API_URL, pollJobStatus, fmSidecarFile])
+  }, [API_URL, pollJobStatus, fmSidecarFile, checkBackendHealth, fetchWithTimeout])
 
   const handleDrop = useCallback((e) => {
     e.preventDefault()

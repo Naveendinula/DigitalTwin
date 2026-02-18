@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
+import DraggablePanel from './DraggablePanel'
 
 /**
  * IdsValidationPanel Component
@@ -16,41 +17,12 @@ function IdsValidationPanel({ isOpen, onClose, jobId, focusToken, zIndex }) {
   const [error, setError] = useState(null)
   const [activeTab, setActiveTab] = useState('uploaded')
   
-  // Draggable state
+  // Floating panel state
   const [position, setPosition] = useState({ x: 80, y: 80 })
   const [size, setSize] = useState({ width: 420, height: 520 })
-  const [isDragging, setIsDragging] = useState(false)
-  const [isResizing, setIsResizing] = useState(false)
-  
-  const dragStart = useRef({ x: 0, y: 0 })
-  const startPos = useRef({ x: 0, y: 0 })
-  const resizeStart = useRef({ x: 0, y: 0 })
-  const startSize = useRef({ width: 0, height: 0 })
-  const panelRef = useRef(null)
   const fileInputRef = useRef(null)
 
   const API_URL = 'http://localhost:8000'
-
-  // Focus effect when focusToken changes
-  useEffect(() => {
-    if (!panelRef.current) return
-
-    setPosition(prev => {
-      const maxX = Math.max(20, window.innerWidth - size.width - 20)
-      const maxY = Math.max(20, window.innerHeight - size.height - 20)
-      const x = Math.min(Math.max(20, prev.x), maxX)
-      const y = Math.min(Math.max(20, prev.y), maxY)
-      return { x, y }
-    })
-
-    if (panelRef.current) {
-      const el = panelRef.current
-      const original = el.style.boxShadow
-      el.style.boxShadow = '0 12px 40px rgba(0,0,0,0.18)'
-      const t = setTimeout(() => { el.style.boxShadow = original }, 280)
-      return () => clearTimeout(t)
-    }
-  }, [focusToken, size.width, size.height])
 
   // Load IDS files when panel opens
   useEffect(() => {
@@ -68,7 +40,9 @@ function IdsValidationPanel({ isOpen, onClose, jobId, focusToken, zIndex }) {
   const fetchIdsFiles = async () => {
     if (!jobId) return
     try {
-      const response = await fetch(`${API_URL}/validation/${jobId}/ids`)
+      const response = await fetch(`${API_URL}/validation/${jobId}/ids`, {
+        credentials: 'include',
+      })
       if (response.ok) {
         const data = await response.json()
         setIdsFiles(data.idsFiles || [])
@@ -80,7 +54,9 @@ function IdsValidationPanel({ isOpen, onClose, jobId, focusToken, zIndex }) {
 
   const fetchDefaultTemplates = async () => {
     try {
-      const response = await fetch(`${API_URL}/validation/ids/templates/default`)
+      const response = await fetch(`${API_URL}/validation/ids/templates/default`, {
+        credentials: 'include',
+      })
       if (response.ok) {
         const data = await response.json()
         setDefaultTemplates(data.templates || [])
@@ -107,6 +83,7 @@ function IdsValidationPanel({ isOpen, onClose, jobId, focusToken, zIndex }) {
 
       const response = await fetch(`${API_URL}/validation/${jobId}/ids/upload`, {
         method: 'POST',
+        credentials: 'include',
         body: formData
       })
 
@@ -151,7 +128,10 @@ function IdsValidationPanel({ isOpen, onClose, jobId, focusToken, zIndex }) {
         url += `?ids_filename=${encodeURIComponent(idsFilename)}`
       }
 
-      const response = await fetch(url, { method: 'POST' })
+      const response = await fetch(url, {
+        method: 'POST',
+        credentials: 'include',
+      })
       const data = await response.json()
 
       if (!response.ok) {
@@ -172,7 +152,8 @@ function IdsValidationPanel({ isOpen, onClose, jobId, focusToken, zIndex }) {
 
     try {
       const response = await fetch(`${API_URL}/validation/${jobId}/ids/${encodeURIComponent(filename)}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        credentials: 'include',
       })
 
       if (response.ok) {
@@ -187,91 +168,20 @@ function IdsValidationPanel({ isOpen, onClose, jobId, focusToken, zIndex }) {
     }
   }
 
-  // Drag handlers
-  const handleMouseDown = (e) => {
-    if (panelRef.current && e.target.closest('.drag-handle')) {
-      setIsDragging(true)
-      dragStart.current = { x: e.clientX, y: e.clientY }
-      startPos.current = { x: position.x, y: position.y }
-    }
-  }
-
-  const handleMouseMove = useCallback((e) => {
-    if (isDragging) {
-      e.preventDefault()
-      const dx = e.clientX - dragStart.current.x
-      const dy = e.clientY - dragStart.current.y
-      setPosition({
-        x: startPos.current.x + dx,
-        y: startPos.current.y + dy
-      })
-    }
-  }, [isDragging])
-
-  const handleMouseUp = useCallback(() => {
-    setIsDragging(false)
-  }, [])
-
-  // Resize handlers
-  const handleResizeMouseDown = (e) => {
-    e.stopPropagation()
-    setIsResizing(true)
-    resizeStart.current = { x: e.clientX, y: e.clientY }
-    startSize.current = { width: size.width, height: size.height }
-  }
-
-  const handleResizeMouseMove = useCallback((e) => {
-    if (isResizing) {
-      e.preventDefault()
-      const dx = e.clientX - resizeStart.current.x
-      const dy = e.clientY - resizeStart.current.y
-      setSize({
-        width: Math.max(340, startSize.current.width + dx),
-        height: Math.max(300, startSize.current.height + dy)
-      })
-    }
-  }, [isResizing])
-
-  const handleResizeMouseUp = useCallback(() => {
-    setIsResizing(false)
-  }, [])
-
-  // Global mouse listeners
-  useEffect(() => {
-    if (isDragging) {
-      window.addEventListener('mousemove', handleMouseMove)
-      window.addEventListener('mouseup', handleMouseUp)
-      document.body.style.userSelect = 'none'
-    } else if (isResizing) {
-      window.addEventListener('mousemove', handleResizeMouseMove)
-      window.addEventListener('mouseup', handleResizeMouseUp)
-      document.body.style.userSelect = 'none'
-    }
-
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove)
-      window.removeEventListener('mouseup', handleMouseUp)
-      window.removeEventListener('mousemove', handleResizeMouseMove)
-      window.removeEventListener('mouseup', handleResizeMouseUp)
-      document.body.style.userSelect = ''
-    }
-  }, [isDragging, isResizing, handleMouseMove, handleMouseUp, handleResizeMouseMove, handleResizeMouseUp])
-
   if (!isOpen) return null
 
   return (
-    <div
-      ref={panelRef}
-      onMouseDown={handleMouseDown}
-      style={{
-        ...styles.panel,
-        left: position.x,
-        top: position.y,
-        width: size.width,
-        height: size.height,
-        zIndex: zIndex || 1000,
-        cursor: isDragging ? 'grabbing' : 'default'
-      }}
+    <DraggablePanel
+      position={position}
+      setPosition={setPosition}
+      size={size}
+      setSize={setSize}
+      minWidth={340}
+      minHeight={300}
+      panelStyle={styles.panel}
+      resizeHandleStyle={styles.resizeHandle}
+      zIndex={zIndex || 1000}
+      focusToken={focusToken}
     >
       {/* Header */}
       <div className="drag-handle" style={styles.header}>
@@ -511,12 +421,7 @@ function IdsValidationPanel({ isOpen, onClose, jobId, focusToken, zIndex }) {
         )}
       </div>
 
-      {/* Resize Handle */}
-      <div
-        style={styles.resizeHandle}
-        onMouseDown={handleResizeMouseDown}
-      />
-    </div>
+    </DraggablePanel>
   )
 }
 

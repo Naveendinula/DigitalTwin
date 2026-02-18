@@ -43,7 +43,8 @@ const appStyles = {
     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06)',
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
+    gap: '16px',
     padding: '0 24px',
     zIndex: 100,
     margin: '12px 16px 0 16px',
@@ -91,6 +92,18 @@ const appStyles = {
     display: 'flex',
     alignItems: 'center',
     gap: '16px',
+    marginLeft: 'auto',
+  },
+  headerCenter: {
+    flex: 1,
+    display: 'flex',
+    justifyContent: 'center',
+    minWidth: 0,
+  },
+  headerSearchSlot: {
+    width: '100%',
+    maxWidth: '620px',
+    minWidth: 0,
   },
   mainContent: {
     flex: 1,

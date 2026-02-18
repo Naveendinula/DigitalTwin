@@ -8,13 +8,15 @@ import json
 import traceback
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 
 import ifcopenshell
 from ifcopenshell.util import element as ifc_element
 
+from auth_deps import get_current_user
 from config import UPLOAD_DIR, OUTPUT_DIR
 from fm_hvac_core import analyze_hvac_fm
+from job_security import ensure_job_access
 from occupancy_sim import (
     generate_occupancy_snapshot,
     load_current_occupancy,
@@ -367,7 +369,8 @@ def _compute_space_bboxes(model) -> dict:
 
 
 @router.post("/api/fm/hvac/analyze/{job_id}")
-async def analyze_hvac(job_id: str):
+async def analyze_hvac(job_id: str, current_user: dict = Depends(get_current_user)):
+    await ensure_job_access(job_id, int(current_user["id"]))
     ifc_path = _find_ifc_for_job(job_id)
     output_path = _get_output_path(job_id)
 
@@ -399,7 +402,8 @@ async def analyze_hvac(job_id: str):
 
 
 @router.get("/api/fm/hvac/{job_id}")
-async def get_hvac_results(job_id: str):
+async def get_hvac_results(job_id: str, current_user: dict = Depends(get_current_user)):
+    await ensure_job_access(job_id, int(current_user["id"]))
     output_path = OUTPUT_DIR / job_id / "hvac_fm.json"
     if not output_path.exists():
         raise HTTPException(status_code=404, detail="HVAC/FM result not found")
@@ -415,7 +419,8 @@ async def get_hvac_results(job_id: str):
 
 
 @router.get("/api/spaces/bboxes/{job_id}")
-async def get_space_bboxes(job_id: str):
+async def get_space_bboxes(job_id: str, current_user: dict = Depends(get_current_user)):
+    await ensure_job_access(job_id, int(current_user["id"]))
     output_path = _get_space_bbox_path(job_id)
     if output_path.exists():
         try:
@@ -478,11 +483,12 @@ def _load_spaces_for_job(job_id: str) -> list[dict]:
 
 
 @router.get("/api/occupancy/{job_id}")
-async def get_occupancy(job_id: str):
+async def get_occupancy(job_id: str, current_user: dict = Depends(get_current_user)):
     """
     Get the current occupancy snapshot for a job.
     Returns per-space occupancy counts and totals.
     """
+    await ensure_job_access(job_id, int(current_user["id"]))
     # Load existing snapshot
     snapshot = load_current_occupancy(job_id)
 
@@ -513,11 +519,12 @@ async def get_occupancy(job_id: str):
 
 
 @router.post("/api/occupancy/tick/{job_id}")
-async def tick_occupancy(job_id: str):
+async def tick_occupancy(job_id: str, current_user: dict = Depends(get_current_user)):
     """
     Advance the occupancy simulation by one tick.
     Uses random walk with time-based patterns.
     """
+    await ensure_job_access(job_id, int(current_user["id"]))
     try:
         spaces = _load_spaces_for_job(job_id)
     except HTTPException:
@@ -542,10 +549,11 @@ async def tick_occupancy(job_id: str):
 
 
 @router.post("/api/occupancy/reset/{job_id}")
-async def reset_occupancy(job_id: str):
+async def reset_occupancy(job_id: str, current_user: dict = Depends(get_current_user)):
     """
     Reset occupancy simulation to fresh initial state.
     """
+    await ensure_job_access(job_id, int(current_user["id"]))
     try:
         spaces = _load_spaces_for_job(job_id)
     except HTTPException:
@@ -570,10 +578,15 @@ async def reset_occupancy(job_id: str):
 
 
 @router.post("/api/occupancy/demo/{job_id}")
-async def generate_demo(job_id: str, frames: int = 30):
+async def generate_demo(
+    job_id: str,
+    frames: int = 30,
+    current_user: dict = Depends(get_current_user),
+):
     """
     Generate a demo loop of occupancy frames for playback.
     """
+    await ensure_job_access(job_id, int(current_user["id"]))
     try:
         spaces = _load_spaces_for_job(job_id)
     except HTTPException:
@@ -598,10 +611,11 @@ async def generate_demo(job_id: str, frames: int = 30):
 
 
 @router.get("/api/occupancy/demo/{job_id}")
-async def get_demo(job_id: str):
+async def get_demo(job_id: str, current_user: dict = Depends(get_current_user)):
     """
     Get the pre-generated demo loop for playback.
     """
+    await ensure_job_access(job_id, int(current_user["id"]))
     demo_path = OUTPUT_DIR / job_id / "occupancy_demo.json"
     if not demo_path.exists():
         raise HTTPException(status_code=404, detail="Demo not generated yet")

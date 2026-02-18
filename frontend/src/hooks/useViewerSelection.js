@@ -122,8 +122,12 @@ export default function useViewerSelection({
   useEffect(() => {
     if (!xRayEnabled) return
     const solidIds = [...(isolatedIds || []), ...normalizeIds(selectedId)]
+    if (solidIds.length === 0) {
+      disableXRay()
+      return
+    }
     updateXRaySelection(solidIds)
-  }, [xRayEnabled, isolatedIds, selectedId, updateXRaySelection])
+  }, [xRayEnabled, isolatedIds, selectedId, updateXRaySelection, disableXRay])
 
   useEffect(() => {
     if (mode === 'FOCUS' && !focusLock && selectedId) {

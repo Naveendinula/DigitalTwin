@@ -202,7 +202,9 @@ function SpaceBboxOverlay({ enabled, jobId, onSpaceSelect, highlightedSpaceIds =
     setError(null)
     onStatus?.({ hasSpaces: false, count: 0, error: null, loading: true, checked: false })
 
-    fetch(`http://localhost:8000/api/spaces/bboxes/${jobId}`)
+    fetch(`http://localhost:8000/api/spaces/bboxes/${jobId}`, {
+      credentials: 'include',
+    })
       .then(res => {
         if (!res.ok) throw new Error('Failed to load space bboxes')
         return res.json()

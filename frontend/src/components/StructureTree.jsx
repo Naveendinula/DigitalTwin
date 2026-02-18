@@ -138,7 +138,7 @@ function StructureTree({
 
   // Load hierarchy JSON on mount
   useEffect(() => {
-    fetch(hierarchyUrl)
+    fetch(hierarchyUrl, { credentials: 'include' })
       .then(res => {
         if (!res.ok) throw new Error('Failed to load hierarchy')
         return res.json()

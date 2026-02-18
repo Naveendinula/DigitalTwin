@@ -13,10 +13,12 @@ import json
 import traceback
 from typing import Any, Optional
 
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, HTTPException, UploadFile, File, Depends
 from pydantic import BaseModel
 
+from auth_deps import get_current_user
 from config import UPLOAD_DIR, OUTPUT_DIR
+from job_security import ensure_job_access
 _IFC_VALIDATION_AVAILABLE = True
 _IFC_VALIDATION_IMPORT_ERROR: Optional[Exception] = None
 try:
@@ -74,7 +76,11 @@ except ModuleNotFoundError as exc:
     IdsAuditResult = None  # type: ignore[assignment]
     MAX_IDS_FILE_SIZE = None  # type: ignore[assignment]
 
-router = APIRouter(prefix="/validation", tags=["validation"])
+router = APIRouter(
+    prefix="/validation",
+    tags=["validation"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 # =============================================================================
@@ -175,22 +181,15 @@ def _save_validation_cache(job_id: str, report: dict) -> None:
         json.dump(report, f, indent=2, ensure_ascii=False)
 
 
-# =============================================================================
-# API Endpoints
-# =============================================================================
+async def _require_job_access(
+    job_id: str,
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    await ensure_job_access(job_id, int(current_user["id"]))
+    return current_user
 
-@router.get("/{job_id}")
-async def get_validation_report(job_id: str, force_refresh: bool = False) -> dict:
-    """
-    Get the full validation report for a job.
-    
-    Args:
-        job_id: The job ID to validate
-        force_refresh: If true, re-run validation even if cached
-        
-    Returns:
-        Complete validation report
-    """
+
+async def _build_validation_report(job_id: str, force_refresh: bool = False) -> dict:
     # Check cache first
     if not force_refresh:
         cached = _load_cached_validation(job_id)
@@ -198,7 +197,7 @@ async def get_validation_report(job_id: str, force_refresh: bool = False) -> dic
             return cached
 
     _require_ifc_validation()
-    
+
     # Find and validate IFC file
     try:
         ifc_path = _find_ifc_for_job(job_id)
@@ -206,7 +205,7 @@ async def get_validation_report(job_id: str, force_refresh: bool = False) -> dic
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error finding IFC file: {str(e)}")
-    
+
     try:
         report = validate_ifc_to_json(ifc_path, job_id=job_id)
         _save_validation_cache(job_id, report)
@@ -219,8 +218,34 @@ async def get_validation_report(job_id: str, force_refresh: bool = False) -> dic
         )
 
 
+# =============================================================================
+# API Endpoints
+# =============================================================================
+
+@router.get("/{job_id}")
+async def get_validation_report(
+    job_id: str,
+    force_refresh: bool = False,
+    _: dict[str, Any] = Depends(_require_job_access),
+) -> dict:
+    """
+    Get the full validation report for a job.
+    
+    Args:
+        job_id: The job ID to validate
+        force_refresh: If true, re-run validation even if cached
+        
+    Returns:
+        Complete validation report
+    """
+    return await _build_validation_report(job_id, force_refresh=force_refresh)
+
+
 @router.get("/{job_id}/summary")
-async def get_validation_summary_endpoint(job_id: str) -> dict:
+async def get_validation_summary_endpoint(
+    job_id: str,
+    _: dict[str, Any] = Depends(_require_job_access),
+) -> dict:
     """
     Get a concise validation summary for quick status display.
     
@@ -233,12 +258,16 @@ async def get_validation_summary_endpoint(job_id: str) -> dict:
         return get_validation_summary(cached)
     
     # Run validation if not cached
-    full_report = await get_validation_report(job_id)
+    full_report = await _build_validation_report(job_id)
     return get_validation_summary(full_report)
 
 
 @router.get("/{job_id}/domain/{domain}")
-async def get_domain_validation(job_id: str, domain: str) -> dict:
+async def get_domain_validation(
+    job_id: str,
+    domain: str,
+    _: dict[str, Any] = Depends(_require_job_access),
+) -> dict:
     """
     Get validation results for a specific domain.
     
@@ -257,7 +286,7 @@ async def get_domain_validation(job_id: str, domain: str) -> dict:
         )
     
     # Get full report
-    full_report = await get_validation_report(job_id)
+    full_report = await _build_validation_report(job_id)
     
     # Filter to domain
     domain_results = [
@@ -278,7 +307,8 @@ async def get_domain_validation(job_id: str, domain: str) -> dict:
 async def get_validation_issues(
     job_id: str, 
     severity: Optional[str] = None,
-    domain: Optional[str] = None
+    domain: Optional[str] = None,
+    _: dict[str, Any] = Depends(_require_job_access),
 ) -> dict:
     """
     Get validation issues (non-passing rules) with optional filtering.
@@ -291,7 +321,7 @@ async def get_validation_issues(
     Returns:
         List of issues with recommendations
     """
-    full_report = await get_validation_report(job_id)
+    full_report = await _build_validation_report(job_id)
     
     issues = [
         {
@@ -320,23 +350,29 @@ async def get_validation_issues(
 
 
 @router.post("/{job_id}/revalidate")
-async def revalidate_job(job_id: str) -> dict:
+async def revalidate_job(
+    job_id: str,
+    _: dict[str, Any] = Depends(_require_job_access),
+) -> dict:
     """
     Force re-validation of a job, clearing the cache.
     
     Returns the new validation report.
     """
-    return await get_validation_report(job_id, force_refresh=True)
+    return await _build_validation_report(job_id, force_refresh=True)
 
 
 @router.get("/{job_id}/feature-readiness")
-async def get_feature_readiness(job_id: str) -> dict:
+async def get_feature_readiness(
+    job_id: str,
+    _: dict[str, Any] = Depends(_require_job_access),
+) -> dict:
     """
     Get feature readiness status for each application domain.
     
     Returns a simple map of domain -> ready boolean with explanations.
     """
-    full_report = await get_validation_report(job_id)
+    full_report = await _build_validation_report(job_id)
     
     readiness = {}
     for domain, summary in full_report.get("domainSummaries", {}).items():
@@ -438,7 +474,10 @@ async def list_default_templates() -> dict:
 
 
 @router.get("/{job_id}/ids")
-async def list_job_ids_files(job_id: str) -> dict:
+async def list_job_ids_files(
+    job_id: str,
+    _: dict[str, Any] = Depends(_require_job_access),
+) -> dict:
     """
     List IDS files uploaded for a specific job.
     
@@ -482,7 +521,11 @@ async def list_job_ids_files(job_id: str) -> dict:
 
 
 @router.get("/{job_id}/ids/{filename}/audit")
-async def get_ids_audit(job_id: str, filename: str) -> dict:
+async def get_ids_audit(
+    job_id: str,
+    filename: str,
+    _: dict[str, Any] = Depends(_require_job_access),
+) -> dict:
     """
     Get the full audit result for a specific IDS file.
     
@@ -526,7 +569,11 @@ async def get_ids_audit(job_id: str, filename: str) -> dict:
 
 
 @router.post("/{job_id}/ids/{filename}/reaudit")
-async def reaudit_ids_file(job_id: str, filename: str) -> dict:
+async def reaudit_ids_file(
+    job_id: str,
+    filename: str,
+    _: dict[str, Any] = Depends(_require_job_access),
+) -> dict:
     """
     Re-run the two-gate validation on an IDS file.
     
@@ -572,7 +619,11 @@ async def reaudit_ids_file(job_id: str, filename: str) -> dict:
 
 
 @router.post("/{job_id}/ids/upload")
-async def upload_ids_file(job_id: str, file: UploadFile = File(...)) -> dict:
+async def upload_ids_file(
+    job_id: str,
+    file: UploadFile = File(...),
+    _: dict[str, Any] = Depends(_require_job_access),
+) -> dict:
     """
     Upload an IDS file for a specific job.
     
@@ -674,7 +725,11 @@ async def upload_ids_file(job_id: str, file: UploadFile = File(...)) -> dict:
 
 
 @router.delete("/{job_id}/ids/{filename}")
-async def delete_ids_file(job_id: str, filename: str) -> dict:
+async def delete_ids_file(
+    job_id: str,
+    filename: str,
+    _: dict[str, Any] = Depends(_require_job_access),
+) -> dict:
     """
     Delete an uploaded IDS file for a job.
     
@@ -710,7 +765,8 @@ async def delete_ids_file(job_id: str, filename: str) -> dict:
 async def validate_against_ids(
     job_id: str,
     ids_filename: Optional[str] = None,
-    skip_audit_check: bool = False
+    skip_audit_check: bool = False,
+    _: dict[str, Any] = Depends(_require_job_access),
 ) -> dict:
     """
     Validate the job's IFC file against IDS specifications.

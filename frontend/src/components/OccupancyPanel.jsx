@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react'
+import React, { useState, useMemo } from 'react'
+import DraggablePanel from './DraggablePanel'
 
 /**
  * Get color string for occupancy percentage using iOS-style gradient
@@ -36,77 +37,9 @@ function OccupancyPanel({ isOpen, onClose, occupancyData, totals, timestamp, onR
   const [storeyFilter, setStoreyFilter] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
 
-  // Draggable state
+  // Floating panel state
   const [position, setPosition] = useState({ x: 20, y: 80 })
   const [size, setSize] = useState({ width: 380, height: 520 })
-  const [isDragging, setIsDragging] = useState(false)
-  const [isResizing, setIsResizing] = useState(false)
-
-  const dragStart = useRef({ x: 0, y: 0 })
-  const startPos = useRef({ x: 0, y: 0 })
-  const resizeStart = useRef({ x: 0, y: 0 })
-  const startSize = useRef({ width: 0, height: 0 })
-  const panelRef = useRef(null)
-
-  // Drag handlers
-  const handleDragStart = (e) => {
-    if (e.target.closest('.resize-handle')) return
-    setIsDragging(true)
-    dragStart.current = { x: e.clientX, y: e.clientY }
-    startPos.current = { ...position }
-  }
-
-  useEffect(() => {
-    if (!isDragging) return
-
-    const handleMouseMove = (e) => {
-      const dx = e.clientX - dragStart.current.x
-      const dy = e.clientY - dragStart.current.y
-      setPosition({
-        x: Math.max(0, startPos.current.x + dx),
-        y: Math.max(0, startPos.current.y + dy)
-      })
-    }
-
-    const handleMouseUp = () => setIsDragging(false)
-
-    window.addEventListener('mousemove', handleMouseMove)
-    window.addEventListener('mouseup', handleMouseUp)
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove)
-      window.removeEventListener('mouseup', handleMouseUp)
-    }
-  }, [isDragging])
-
-  // Resize handlers
-  const handleResizeStart = (e) => {
-    e.stopPropagation()
-    setIsResizing(true)
-    resizeStart.current = { x: e.clientX, y: e.clientY }
-    startSize.current = { ...size }
-  }
-
-  useEffect(() => {
-    if (!isResizing) return
-
-    const handleMouseMove = (e) => {
-      const dx = e.clientX - resizeStart.current.x
-      const dy = e.clientY - resizeStart.current.y
-      setSize({
-        width: Math.max(320, startSize.current.width + dx),
-        height: Math.max(300, startSize.current.height + dy)
-      })
-    }
-
-    const handleMouseUp = () => setIsResizing(false)
-
-    window.addEventListener('mousemove', handleMouseMove)
-    window.addEventListener('mouseup', handleMouseUp)
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove)
-      window.removeEventListener('mouseup', handleMouseUp)
-    }
-  }, [isResizing])
 
   // Get sorted and filtered spaces
   const processedSpaces = useMemo(() => {
@@ -182,18 +115,20 @@ function OccupancyPanel({ isOpen, onClose, occupancyData, totals, timestamp, onR
   const totalPercent = totalCapacity > 0 ? Math.round((totalOccupancy / totalCapacity) * 100) : 0
 
   return (
-    <div
-      ref={panelRef}
-      style={{
-        ...styles.panel,
-        left: position.x,
-        top: position.y,
-        width: size.width,
-        height: size.height,
-        zIndex: zIndex || 200
-      }}
+    <DraggablePanel
+      position={position}
+      setPosition={setPosition}
+      size={size}
+      setSize={setSize}
+      minWidth={320}
+      minHeight={300}
+      panelStyle={styles.panel}
+      resizeHandleStyle={styles.resizeHandle}
+      resizeHandleClassName="resize-handle"
+      zIndex={zIndex || 200}
+      dragBounds={{ minX: 0, minY: 0 }}
     >
-      <div style={styles.header} className="drag-handle" onMouseDown={handleDragStart}>
+      <div style={styles.header} className="drag-handle">
         <div style={styles.titleContainer}>
           <span style={styles.dragIcon}>:::</span>
           <h3 style={styles.title}>Occupancy</h3>
@@ -315,13 +250,7 @@ function OccupancyPanel({ isOpen, onClose, occupancyData, totals, timestamp, onR
         </div>
       </div>
 
-      {/* Resize handle */}
-      <div
-        style={styles.resizeHandle}
-        className="resize-handle"
-        onMouseDown={handleResizeStart}
-      />
-    </div>
+    </DraggablePanel>
   )
 }
 

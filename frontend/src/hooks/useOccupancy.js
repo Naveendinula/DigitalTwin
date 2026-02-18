@@ -34,7 +34,9 @@ export default function useOccupancy({ jobId, pollInterval = 2000, showToast }) 
     if (!jobId) return null
 
     try {
-      const res = await fetch(`http://localhost:8000/api/occupancy/${jobId}`)
+      const res = await fetch(`http://localhost:8000/api/occupancy/${jobId}`, {
+        credentials: 'include',
+      })
       if (!res.ok) {
         throw new Error(`Failed to fetch occupancy: ${res.status}`)
       }
@@ -53,7 +55,8 @@ export default function useOccupancy({ jobId, pollInterval = 2000, showToast }) 
 
     try {
       const res = await fetch(`http://localhost:8000/api/occupancy/tick/${jobId}`, {
-        method: 'POST'
+        method: 'POST',
+        credentials: 'include',
       })
       if (!res.ok) {
         throw new Error(`Failed to tick occupancy: ${res.status}`)
@@ -158,7 +161,8 @@ export default function useOccupancy({ jobId, pollInterval = 2000, showToast }) 
 
     try {
       const res = await fetch(`http://localhost:8000/api/occupancy/reset/${jobId}`, {
-        method: 'POST'
+        method: 'POST',
+        credentials: 'include',
       })
       if (!res.ok) {
         throw new Error(`Failed to reset occupancy: ${res.status}`)

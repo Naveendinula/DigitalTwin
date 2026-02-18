@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import MaintenanceLog from './MaintenanceLog'
 
 /**
  * PropertyPanel Component
@@ -9,14 +10,14 @@ import React, { useState, useEffect } from 'react'
  * @param {string|null} selectedId - The GlobalId of the selected element
  * @param {string} metadataUrl - URL to the metadata JSON file (default: '/metadata.json')
  */
-function PropertyPanel({ selectedId, metadataUrl = '/metadata.json' }) {
+function PropertyPanel({ selectedId, metadataUrl = '/metadata.json', jobId = null }) {
   const [metadata, setMetadata] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   // Load metadata JSON on mount
   useEffect(() => {
-    fetch(metadataUrl)
+    fetch(metadataUrl, { credentials: 'include' })
       .then(res => {
         if (!res.ok) throw new Error('Failed to load metadata')
         return res.json()
@@ -165,6 +166,13 @@ function PropertyPanel({ selectedId, metadataUrl = '/metadata.json' }) {
                 ))}
               </div>
             )}
+
+            <MaintenanceLog
+              jobId={jobId}
+              globalId={selectedId}
+              elementName={elementData.name || ''}
+              elementType={elementData.type || ''}
+            />
           </div>
         )}
       </div>

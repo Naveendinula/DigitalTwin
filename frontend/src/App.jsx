@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import AppHeader from './components/AppHeader'
 import PropertyPanel from './components/PropertyPanel'
 import StructureTree from './components/StructureTree'
@@ -18,6 +19,9 @@ import useViewMode from './hooks/useViewMode'
 import useSpaceOverlay from './hooks/useSpaceOverlay'
 import useOccupancy from './hooks/useOccupancy'
 import useViewerScene from './hooks/useViewerScene'
+import { useAuth } from './hooks/useAuth'
+import LoginPage from './pages/LoginPage'
+import SignupPage from './pages/SignupPage'
 import appStyles from './constants/appStyles'
 import { debugLog } from './utils/logger'
 
@@ -27,7 +31,9 @@ import { debugLog } from './utils/logger'
  * Composes the Viewer, Model, PropertyPanel, and StructureTree components.
  * Supports element selection, property display, and visibility isolation.
  */
-function App() {
+function ViewerApp() {
+  const { user, logout } = useAuth()
+
   // Model URLs - null until uploaded
   const [modelUrls, setModelUrls] = useState(null)
   const [jobId, setJobId] = useState(null)
@@ -56,6 +62,7 @@ function App() {
   // Occupancy panel state
   const [occupancyPanelOpen, setOccupancyPanelOpen] = useState(false)
   const [geometryHidden, setGeometryHidden] = useState(false)
+  const [logoutPending, setLogoutPending] = useState(false)
 
   const {
     focusLock,
@@ -166,6 +173,25 @@ function App() {
     setGeometryHidden(prev => !prev)
   }, [])
 
+  const handleLogout = useCallback(async () => {
+    setLogoutPending(true)
+    try {
+      await logout()
+    } finally {
+      setLogoutPending(false)
+    }
+  }, [logout])
+
+  const handleGlobalSearchSelect = useCallback((result) => {
+    if (!result?.globalId) return
+
+    handleTreeSelect(result.globalId)
+
+    if (result.type === 'IfcSpace') {
+      spaceOverlay.enableSpaceOverlayForSpaces([result.globalId])
+    }
+  }, [handleTreeSelect, spaceOverlay.enableSpaceOverlayForSpaces])
+
   const handleStartResize = useCallback((side, event) => {
     event.preventDefault()
     dragStateRef.current = {
@@ -244,6 +270,11 @@ function App() {
       <AppHeader 
         filename={modelUrls?.filename}
         ifcSchema={modelUrls?.ifcSchema}
+        metadataUrl={modelUrls?.metadataUrl}
+        onGlobalSearchSelect={handleGlobalSearchSelect}
+        authUserLabel={user?.display_name || user?.email || ''}
+        onLogout={handleLogout}
+        logoutPending={logoutPending}
       />
 
       <div style={appStyles.mainContent}>
@@ -340,6 +371,7 @@ function App() {
             <PropertyPanel 
               selectedId={selection.selectedId}
               metadataUrl={modelUrls.metadataUrl}
+              jobId={jobId}
             />
           </div>
         )}
@@ -347,6 +379,74 @@ function App() {
 
       <ToastContainer />
     </div>
+  )
+}
+
+function FullscreenLoader() {
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#f4f4f4',
+        color: '#86868b',
+        fontSize: '13px',
+      }}
+    >
+      Loading...
+    </div>
+  )
+}
+
+function RequireAuth({ children }) {
+  const { isAuthenticated, loading } = useAuth()
+  const location = useLocation()
+
+  if (loading) return <FullscreenLoader />
+  if (!isAuthenticated) {
+    const from = `${location.pathname}${location.search}${location.hash}`
+    return <Navigate to="/login" replace state={{ from }} />
+  }
+  return children
+}
+
+function PublicOnly({ children }) {
+  const { isAuthenticated, loading } = useAuth()
+  if (loading) return <FullscreenLoader />
+  if (isAuthenticated) return <Navigate to="/" replace />
+  return children
+}
+
+function App() {
+  return (
+    <Routes>
+      <Route
+        path="/login"
+        element={(
+          <PublicOnly>
+            <LoginPage />
+          </PublicOnly>
+        )}
+      />
+      <Route
+        path="/signup"
+        element={(
+          <PublicOnly>
+            <SignupPage />
+          </PublicOnly>
+        )}
+      />
+      <Route
+        path="/*"
+        element={(
+          <RequireAuth>
+            <ViewerApp />
+          </RequireAuth>
+        )}
+      />
+    </Routes>
   )
 }
 
