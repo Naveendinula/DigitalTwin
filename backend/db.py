@@ -75,6 +75,17 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_wo_job_external_unique
 ON work_orders(job_id, external_system, external_work_order_id)
 WHERE external_system IS NOT NULL AND external_work_order_id IS NOT NULL;
 
+CREATE TABLE IF NOT EXISTS cmms_sync_settings (
+    user_id                INTEGER PRIMARY KEY,
+    enabled                INTEGER NOT NULL DEFAULT 0,
+    system                 TEXT    NOT NULL DEFAULT 'mock',
+    base_url               TEXT    DEFAULT '',
+    credentials_encrypted  TEXT    DEFAULT '',
+    created_at             TEXT    NOT NULL,
+    updated_at             TEXT    NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS model_jobs (
     job_id            TEXT    PRIMARY KEY,
     owner_user_id     INTEGER NOT NULL,

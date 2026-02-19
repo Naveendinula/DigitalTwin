@@ -7,6 +7,10 @@
 ## Recent additions / changes
 
 - **Date:** 2026-02-19
+- **CMMS sync architecture (phase 5):** Added sync settings storage, encrypted credential handling, adapter-based sync module (`mock`, `upkeep`, `fiix`, `maximo`, `other`), and secured push/pull/webhook sync endpoints.
+- **Frontend updates:** Added a compact "CMMS Sync" section in `WorkOrdersPanel` for settings save plus push/pull actions.
+
+- **Date:** 2026-02-19
 - **Work Orders export (phase 4):** Added CMMS export support with `GET /api/work-orders/{job_id}/export?format=csv|json`, returning COBie-compatible column names for FM handover workflows.
 - **Frontend updates:** Added `Export CSV` and `Export JSON` actions to `WorkOrdersPanel` for one-click authenticated downloads.
 
@@ -120,6 +124,9 @@ The system bridges the gap between complex BIM files and accessible web visualiz
 *   `maintenance_models.py`: Pydantic models for maintenance log requests/responses.
 *   `work_order_api.py`: API router for work orders CRUD/list/summary endpoints.
 *   `work_order_models.py`: Pydantic models for work order requests/responses.
+*   `cmms_sync.py`: Adapter pattern and encrypted credential helpers for CMMS sync.
+*   `cmms_sync_api.py`: API router for CMMS settings, work-order sync push/pull, and inbound webhook updates.
+*   `cmms_sync_models.py`: Pydantic models for CMMS settings payloads and webhook payload validation.
 *   `fm_hvac_core.py`: HVAC/FM core logic (equipment -> physically connected terminals -> spaces), plus separate system-associated terminal inference.
 *   `validation_api.py`: API router for IFC validation and IDS file workflows.
 *   `ifc_validation.py`: Minimal IFC rule checks and report summaries used by validation endpoints.
@@ -283,6 +290,13 @@ graph TB
 5.  **Locate in model**: Clicking a work order triggers viewer selection/focus using `global_id`.
 6.  **Soft delete**: Frontend removes an item via `DELETE /api/work-orders/{jobId}/{woId}`.
 7.  **Export for handover/interoperability**: Frontend downloads CSV/JSON from `GET /api/work-orders/{jobId}/export?format=csv|json` with COBie-compatible column naming.
+
+### Data Flow: CMMS Sync (Phase 5)
+1.  **Configure sync**: Frontend calls `PUT /api/cmms/settings` to save system, base URL, and credentials.
+2.  **Encrypt at rest**: Backend encrypts sensitive sync credentials before storing in `cmms_sync_settings`.
+3.  **Push**: Frontend calls `POST /api/work-orders/{jobId}/{woId}/sync/push`; backend adapter returns external ID and sync status.
+4.  **Pull**: Frontend calls `POST /api/work-orders/{jobId}/{woId}/sync/pull`; backend adapter returns latest remote fields to apply locally.
+5.  **Webhook updates**: External CMMS can call `POST /api/cmms/webhooks/{system}` with shared-secret auth to update local rows by external work-order ID.
 
 #### FM Sidecar JSON Contract
 ```json

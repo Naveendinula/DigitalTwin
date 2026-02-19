@@ -25,6 +25,11 @@ SECRET_KEY = os.getenv(
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "15"))
 REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
+CMMS_CREDENTIALS_KEY = os.getenv("CMMS_CREDENTIALS_KEY", SECRET_KEY)
+CMMS_WEBHOOK_SHARED_SECRET = os.getenv(
+    "CMMS_WEBHOOK_SHARED_SECRET",
+    "dev-cmms-webhook-secret-change-me",
+)
 
 # Cookie configuration
 ACCESS_COOKIE_NAME = os.getenv("ACCESS_COOKIE_NAME", "access_token")

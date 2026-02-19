@@ -5,8 +5,9 @@ import { apiFetch, parseJsonSafe } from '../utils/api'
 const STATUS_CYCLE = ['open', 'in_progress', 'on_hold', 'resolved', 'closed']
 const CATEGORY_OPTIONS = ['inspection', 'repair', 'replacement', 'preventive', 'corrective', 'note', 'issue']
 const PRIORITY_OPTIONS = ['low', 'medium', 'high', 'critical']
-const EXTERNAL_SYSTEM_OPTIONS = ['none', 'upkeep', 'fiix', 'maximo', 'other']
+const EXTERNAL_SYSTEM_OPTIONS = ['none', 'mock', 'upkeep', 'fiix', 'maximo', 'other']
 const SYNC_STATUS_OPTIONS = ['none', 'pending', 'synced', 'conflict']
+const CMMS_SYNC_SYSTEM_OPTIONS = ['mock', 'upkeep', 'fiix', 'maximo', 'other']
 const SORT_BY_OPTIONS = [
   { value: 'updated_at', label: 'Updated' },
   { value: 'created_at', label: 'Created' },
@@ -22,6 +23,16 @@ const PRIORITY_COLORS = {
   medium: '#0071e3',
   high: '#ff9500',
   critical: '#ff3b30',
+}
+
+const DEFAULT_SYNC_SETTINGS = {
+  enabled: false,
+  system: 'mock',
+  base_url: '',
+  has_api_key: false,
+  has_webhook_secret: false,
+  api_key: '',
+  webhook_secret: '',
 }
 
 function getNextStatus(status) {
@@ -145,6 +156,11 @@ function WorkOrdersPanel({
   const [deletingId, setDeletingId] = useState(null)
   const [statusUpdateId, setStatusUpdateId] = useState(null)
   const [exportingFormat, setExportingFormat] = useState(null)
+  const [syncSettings, setSyncSettings] = useState(DEFAULT_SYNC_SETTINGS)
+  const [syncSettingsLoading, setSyncSettingsLoading] = useState(false)
+  const [syncSettingsSaving, setSyncSettingsSaving] = useState(false)
+  const [syncAction, setSyncAction] = useState(null)
+  const [syncMessage, setSyncMessage] = useState('')
 
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [createPending, setCreatePending] = useState(false)
@@ -225,6 +241,31 @@ function WorkOrdersPanel({
     }
   }, [isOpen, jobId, sortBy, sortOrder, selectedOnly, selectedGlobalId, searchQuery])
 
+  const fetchSyncSettings = useCallback(async () => {
+    if (!isOpen) return
+    setSyncSettingsLoading(true)
+    try {
+      const response = await apiFetch('/api/cmms/settings')
+      const payload = await parseJsonSafe(response)
+      if (!response.ok) {
+        throw new Error(payload?.detail || 'Failed to load CMMS sync settings')
+      }
+      setSyncSettings({
+        enabled: Boolean(payload?.enabled),
+        system: payload?.system || 'mock',
+        base_url: payload?.base_url || '',
+        has_api_key: Boolean(payload?.has_api_key),
+        has_webhook_secret: Boolean(payload?.has_webhook_secret),
+        api_key: '',
+        webhook_secret: '',
+      })
+    } catch (err) {
+      setError(err.message || 'Failed to load CMMS sync settings')
+    } finally {
+      setSyncSettingsLoading(false)
+    }
+  }, [isOpen])
+
   useEffect(() => {
     fetchMetadata()
   }, [fetchMetadata])
@@ -232,6 +273,10 @@ function WorkOrdersPanel({
   useEffect(() => {
     fetchWorkOrders()
   }, [fetchWorkOrders])
+
+  useEffect(() => {
+    fetchSyncSettings()
+  }, [fetchSyncSettings])
 
   useEffect(() => {
     if (!isOpen) return
@@ -476,6 +521,73 @@ function WorkOrdersPanel({
     }
   }
 
+  const handleSaveSyncSettings = async () => {
+    if (syncSettingsSaving) return
+    setSyncSettingsSaving(true)
+    setSyncMessage('')
+    setError(null)
+    try {
+      const body = {
+        enabled: Boolean(syncSettings.enabled),
+        system: syncSettings.system || 'mock',
+        base_url: syncSettings.base_url || '',
+      }
+      const apiKey = syncSettings.api_key.trim()
+      const webhookSecret = syncSettings.webhook_secret.trim()
+      if (apiKey) body.api_key = apiKey
+      if (webhookSecret) body.webhook_secret = webhookSecret
+
+      const response = await apiFetch('/api/cmms/settings', { method: 'PUT', body })
+      const payload = await parseJsonSafe(response)
+      if (!response.ok) {
+        throw new Error(payload?.detail || 'Failed to save CMMS sync settings')
+      }
+
+      setSyncSettings((prev) => ({
+        ...prev,
+        enabled: Boolean(payload?.enabled),
+        system: payload?.system || 'mock',
+        base_url: payload?.base_url || '',
+        has_api_key: Boolean(payload?.has_api_key),
+        has_webhook_secret: Boolean(payload?.has_webhook_secret),
+        api_key: '',
+        webhook_secret: '',
+      }))
+      setSyncMessage('CMMS sync settings saved.')
+    } catch (err) {
+      setError(err.message || 'Failed to save CMMS sync settings')
+    } finally {
+      setSyncSettingsSaving(false)
+    }
+  }
+
+  const handleSyncAction = async (direction) => {
+    if (!jobId || !selectedWorkOrder || syncAction) return
+    setSyncAction(direction)
+    setSyncMessage('')
+    setError(null)
+    try {
+      const response = await apiFetch(`/api/work-orders/${jobId}/${selectedWorkOrder.id}/sync/${direction}`, {
+        method: 'POST',
+      })
+      const payload = await parseJsonSafe(response)
+      if (!response.ok) {
+        throw new Error(payload?.detail || `Failed to ${direction} work order`)
+      }
+      if (!payload || typeof payload.id !== 'number') {
+        throw new Error(`Unexpected ${direction} response from server`)
+      }
+      setRawItems((prev) => prev.map((row) => (row.id === payload.id ? payload : row)))
+      setEditorState(toEditorState(payload))
+      setSyncMessage(direction === 'push' ? 'Work order pushed to CMMS.' : 'Work order pulled from CMMS.')
+      await fetchWorkOrders()
+    } catch (err) {
+      setError(err.message || `Failed to ${direction} work order`)
+    } finally {
+      setSyncAction(null)
+    }
+  }
+
   const activeCount = summary?.status
     ? Number(summary.status.open || 0) + Number(summary.status.in_progress || 0) + Number(summary.status.on_hold || 0)
     : items.filter((item) => ACTIVE_STATUSES.has(item.status)).length
@@ -707,6 +819,82 @@ function WorkOrdersPanel({
                   </select>
                 </div>
                 <input value={editorState.external_work_order_id} onChange={(event) => setEditorState((prev) => ({ ...prev, external_work_order_id: event.target.value }))} placeholder="External ID" style={styles.input} />
+
+                <div style={styles.syncSection}>
+                  <div style={styles.syncHeaderRow}>
+                    <strong style={styles.syncTitle}>CMMS Sync</strong>
+                    <span style={styles.syncHint}>
+                      {syncSettingsLoading ? 'Loading...' : syncSettings.has_api_key ? 'API key saved' : 'No API key'}
+                    </span>
+                  </div>
+                  <div style={styles.formRow}>
+                    <label style={styles.checkboxLabel}>
+                      <input
+                        type="checkbox"
+                        checked={Boolean(syncSettings.enabled)}
+                        onChange={(event) => setSyncSettings((prev) => ({ ...prev, enabled: event.target.checked }))}
+                      />
+                      <span>Enabled</span>
+                    </label>
+                    <select
+                      value={syncSettings.system}
+                      onChange={(event) => setSyncSettings((prev) => ({ ...prev, system: event.target.value }))}
+                      style={styles.select}
+                    >
+                      {CMMS_SYNC_SYSTEM_OPTIONS.map((value) => (
+                        <option key={value} value={value}>{value}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <input
+                    value={syncSettings.base_url}
+                    onChange={(event) => setSyncSettings((prev) => ({ ...prev, base_url: event.target.value }))}
+                    placeholder="CMMS Base URL (optional)"
+                    style={styles.input}
+                  />
+                  <input
+                    type="password"
+                    value={syncSettings.api_key}
+                    onChange={(event) => setSyncSettings((prev) => ({ ...prev, api_key: event.target.value }))}
+                    placeholder={syncSettings.has_api_key ? 'API key saved (enter to replace)' : 'API key'}
+                    style={styles.input}
+                  />
+                  <input
+                    type="password"
+                    value={syncSettings.webhook_secret}
+                    onChange={(event) => setSyncSettings((prev) => ({ ...prev, webhook_secret: event.target.value }))}
+                    placeholder={syncSettings.has_webhook_secret ? 'Webhook secret saved (enter to replace)' : 'Webhook secret'}
+                    style={styles.input}
+                  />
+                  <div style={styles.syncActions}>
+                    <button
+                      type="button"
+                      style={styles.secondaryButton}
+                      onClick={handleSaveSyncSettings}
+                      disabled={syncSettingsSaving || syncSettingsLoading}
+                    >
+                      {syncSettingsSaving ? 'Saving...' : 'Save Sync Settings'}
+                    </button>
+                    <button
+                      type="button"
+                      style={styles.secondaryButton}
+                      onClick={() => handleSyncAction('push')}
+                      disabled={Boolean(syncAction)}
+                    >
+                      {syncAction === 'push' ? 'Pushing...' : 'Push'}
+                    </button>
+                    <button
+                      type="button"
+                      style={styles.secondaryButton}
+                      onClick={() => handleSyncAction('pull')}
+                      disabled={Boolean(syncAction)}
+                    >
+                      {syncAction === 'pull' ? 'Pulling...' : 'Pull'}
+                    </button>
+                  </div>
+                  {syncMessage && <div style={styles.syncMessage}>{syncMessage}</div>}
+                </div>
+
                 <button type="button" style={styles.primaryButton} onClick={handleSaveDetails} disabled={savingDetails}>
                   {savingDetails ? 'Saving...' : 'Save Work Order'}
                 </button>
@@ -790,6 +978,13 @@ const styles = {
   statusButton: { border: '1px solid #d2d2d7', borderRadius: '999px', background: '#f5f5f7', color: '#1d1d1f', padding: '3px 9px', fontSize: '11px', cursor: 'pointer' },
   form: { display: 'flex', flexDirection: 'column', gap: '8px', border: '1px solid #e5e5e7', borderRadius: '10px', padding: '10px', background: '#fff', overflowY: 'auto' },
   formMeta: { fontSize: '11px', color: '#6e6e73' },
+  syncSection: { display: 'flex', flexDirection: 'column', gap: '8px', border: '1px solid #d2d2d7', borderRadius: '8px', padding: '8px', background: '#fafafc' },
+  syncHeaderRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' },
+  syncTitle: { fontSize: '12px', color: '#1d1d1f' },
+  syncHint: { fontSize: '11px', color: '#6e6e73' },
+  syncActions: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' },
+  syncMessage: { fontSize: '11px', color: '#0a7f2e' },
+  checkboxLabel: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#1d1d1f' },
 }
 
 export default WorkOrdersPanel

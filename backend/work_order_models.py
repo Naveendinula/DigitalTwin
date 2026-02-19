@@ -17,7 +17,7 @@ WOCategory = Literal[
 ]
 WOPriority = Literal["low", "medium", "high", "critical"]
 WOStatus = Literal["open", "in_progress", "on_hold", "resolved", "closed"]
-ExternalSystem = Literal["upkeep", "fiix", "maximo", "other"]
+ExternalSystem = Literal["mock", "upkeep", "fiix", "maximo", "other"]
 SyncStatus = Literal["synced", "pending", "conflict"]
 SortBy = Literal["updated_at", "created_at", "due_date", "priority", "status", "work_order_no"]
 SortOrder = Literal["asc", "desc"]

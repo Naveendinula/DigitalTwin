@@ -27,6 +27,7 @@ from fm_api import router as fm_router
 from validation_api import router as validation_router
 from maintenance_api import router as maintenance_router
 from work_order_api import router as work_order_router
+from cmms_sync_api import router as cmms_sync_router
 from auth_api import router as auth_router
 from auth_deps import get_current_user, get_current_user_optional
 from config import (
@@ -74,6 +75,7 @@ app.include_router(fm_router)
 app.include_router(validation_router)
 app.include_router(maintenance_router)
 app.include_router(work_order_router)
+app.include_router(cmms_sync_router)
 app.include_router(auth_router)
 
 # Enable CORS for frontend
