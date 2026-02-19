@@ -7,7 +7,7 @@
 ## Recent additions / changes
 
 - **Date:** 2026-02-18
-- **Work Orders module (phase 1):** Added geometry-native CMMS work orders with a dedicated floating panel and secured API endpoints under `/api/work-orders/*`.
+- **Work Orders module (phase 1-2):** Added geometry-native CMMS work orders with secured API endpoints and an interactive floating panel with model-wide filters, detail editing, and model selection linking.
 - **Backend updates:** Added `backend/work_order_models.py` and `backend/work_order_api.py`; extended `backend/db.py` with `work_orders` schema, indexes, and idempotent migration from `maintenance_logs`.
 - **Frontend updates:** Added `frontend/src/components/WorkOrdersPanel.jsx`; wired toolbar toggle and floating panel stacking for model-wide work order queue + locate-in-model interaction.
 

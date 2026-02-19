@@ -167,6 +167,7 @@ export default function ViewerShell({
     onClose: floatingPanels.handleCloseWorkOrdersPanel,
     jobId,
     selectedId: selection.selectedId,
+    metadataUrl: modelUrls?.metadataUrl || '',
     onSelectWorkOrder: handleTreeSelect,
     focusToken: floatingPanels.workOrdersPanelZIndex,
     zIndex: floatingPanels.workOrdersPanelZIndex

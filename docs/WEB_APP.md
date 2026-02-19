@@ -74,7 +74,7 @@ Key hooks:
 - HVAC/FM: `frontend/src/components/HvacFmPanel.jsx` calls `POST /api/fm/hvac/analyze/{job_id}` then `GET /api/fm/hvac/{job_id}`.
   - `servedTerminals` are physically connected terminals from traversal.
   - `systemAssociatedTerminals` are returned separately for same-system inference and are not mixed into `servedTerminals`.
-- Work orders: `frontend/src/components/WorkOrdersPanel.jsx` calls `/api/work-orders/{job_id}` CRUD + summary endpoints, with model selection linking in both directions.
+- Work orders: `frontend/src/components/WorkOrdersPanel.jsx` calls `/api/work-orders/{job_id}` CRUD + summary endpoints, with model selection linking in both directions plus in-panel filtering/sorting and detail editing.
 - Maintenance log: `frontend/src/components/MaintenanceLog.jsx` calls maintenance CRUD endpoints scoped by `jobId` and selected `globalId`.
 
 5) Authentication
