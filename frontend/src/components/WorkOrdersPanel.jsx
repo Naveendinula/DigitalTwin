@@ -71,6 +71,17 @@ function isOverdue(item) {
   return Number.isFinite(dueTime) && dueTime < Date.now()
 }
 
+function getDownloadFilename(contentDisposition, fallbackName) {
+  if (!contentDisposition) return fallbackName
+  const match = /filename\*?=(?:UTF-8'')?\"?([^\";]+)\"?/i.exec(contentDisposition)
+  if (!match?.[1]) return fallbackName
+  try {
+    return decodeURIComponent(match[1])
+  } catch {
+    return match[1]
+  }
+}
+
 function toEditorState(item) {
   if (!item) return null
   return {
@@ -133,6 +144,7 @@ function WorkOrdersPanel({
   const [savingDetails, setSavingDetails] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
   const [statusUpdateId, setStatusUpdateId] = useState(null)
+  const [exportingFormat, setExportingFormat] = useState(null)
 
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [createPending, setCreatePending] = useState(false)
@@ -434,6 +446,36 @@ function WorkOrdersPanel({
     }
   }
 
+  const handleExport = async (format) => {
+    if (!jobId || exportingFormat) return
+    setExportingFormat(format)
+    setError(null)
+
+    try {
+      const response = await apiFetch(`/api/work-orders/${jobId}/export?format=${format}`)
+      if (!response.ok) {
+        const payload = await parseJsonSafe(response)
+        throw new Error(payload?.detail || `Failed to export ${format.toUpperCase()}`)
+      }
+
+      const blob = await response.blob()
+      const fallbackName = `work-orders-${jobId}.${format}`
+      const filename = getDownloadFilename(response.headers.get('content-disposition'), fallbackName)
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      setError(err.message || 'Failed to export work orders')
+    } finally {
+      setExportingFormat(null)
+    }
+  }
+
   const activeCount = summary?.status
     ? Number(summary.status.open || 0) + Number(summary.status.in_progress || 0) + Number(summary.status.on_hold || 0)
     : items.filter((item) => ACTIVE_STATUSES.has(item.status)).length
@@ -516,6 +558,22 @@ function WorkOrdersPanel({
             Selected Element
           </button>
           <button type="button" style={styles.secondaryButton} onClick={fetchWorkOrders}>Refresh</button>
+          <button
+            type="button"
+            style={styles.secondaryButton}
+            onClick={() => handleExport('csv')}
+            disabled={Boolean(exportingFormat)}
+          >
+            {exportingFormat === 'csv' ? 'Exporting CSV...' : 'Export CSV'}
+          </button>
+          <button
+            type="button"
+            style={styles.secondaryButton}
+            onClick={() => handleExport('json')}
+            disabled={Boolean(exportingFormat)}
+          >
+            {exportingFormat === 'json' ? 'Exporting JSON...' : 'Export JSON'}
+          </button>
           <button type="button" style={styles.primarySmall} onClick={() => setShowCreateForm((prev) => !prev)}>
             {showCreateForm ? 'Cancel' : 'New'}
           </button>

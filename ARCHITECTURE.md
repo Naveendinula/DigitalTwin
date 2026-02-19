@@ -6,6 +6,10 @@
 
 ## Recent additions / changes
 
+- **Date:** 2026-02-19
+- **Work Orders export (phase 4):** Added CMMS export support with `GET /api/work-orders/{job_id}/export?format=csv|json`, returning COBie-compatible column names for FM handover workflows.
+- **Frontend updates:** Added `Export CSV` and `Export JSON` actions to `WorkOrdersPanel` for one-click authenticated downloads.
+
 - **Date:** 2026-02-18
 - **Work Orders module (phase 1-2):** Added geometry-native CMMS work orders with secured API endpoints and an interactive floating panel with model-wide filters, detail editing, and model selection linking.
 - **Backend updates:** Added `backend/work_order_models.py` and `backend/work_order_api.py`; extended `backend/db.py` with `work_orders` schema, indexes, and idempotent migration from `maintenance_logs`.
@@ -278,6 +282,7 @@ graph TB
 4.  **Status lifecycle**: Frontend patches `PATCH /api/work-orders/{jobId}/{woId}` to progress status.
 5.  **Locate in model**: Clicking a work order triggers viewer selection/focus using `global_id`.
 6.  **Soft delete**: Frontend removes an item via `DELETE /api/work-orders/{jobId}/{woId}`.
+7.  **Export for handover/interoperability**: Frontend downloads CSV/JSON from `GET /api/work-orders/{jobId}/export?format=csv|json` with COBie-compatible column naming.
 
 #### FM Sidecar JSON Contract
 ```json

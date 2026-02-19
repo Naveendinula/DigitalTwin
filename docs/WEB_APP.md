@@ -74,7 +74,7 @@ Key hooks:
 - HVAC/FM: `frontend/src/components/HvacFmPanel.jsx` calls `POST /api/fm/hvac/analyze/{job_id}` then `GET /api/fm/hvac/{job_id}`.
   - `servedTerminals` are physically connected terminals from traversal.
   - `systemAssociatedTerminals` are returned separately for same-system inference and are not mixed into `servedTerminals`.
-- Work orders: `frontend/src/components/WorkOrdersPanel.jsx` calls `/api/work-orders/{job_id}` CRUD + summary endpoints, with model selection linking in both directions plus in-panel filtering/sorting and detail editing.
+- Work orders: `frontend/src/components/WorkOrdersPanel.jsx` calls `/api/work-orders/{job_id}` CRUD + summary endpoints, with model selection linking in both directions plus in-panel filtering/sorting, detail editing, and CSV/JSON export downloads (`/api/work-orders/{job_id}/export`).
 - PropertyPanel transition: the right-side panel now shows a slim "Related Work Orders" section (count + "View in Work Orders"), which opens/focuses the Work Orders panel for the selected element.
 - Maintenance log: `frontend/src/components/MaintenanceLog.jsx` remains available in code but is no longer embedded in `PropertyPanel`.
 
@@ -140,6 +140,7 @@ Endpoints used:
 - `PATCH /api/work-orders/{job_id}/{wo_id}`
 - `DELETE /api/work-orders/{job_id}/{wo_id}`
 - `GET /api/work-orders/{job_id}/summary`
+- `GET /api/work-orders/{job_id}/export?format=csv|json`
 
 ## File Map (Frontend)
 

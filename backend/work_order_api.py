@@ -4,9 +4,12 @@ FastAPI router for geometry-native work orders.
 
 from __future__ import annotations
 
-from typing import Any
+import csv
+import io
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import JSONResponse, Response
 
 from auth_deps import get_current_user
 from db import get_db, utc_now_iso
@@ -76,9 +79,59 @@ ALLOWED_CATEGORIES = (
 )
 ACTIVE_STATUSES = ("open", "in_progress", "on_hold")
 
+COBIE_EXPORT_COLUMNS = [
+    "Job.Name",
+    "Job.Description",
+    "Job.Category",
+    "Job.Status",
+    "Job.Priority",
+    "Job.ComponentNames",
+    "Component.ExternalIdentifier",
+    "Job.ResourceNames",
+    "Job.Duration",
+    "Job.CreatedOn",
+    "Job.UpdatedOn",
+    "Local.JobId",
+    "Local.WorkOrderId",
+    "Local.ElementName",
+    "Local.ElementType",
+    "Local.Storey",
+    "Local.Priority",
+    "Local.Description",
+    "Local.ExternalSystem",
+    "Local.ExternalWorkOrderId",
+    "Local.ExternalSyncStatus",
+]
+
 
 def _to_response(row: Any) -> WOResponse:
     return WOResponse(**dict(row))
+
+
+def _to_export_row(row: Any) -> dict[str, Any]:
+    return {
+        "Job.Name": row["work_order_no"],
+        "Job.Description": row["title"],
+        "Job.Category": row["category"],
+        "Job.Status": row["status"],
+        "Job.Priority": row["priority"],
+        "Job.ComponentNames": row["global_id"],
+        "Component.ExternalIdentifier": row["global_id"],
+        "Job.ResourceNames": row["assigned_to"] or "",
+        "Job.Duration": row["due_date"] or "",
+        "Job.CreatedOn": row["created_at"],
+        "Job.UpdatedOn": row["updated_at"],
+        "Local.JobId": row["job_id"],
+        "Local.WorkOrderId": row["id"],
+        "Local.ElementName": row["element_name"] or "",
+        "Local.ElementType": row["element_type"] or "",
+        "Local.Storey": row["storey"] or "",
+        "Local.Priority": row["priority"],
+        "Local.Description": row["description"] or "",
+        "Local.ExternalSystem": row["external_system"] or "",
+        "Local.ExternalWorkOrderId": row["external_work_order_id"] or "",
+        "Local.ExternalSyncStatus": row["external_sync_status"] or "",
+    }
 
 
 async def _get_work_order_row(db, job_id: str, wo_id: int):
@@ -259,6 +312,56 @@ async def get_work_orders_summary(
         return summary
     finally:
         await db.close()
+
+
+@router.get("/{job_id}/export")
+async def export_work_orders(
+    job_id: str,
+    format: Literal["csv", "json"] = Query(default="csv"),
+    current_user: dict[str, Any] = Depends(get_current_user),
+):
+    await ensure_job_access(job_id, int(current_user["id"]))
+
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            f"""
+            SELECT {SELECT_COLUMNS}
+            FROM work_orders
+            WHERE job_id = ? AND deleted_at IS NULL
+            ORDER BY created_at ASC, id ASC
+            """,
+            (job_id,),
+        )
+        rows = await cursor.fetchall()
+        await cursor.close()
+    finally:
+        await db.close()
+
+    export_rows = [_to_export_row(row) for row in rows]
+    filename = f"work-orders-{job_id}.{format}"
+    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+
+    if format == "json":
+        return JSONResponse(
+            content={
+                "job_id": job_id,
+                "count": len(export_rows),
+                "columns": COBIE_EXPORT_COLUMNS,
+                "rows": export_rows,
+            },
+            headers=headers,
+        )
+
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=COBIE_EXPORT_COLUMNS)
+    writer.writeheader()
+    writer.writerows(export_rows)
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers=headers,
+    )
 
 
 @router.get("/{job_id}/{wo_id}", response_model=WOResponse)
