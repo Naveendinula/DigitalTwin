@@ -13,6 +13,9 @@ build/
 # Project specific
 backend/output/
 backend/uploads/
+backend/*.db
+backend/*.db-wal
+backend/*.db-shm
 media_sources/
 HELICOPTER_VIEW.md
 
