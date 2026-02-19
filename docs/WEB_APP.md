@@ -75,7 +75,8 @@ Key hooks:
   - `servedTerminals` are physically connected terminals from traversal.
   - `systemAssociatedTerminals` are returned separately for same-system inference and are not mixed into `servedTerminals`.
 - Work orders: `frontend/src/components/WorkOrdersPanel.jsx` calls `/api/work-orders/{job_id}` CRUD + summary endpoints, with model selection linking in both directions plus in-panel filtering/sorting and detail editing.
-- Maintenance log: `frontend/src/components/MaintenanceLog.jsx` calls maintenance CRUD endpoints scoped by `jobId` and selected `globalId`.
+- PropertyPanel transition: the right-side panel now shows a slim "Related Work Orders" section (count + "View in Work Orders"), which opens/focuses the Work Orders panel for the selected element.
+- Maintenance log: `frontend/src/components/MaintenanceLog.jsx` remains available in code but is no longer embedded in `PropertyPanel`.
 
 5) Authentication
 - Routes are guarded in `App.jsx` using `react-router-dom`.

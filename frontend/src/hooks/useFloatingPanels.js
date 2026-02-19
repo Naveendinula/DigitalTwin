@@ -66,6 +66,17 @@ export default function useFloatingPanels(disableXRay) {
     })
   }, [panelStacking.togglePanel, panelStacking.workOrdersPanelZIndex, panelStacking.setWorkOrdersPanelZIndex, workOrdersPanelOpen, handleCloseWorkOrdersPanel])
 
+  const handleOpenWorkOrdersPanel = useCallback(() => {
+    // Open/focus the panel without the "toggle-to-close when topmost" behavior.
+    panelStacking.togglePanel({
+      isOpen: false,
+      panelZIndex: panelStacking.workOrdersPanelZIndex,
+      setIsOpen: setWorkOrdersPanelOpen,
+      setPanelZIndex: panelStacking.setWorkOrdersPanelZIndex,
+      onClose: handleCloseWorkOrdersPanel
+    })
+  }, [panelStacking.togglePanel, panelStacking.workOrdersPanelZIndex, panelStacking.setWorkOrdersPanelZIndex, handleCloseWorkOrdersPanel])
+
   return {
     ecPanelOpen,
     hvacPanelOpen,
@@ -82,6 +93,7 @@ export default function useFloatingPanels(disableXRay) {
     handleToggleEcPanel,
     handleToggleHvacPanel,
     handleToggleIdsValidationPanel,
-    handleToggleWorkOrdersPanel
+    handleToggleWorkOrdersPanel,
+    handleOpenWorkOrdersPanel
   }
 }

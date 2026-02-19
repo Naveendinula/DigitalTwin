@@ -380,6 +380,7 @@ function ViewerApp() {
               selectedId={selection.selectedId}
               metadataUrl={modelUrls.metadataUrl}
               jobId={jobId}
+              onOpenWorkOrdersPanel={floatingPanels.handleOpenWorkOrdersPanel}
             />
           </div>
         )}

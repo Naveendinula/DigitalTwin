@@ -11,6 +11,10 @@
 - **Backend updates:** Added `backend/work_order_models.py` and `backend/work_order_api.py`; extended `backend/db.py` with `work_orders` schema, indexes, and idempotent migration from `maintenance_logs`.
 - **Frontend updates:** Added `frontend/src/components/WorkOrdersPanel.jsx`; wired toolbar toggle and floating panel stacking for model-wide work order queue + locate-in-model interaction.
 
+- **Date:** 2026-02-19
+- **PropertyPanel transition (phase 3):** Replaced embedded `MaintenanceLog` with a slim `Related Work Orders` section that shows per-element counts and a direct "View in Work Orders" action.
+- **Selection linking:** Added an explicit open/focus handler for Work Orders so PropertyPanel can open the CMMS panel filtered to the currently selected element.
+
 - **Date:** 2026-02-18
 - **Security hardening (phase 1):** Added authenticated job ownership checks across upload/job/EC/FM/validation/maintenance routes, protected `/files/{job_id}/{filename}` access, hardened upload size/filename validation, and added baseline security headers.
 - **Backend updates:** Added `backend/job_security.py` and `model_jobs` table in `backend/db.py` for persistent job-to-user ownership and file-token checks.

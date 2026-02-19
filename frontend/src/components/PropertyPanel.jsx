@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import MaintenanceLog from './MaintenanceLog'
+import { apiFetch, parseJsonSafe } from '../utils/api'
 
 /**
  * PropertyPanel Component
@@ -10,7 +10,12 @@ import MaintenanceLog from './MaintenanceLog'
  * @param {string|null} selectedId - The GlobalId of the selected element
  * @param {string} metadataUrl - URL to the metadata JSON file (default: '/metadata.json')
  */
-function PropertyPanel({ selectedId, metadataUrl = '/metadata.json', jobId = null }) {
+function PropertyPanel({
+  selectedId,
+  metadataUrl = '/metadata.json',
+  jobId = null,
+  onOpenWorkOrdersPanel,
+}) {
   const [metadata, setMetadata] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -167,14 +172,97 @@ function PropertyPanel({ selectedId, metadataUrl = '/metadata.json', jobId = nul
               </div>
             )}
 
-            <MaintenanceLog
+            <RelatedWorkOrders
               jobId={jobId}
               globalId={selectedId}
-              elementName={elementData.name || ''}
-              elementType={elementData.type || ''}
+              onOpenWorkOrdersPanel={onOpenWorkOrdersPanel}
             />
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+function RelatedWorkOrders({ jobId, globalId, onOpenWorkOrdersPanel }) {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [totalCount, setTotalCount] = useState(0)
+  const [activeCount, setActiveCount] = useState(0)
+
+  useEffect(() => {
+    if (!jobId || !globalId) {
+      setTotalCount(0)
+      setActiveCount(0)
+      setError(null)
+      return
+    }
+
+    let mounted = true
+
+    ;(async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const params = new URLSearchParams({
+          global_id: globalId,
+          limit: '250',
+          offset: '0',
+        })
+        const response = await apiFetch(`/api/work-orders/${jobId}?${params.toString()}`)
+        const payload = await parseJsonSafe(response)
+        if (!response.ok) {
+          throw new Error(payload?.detail || 'Failed to load related work orders')
+        }
+
+        const rows = Array.isArray(payload) ? payload : []
+        const active = rows.filter(row => row.status === 'open' || row.status === 'in_progress' || row.status === 'on_hold').length
+
+        if (!mounted) return
+        setTotalCount(rows.length)
+        setActiveCount(active)
+      } catch (err) {
+        if (!mounted) return
+        setError(err.message || 'Failed to load related work orders')
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    })()
+
+    return () => {
+      mounted = false
+    }
+  }, [jobId, globalId])
+
+  if (!globalId) return null
+
+  return (
+    <div style={styles.section}>
+      <h4 style={styles.sectionTitle}>Related Work Orders</h4>
+      <div style={styles.relatedWorkOrdersCard}>
+        <div style={styles.relatedWorkOrdersTop}>
+          <span style={styles.relatedWorkOrdersLabel}>Active</span>
+          <span style={styles.relatedWorkOrdersBadge}>{activeCount}</span>
+          <span style={styles.relatedWorkOrdersTotal}>{totalCount} total</span>
+        </div>
+
+        {loading && <p style={styles.relatedWorkOrdersMeta}>Loading related work orders...</p>}
+        {!loading && !error && totalCount === 0 && (
+          <p style={styles.relatedWorkOrdersMeta}>No work orders linked to this element.</p>
+        )}
+        {!loading && !error && totalCount > 0 && (
+          <p style={styles.relatedWorkOrdersMeta}>This element has linked work orders.</p>
+        )}
+        {!loading && error && <p style={styles.relatedWorkOrdersError}>{error}</p>}
+
+        <button
+          type="button"
+          style={styles.relatedWorkOrdersButton}
+          onClick={() => onOpenWorkOrdersPanel && onOpenWorkOrdersPanel()}
+          disabled={!onOpenWorkOrdersPanel}
+        >
+          View in Work Orders
+        </button>
       </div>
     </div>
   )
@@ -569,6 +657,66 @@ const styles = {
   psetContent: {
     borderTop: '1px solid rgba(0, 0, 0, 0.05)',
     background: '#f4f4f4',
+  },
+  relatedWorkOrdersCard: {
+    background: '#e8e8ec',
+    borderRadius: '10px',
+    padding: '10px 12px',
+    boxShadow: 'inset 1px 1px 2px rgba(255,255,255,0.8), inset -1px -1px 2px rgba(0,0,0,0.08)',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+  },
+  relatedWorkOrdersTop: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  relatedWorkOrdersLabel: {
+    fontSize: '11px',
+    color: '#86868b',
+    textTransform: 'uppercase',
+    letterSpacing: '0.3px',
+    fontWeight: 600,
+  },
+  relatedWorkOrdersBadge: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: '20px',
+    height: '20px',
+    borderRadius: '999px',
+    background: '#0071e3',
+    color: '#fff',
+    fontSize: '11px',
+    fontWeight: 700,
+    padding: '0 6px',
+  },
+  relatedWorkOrdersTotal: {
+    fontSize: '12px',
+    color: '#1d1d1f',
+    fontWeight: 500,
+  },
+  relatedWorkOrdersMeta: {
+    margin: 0,
+    fontSize: '12px',
+    color: '#6e6e73',
+  },
+  relatedWorkOrdersError: {
+    margin: 0,
+    fontSize: '12px',
+    color: '#b42318',
+  },
+  relatedWorkOrdersButton: {
+    alignSelf: 'flex-start',
+    border: 'none',
+    borderRadius: '8px',
+    padding: '7px 10px',
+    background: '#1d1d1f',
+    color: '#fff',
+    fontSize: '12px',
+    fontWeight: 600,
+    cursor: 'pointer',
   },
   debugDetails: {
     marginTop: '12px',
