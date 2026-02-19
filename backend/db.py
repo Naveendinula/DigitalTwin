@@ -92,7 +92,12 @@ CREATE TABLE IF NOT EXISTS model_jobs (
     original_filename TEXT    NOT NULL,
     stored_ifc_name   TEXT    NOT NULL,
     file_token_hash   TEXT    NOT NULL,
+    file_hash         TEXT    DEFAULT '',
+    ifc_schema        TEXT,
+    status            TEXT    NOT NULL DEFAULT 'pending',
     created_at        TEXT    NOT NULL,
+    updated_at        TEXT    NOT NULL,
+    last_opened_at    TEXT,
     FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
@@ -158,6 +163,52 @@ async def _table_exists(db: aiosqlite.Connection, table_name: str) -> bool:
     row = await cursor.fetchone()
     await cursor.close()
     return row is not None
+
+
+async def _column_exists(db: aiosqlite.Connection, table_name: str, column_name: str) -> bool:
+    cursor = await db.execute(f"PRAGMA table_info({table_name})")
+    rows = await cursor.fetchall()
+    await cursor.close()
+    return any(str(row["name"]) == column_name for row in rows)
+
+
+async def _ensure_column_exists(
+    db: aiosqlite.Connection,
+    table_name: str,
+    column_name: str,
+    definition_sql: str,
+) -> None:
+    if await _column_exists(db, table_name, column_name):
+        return
+    await db.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition_sql}")
+
+
+async def _ensure_model_jobs_columns(db: aiosqlite.Connection) -> None:
+    has_model_jobs = await _table_exists(db, "model_jobs")
+    if not has_model_jobs:
+        return
+
+    await _ensure_column_exists(db, "model_jobs", "file_hash", "TEXT DEFAULT ''")
+    await _ensure_column_exists(db, "model_jobs", "ifc_schema", "TEXT")
+    await _ensure_column_exists(db, "model_jobs", "status", "TEXT NOT NULL DEFAULT 'pending'")
+    await _ensure_column_exists(db, "model_jobs", "updated_at", "TEXT")
+    await _ensure_column_exists(db, "model_jobs", "last_opened_at", "TEXT")
+
+    # Backfill updated_at for legacy rows.
+    await db.execute(
+        """
+        UPDATE model_jobs
+        SET updated_at = COALESCE(updated_at, created_at)
+        """
+    )
+
+    # Ensure index exists for owner+hash dedupe lookups.
+    await db.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_model_jobs_owner_hash
+        ON model_jobs(owner_user_id, file_hash)
+        """
+    )
 
 
 async def _migrate_maintenance_logs_to_work_orders(db: aiosqlite.Connection) -> None:
@@ -256,6 +307,7 @@ async def init_db() -> None:
     db = await get_db()
     try:
         await db.executescript(SCHEMA_SQL)
+        await _ensure_model_jobs_columns(db)
         await _migrate_maintenance_logs_to_work_orders(db)
         await db.commit()
     finally:

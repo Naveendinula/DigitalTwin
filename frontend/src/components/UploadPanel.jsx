@@ -107,6 +107,9 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
   const [progress, setProgress] = useState('')
   const [jobStage, setJobStage] = useState(null)
   const [error, setError] = useState(null)
+  const [savedModels, setSavedModels] = useState([])
+  const [modelsLoading, setModelsLoading] = useState(false)
+  const [openingModelId, setOpeningModelId] = useState(null)
   
   // FM Sidecar state
   const [fmSidecarFile, setFmSidecarFile] = useState(null)
@@ -152,6 +155,24 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
       throw new Error(`Backend health check failed (${response.status})`)
     }
   }, [API_URL, fetchWithTimeout])
+
+  const fetchSavedModels = useCallback(async () => {
+    if (hasModel) return
+    setModelsLoading(true)
+    try {
+      const response = await fetchWithTimeout(`${API_URL}/models`, {}, HEALTH_TIMEOUT_MS)
+      if (!response.ok) {
+        setSavedModels([])
+        return
+      }
+      const payload = await response.json()
+      setSavedModels(Array.isArray(payload) ? payload : [])
+    } catch {
+      setSavedModels([])
+    } finally {
+      setModelsLoading(false)
+    }
+  }, [API_URL, HEALTH_TIMEOUT_MS, fetchWithTimeout, hasModel])
 
   // Generate frame path
   const getFramePath = (index) => {
@@ -210,6 +231,11 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
     ScrollTrigger.refresh()
   }, [hasModel])
+
+  useEffect(() => {
+    if (hasModel) return
+    fetchSavedModels()
+  }, [hasModel, fetchSavedModels])
 
   // Preload all frames
   useEffect(() => {
@@ -580,6 +606,50 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
     throw new Error('Processing timeout after 30 minutes')
   }, [API_URL, onModelReady])
 
+  const handleOpenSavedModel = useCallback(async (jobId) => {
+    if (!jobId) return
+    setOpeningModelId(jobId)
+    setError(null)
+    try {
+      await checkBackendHealth()
+      const response = await fetchWithTimeout(`${API_URL}/models/${jobId}/open`, {
+        method: 'POST'
+      }, HEALTH_TIMEOUT_MS)
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null)
+        throw new Error(payload?.detail || 'Failed to open model')
+      }
+
+      const job = await response.json()
+      if (job.status === 'completed') {
+        setUploadState('idle')
+        onModelReady?.({
+          glbUrl: job.glb_url ? `${API_URL}${job.glb_url}` : null,
+          metadataUrl: `${API_URL}${job.metadata_url}`,
+          hierarchyUrl: `${API_URL}${job.hierarchy_url}`,
+          jobId: job.job_id,
+          filename: job.ifc_filename,
+          ifcSchema: job.ifc_schema
+        })
+        return
+      }
+
+      // Fallback if the selected model is still processing.
+      setUploadState('processing')
+      setProgress(getStageLabel(normalizeStage(job.stage, job.status), job.status))
+      setJobStage(normalizeStage(job.stage, job.status))
+      await pollJobStatus(job.job_id)
+    } catch (err) {
+      console.error('Open model error:', err)
+      setError(err?.message || 'Failed to open model')
+      setUploadState('error')
+      setJobStage(null)
+    } finally {
+      setOpeningModelId(null)
+    }
+  }, [API_URL, HEALTH_TIMEOUT_MS, checkBackendHealth, fetchWithTimeout, onModelReady, pollJobStatus])
+
   /**
    * Upload file to backend
    */
@@ -837,6 +907,53 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
                         style={styles.fileInput}
                       />
                     </label>
+                  )}
+                </div>
+
+                <div style={styles.savedModelsSection}>
+                  <div style={styles.savedModelsHeader}>
+                    <span style={styles.savedModelsTitle}>My Models</span>
+                    <button
+                      type="button"
+                      style={styles.savedModelsRefresh}
+                      onClick={fetchSavedModels}
+                      disabled={modelsLoading}
+                    >
+                      {modelsLoading ? '...' : 'Refresh'}
+                    </button>
+                  </div>
+
+                  {modelsLoading && (
+                    <div style={styles.savedModelsEmpty}>Loading models...</div>
+                  )}
+
+                  {!modelsLoading && savedModels.length === 0 && (
+                    <div style={styles.savedModelsEmpty}>No saved models yet.</div>
+                  )}
+
+                  {!modelsLoading && savedModels.length > 0 && (
+                    <div style={styles.savedModelsList}>
+                      {savedModels.slice(0, 4).map((model) => (
+                        <div key={model.job_id} style={styles.savedModelItem}>
+                          <div style={styles.savedModelMeta}>
+                            <div style={styles.savedModelName} title={model.ifc_filename}>
+                              {model.ifc_filename}
+                            </div>
+                            <div style={styles.savedModelSub}>
+                              {model.job_id} · {model.status}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            style={styles.savedModelOpenBtn}
+                            onClick={() => handleOpenSavedModel(model.job_id)}
+                            disabled={openingModelId === model.job_id}
+                          >
+                            {openingModelId === model.job_id ? 'Opening...' : 'Open'}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
               </>
@@ -1188,6 +1305,80 @@ const styles = {
     padding: '0 4px',
     fontSize: '16px',
     lineHeight: 1,
+  },
+
+  // Saved models list
+  savedModelsSection: {
+    marginTop: '12px',
+    borderTop: '1px solid rgba(0, 0, 0, 0.06)',
+    paddingTop: '10px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+  },
+  savedModelsHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  savedModelsTitle: {
+    fontSize: '12px',
+    color: '#6B7280',
+    fontWeight: 600,
+  },
+  savedModelsRefresh: {
+    border: 'none',
+    background: 'transparent',
+    color: '#6B7280',
+    fontSize: '11px',
+    cursor: 'pointer',
+    padding: '2px 4px',
+  },
+  savedModelsEmpty: {
+    fontSize: '11px',
+    color: '#9CA3AF',
+    textAlign: 'left',
+  },
+  savedModelsList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '6px',
+  },
+  savedModelItem: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '8px',
+    background: '#ececf0',
+    borderRadius: '8px',
+    padding: '6px 8px',
+  },
+  savedModelMeta: {
+    minWidth: 0,
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  savedModelName: {
+    fontSize: '11px',
+    color: '#111827',
+    fontWeight: 500,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  savedModelSub: {
+    fontSize: '10px',
+    color: '#6B7280',
+  },
+  savedModelOpenBtn: {
+    border: 'none',
+    borderRadius: '6px',
+    background: '#111827',
+    color: '#fff',
+    fontSize: '11px',
+    padding: '5px 8px',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
   },
 
   // Processing

@@ -58,6 +58,8 @@ Key hooks:
 1) Upload IFC
 - UploadPanel posts the IFC to `POST /upload` and polls job status with `GET /job/{job_id}`.
 - When complete, it provides model URLs: `glbUrl`, `metadataUrl`, `hierarchyUrl`, plus `jobId`.
+- UploadPanel also shows a `My Models` list from `GET /models` and can reopen a saved model via `POST /models/{job_id}/open` (no re-upload required).
+- Reopen responses return signed file URLs (`/files/{job_id}/...?...t=`), so GLB/metadata/hierarchy file loads work reliably for Three.js loaders.
 
 2) Viewer load
 - `SelectableModelWithVisibility.jsx` loads the GLB and registers the scene with visibility/selection/section/X-ray/camera hooks.
@@ -126,6 +128,8 @@ Endpoints used:
 - `POST /auth/refresh`
 - `POST /auth/password-reset-request`
 - `POST /upload`
+- `GET /models`
+- `POST /models/{job_id}/open`
 - `GET /job/{job_id}`
 - `POST /api/ec/calculate/{job_id}`
 - `POST /api/fm/hvac/analyze/{job_id}`

@@ -8,6 +8,7 @@ geometry conversion (GLB) and metadata extraction (JSON).
 import uuid
 import json
 import shutil
+import hashlib
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Optional
@@ -42,9 +43,15 @@ from job_security import (
     create_job_record,
     delete_job_record,
     ensure_job_access,
+    find_user_job_by_file_hash,
+    get_user_job_record,
     is_valid_job_file_token,
     list_user_job_ids,
+    list_user_job_records,
+    rotate_job_file_access_token,
     require_job_access_user,
+    touch_job_opened,
+    update_job_record_status,
     user_can_access_job,
 )
 from fm_sidecar_merger import find_fm_sidecar, merge_fm_sidecar
@@ -130,6 +137,17 @@ class ConversionJob(BaseModel):
     fm_params_filename: Optional[str] = None  # FM sidecar filename if provided
 
 
+class UserModelSummary(BaseModel):
+    job_id: str
+    ifc_filename: str
+    ifc_schema: Optional[str] = None
+    status: JobStatus
+    created_at: str
+    updated_at: Optional[str] = None
+    last_opened_at: Optional[str] = None
+    has_geometry: bool = False
+
+
 # In-memory job storage (use Redis/DB in production)
 jobs: dict[str, ConversionJob] = {}
 
@@ -147,12 +165,85 @@ def _build_protected_file_url(job_id: str, filename: str, file_access_token: str
     return f"/files/{job_id}/{filename}?t={file_access_token}"
 
 
-async def _save_upload_stream(upload: UploadFile, destination: Path, max_bytes: int) -> None:
+def _build_authenticated_file_url(job_id: str, filename: str) -> str:
+    return f"/files/{job_id}/{filename}"
+
+
+def _coerce_job_status(value: str | None) -> JobStatus:
+    try:
+        return JobStatus(str(value or JobStatus.PENDING.value))
+    except ValueError:
+        return JobStatus.PENDING
+
+
+def _coerce_job_stage(value: str | None, status: JobStatus) -> JobStage:
+    if status == JobStatus.COMPLETED:
+        return JobStage.COMPLETED
+    if status == JobStatus.FAILED:
+        return JobStage.FAILED
+    if status == JobStatus.PROCESSING:
+        try:
+            return JobStage(str(value or JobStage.QUEUED.value))
+        except ValueError:
+            return JobStage.QUEUED
+    return JobStage.QUEUED
+
+
+def _build_persisted_job(
+    job_id: str,
+    record: dict[str, Any],
+    file_access_token: str | None = None,
+) -> ConversionJob:
+    output_dir = OUTPUT_DIR / job_id
+    glb_path = output_dir / "model.glb"
+    metadata_path = output_dir / "metadata.json"
+    hierarchy_path = output_dir / "hierarchy.json"
+
+    metadata_exists = metadata_path.exists()
+    hierarchy_exists = hierarchy_path.exists()
+    glb_exists = glb_path.exists()
+
+    if metadata_exists and hierarchy_exists:
+        status = JobStatus.COMPLETED
+        stage = JobStage.COMPLETED
+        error = None
+        if file_access_token:
+            glb_url = _build_protected_file_url(job_id, "model.glb", file_access_token) if glb_exists else None
+            metadata_url = _build_protected_file_url(job_id, "metadata.json", file_access_token)
+            hierarchy_url = _build_protected_file_url(job_id, "hierarchy.json", file_access_token)
+        else:
+            glb_url = _build_authenticated_file_url(job_id, "model.glb") if glb_exists else None
+            metadata_url = _build_authenticated_file_url(job_id, "metadata.json")
+            hierarchy_url = _build_authenticated_file_url(job_id, "hierarchy.json")
+    else:
+        status = _coerce_job_status(record.get("status"))
+        stage = _coerce_job_stage(None, status)
+        error = "Model outputs missing. Re-upload required." if status == JobStatus.COMPLETED else None
+        glb_url = None
+        metadata_url = None
+        hierarchy_url = None
+
+    return ConversionJob(
+        job_id=job_id,
+        status=status,
+        stage=stage,
+        ifc_filename=str(record.get("original_filename") or ""),
+        ifc_schema=record.get("ifc_schema"),
+        glb_url=glb_url,
+        metadata_url=metadata_url,
+        hierarchy_url=hierarchy_url,
+        error=error,
+    )
+
+
+async def _save_upload_stream(upload: UploadFile, destination: Path, max_bytes: int) -> str:
     """
     Save an uploaded file to disk with a maximum size limit.
+    Returns SHA-256 hash of the written bytes.
     """
-    def _copy() -> None:
+    def _copy() -> str:
         total_size = 0
+        hasher = hashlib.sha256()
         with open(destination, "wb") as buffer:
             while True:
                 chunk = upload.file.read(1024 * 1024)
@@ -162,9 +253,11 @@ async def _save_upload_stream(upload: UploadFile, destination: Path, max_bytes: 
                 if total_size > max_bytes:
                     raise ValueError("File exceeds upload size limit")
                 buffer.write(chunk)
+                hasher.update(chunk)
+        return hasher.hexdigest()
 
     try:
-        await asyncio.to_thread(_copy)
+        return await asyncio.to_thread(_copy)
     except Exception:
         destination.unlink(missing_ok=True)
         raise
@@ -210,6 +303,7 @@ async def process_ifc_file(
     try:
         job.status = JobStatus.PROCESSING
         job.stage = JobStage.CONVERTING_GLB
+        await update_job_record_status(job_id, status=JobStatus.PROCESSING.value)
         
         # Create output directory for this job
         job_output_dir = OUTPUT_DIR / job_id
@@ -252,6 +346,11 @@ async def process_ifc_file(
             
             if "ifcSchema" in metadata:
                 job.ifc_schema = metadata["ifcSchema"]
+                await update_job_record_status(
+                    job_id,
+                    status=JobStatus.PROCESSING.value,
+                    ifc_schema=job.ifc_schema,
+                )
 
             await loop.run_in_executor(
                 None,
@@ -356,12 +455,22 @@ async def process_ifc_file(
             job.hierarchy_url = f"/files/{job_id}/hierarchy.json"
         
         print(f"[{job_id}] Processing completed successfully")
+        await update_job_record_status(
+            job_id,
+            status=JobStatus.COMPLETED.value,
+            ifc_schema=job.ifc_schema,
+        )
         
     except Exception as e:
         print(f"[{job_id}] Processing failed: {e}")
         job.status = JobStatus.FAILED
         job.stage = JobStage.FAILED
         job.error = str(e)
+        await update_job_record_status(
+            job_id,
+            status=JobStatus.FAILED.value,
+            ifc_schema=job.ifc_schema,
+        )
     
     finally:
         # Clean up uploaded IFC file (optional - keep for debugging)
@@ -398,7 +507,7 @@ async def upload_ifc(
     ifc_path = UPLOAD_DIR / ifc_stored_filename
 
     try:
-        await _save_upload_stream(file, ifc_path, max_bytes=MAX_IFC_UPLOAD_BYTES)
+        ifc_file_hash = await _save_upload_stream(file, ifc_path, max_bytes=MAX_IFC_UPLOAD_BYTES)
     except ValueError as exc:
         raise HTTPException(status_code=413, detail=str(exc))
     except Exception as e:
@@ -420,7 +529,7 @@ async def upload_ifc(
             sidecar_filename = f"{job_id}_{fm_params_filename}"
             sidecar_path = UPLOAD_DIR / sidecar_filename
 
-            await _save_upload_stream(
+            _ = await _save_upload_stream(
                 fm_params,
                 sidecar_path,
                 max_bytes=MAX_FM_SIDECAR_UPLOAD_BYTES,
@@ -440,6 +549,31 @@ async def upload_ifc(
             fm_params.file.close()
     
     owner_user_id = int(current_user["id"])
+
+    # Reuse existing model for identical IFC bytes when no sidecar override is provided.
+    if not fm_params_filename:
+        existing_record = await find_user_job_by_file_hash(owner_user_id, ifc_file_hash)
+        if existing_record:
+            existing_job_id = str(existing_record["job_id"])
+            existing_job = _build_persisted_job(existing_job_id, existing_record)
+
+            if existing_job.status == JobStatus.COMPLETED:
+                existing_file_access_token = await rotate_job_file_access_token(existing_job_id, owner_user_id)
+                existing_job = _build_persisted_job(
+                    existing_job_id,
+                    existing_record,
+                    file_access_token=existing_file_access_token,
+                )
+                ifc_path.unlink(missing_ok=True)
+                await touch_job_opened(existing_job_id, owner_user_id)
+                await update_job_record_status(
+                    existing_job_id,
+                    status=JobStatus.COMPLETED.value,
+                    ifc_schema=existing_job.ifc_schema,
+                )
+                jobs[existing_job_id] = existing_job
+                return existing_job
+
     try:
         await create_job_record(
             job_id=job_id,
@@ -447,6 +581,8 @@ async def upload_ifc(
             original_filename=ifc_original_filename,
             stored_ifc_name=ifc_stored_filename,
             file_access_token=file_access_token,
+            file_hash=ifc_file_hash,
+            status=JobStatus.PENDING.value,
         )
     except Exception as exc:
         ifc_path.unlink(missing_ok=True)
@@ -477,7 +613,7 @@ async def upload_ifc(
 @app.get("/job/{job_id}", response_model=ConversionJob)
 async def get_job_status(
     job_id: str,
-    _: dict[str, Any] = Depends(require_job_access_user),
+    current_user: dict[str, Any] = Depends(require_job_access_user),
 ):
     """
     Get the status of a conversion job.
@@ -486,15 +622,91 @@ async def get_job_status(
     """
     job = jobs.get(job_id)
     if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
+        record = await get_user_job_record(job_id, int(current_user["id"]))
+        if not record:
+            raise HTTPException(status_code=404, detail="Job not found")
+        job = _build_persisted_job(job_id, record)
+        if job.status == JobStatus.COMPLETED:
+            file_access_token = await rotate_job_file_access_token(job_id, int(current_user["id"]))
+            job = _build_persisted_job(job_id, record, file_access_token=file_access_token)
+        jobs[job_id] = job
     return job
 
 
 @app.get("/jobs", response_model=list[ConversionJob])
 async def list_jobs(current_user: dict[str, Any] = Depends(get_current_user)):
     """List conversion jobs owned by the authenticated user."""
-    visible_job_ids = await list_user_job_ids(int(current_user["id"]))
-    return [job for job_id, job in jobs.items() if job_id in visible_job_ids]
+    user_id = int(current_user["id"])
+    visible_job_ids = await list_user_job_ids(user_id)
+    visible_jobs: dict[str, ConversionJob] = {
+        job_id: job for job_id, job in jobs.items() if job_id in visible_job_ids
+    }
+
+    missing_job_ids = [job_id for job_id in visible_job_ids if job_id not in visible_jobs]
+    for job_id in missing_job_ids:
+        record = await get_user_job_record(job_id, user_id)
+        if not record:
+            continue
+        visible_jobs[job_id] = _build_persisted_job(job_id, record)
+
+    return list(visible_jobs.values())
+
+
+@app.get("/models", response_model=list[UserModelSummary])
+async def list_models(current_user: dict[str, Any] = Depends(get_current_user)):
+    """List persisted models owned by the authenticated user."""
+    user_id = int(current_user["id"])
+    records = await list_user_job_records(user_id)
+    summaries: list[UserModelSummary] = []
+
+    for record in records:
+        job_id = str(record["job_id"])
+        job = _build_persisted_job(job_id, record)
+        summaries.append(
+            UserModelSummary(
+                job_id=job_id,
+                ifc_filename=str(record.get("original_filename") or ""),
+                ifc_schema=record.get("ifc_schema"),
+                status=job.status,
+                created_at=str(record.get("created_at") or ""),
+                updated_at=record.get("updated_at"),
+                last_opened_at=record.get("last_opened_at"),
+                has_geometry=bool(job.glb_url),
+            )
+        )
+
+    return summaries
+
+
+@app.post("/models/{job_id}/open", response_model=ConversionJob)
+async def open_model(
+    job_id: str,
+    current_user: dict[str, Any] = Depends(get_current_user),
+):
+    """Re-open an existing model without re-uploading the IFC."""
+    user_id = int(current_user["id"])
+    await ensure_job_access(job_id, user_id)
+
+    record = await get_user_job_record(job_id, user_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    job = _build_persisted_job(job_id, record)
+    if job.status == JobStatus.COMPLETED:
+        file_access_token = await rotate_job_file_access_token(job_id, user_id)
+        job = _build_persisted_job(job_id, record, file_access_token=file_access_token)
+
+    await touch_job_opened(job_id, user_id)
+
+    jobs[job_id] = job
+    if job.status == JobStatus.COMPLETED:
+        await update_job_record_status(
+            job_id,
+            status=JobStatus.COMPLETED.value,
+            ifc_schema=job.ifc_schema,
+        )
+
+    return job
 
 
 @app.delete("/job/{job_id}")

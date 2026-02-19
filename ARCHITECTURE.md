@@ -7,6 +7,12 @@
 ## Recent additions / changes
 
 - **Date:** 2026-02-19
+- **Model reopen + dedupe (phase 6):** Added persistent model listing/open endpoints so users can reopen prior uploads by `job_id` without re-uploading. Added IFC hash dedupe so identical re-uploads can reuse completed artifacts.
+- **Backend updates:** Extended `model_jobs` metadata (`file_hash`, `status`, `ifc_schema`, timestamps) with idempotent SQLite column migration and status syncing from processing lifecycle.
+- **File access fix:** Re-opened/persisted jobs now rotate and return signed `/files/...?...t=` URLs so GLB loads do not fail with auth-cookie gaps in Three.js loaders.
+- **Frontend updates:** Added a compact `My Models` section in `UploadPanel` with `Open` action for previously uploaded models.
+
+- **Date:** 2026-02-19
 - **CMMS sync architecture (phase 5):** Added sync settings storage, encrypted credential handling, adapter-based sync module (`mock`, `upkeep`, `fiix`, `maximo`, `other`), and secured push/pull/webhook sync endpoints.
 - **Frontend updates:** Added a compact "CMMS Sync" section in `WorkOrdersPanel` for settings save plus push/pull actions.
 
@@ -290,6 +296,12 @@ graph TB
 5.  **Locate in model**: Clicking a work order triggers viewer selection/focus using `global_id`.
 6.  **Soft delete**: Frontend removes an item via `DELETE /api/work-orders/{jobId}/{woId}`.
 7.  **Export for handover/interoperability**: Frontend downloads CSV/JSON from `GET /api/work-orders/{jobId}/export?format=csv|json` with COBie-compatible column naming.
+
+### Data Flow: Model Reopen & Dedupe
+1.  **Upload once**: User uploads IFC; backend stores original IFC and generated artifacts under a `job_id`.
+2.  **Persist metadata**: Backend stores model ownership + metadata in `model_jobs` (including IFC hash and status).
+3.  **Dedupe**: New upload with identical IFC bytes (same user) reuses the existing completed `job_id` instead of creating duplicates.
+4.  **Reopen later**: Frontend calls `GET /models` then `POST /models/{job_id}/open` to load saved URLs and continue work orders/CMMS context.
 
 ### Data Flow: CMMS Sync (Phase 5)
 1.  **Configure sync**: Frontend calls `PUT /api/cmms/settings` to save system, base URL, and credentials.

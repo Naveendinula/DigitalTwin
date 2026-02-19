@@ -38,7 +38,11 @@ function SelectableModel({
   visible = true,
   ...props 
 }) {
-  const { scene } = useGLTF(url)
+  const { scene } = useGLTF(url, true, true, (loader) => {
+    if (typeof loader.setWithCredentials === 'function') {
+      loader.setWithCredentials(true)
+    }
+  })
   const { scene: threeScene, camera, gl } = useThree()
   const groupRef = useRef()
   
