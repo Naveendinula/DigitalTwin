@@ -246,6 +246,11 @@ function WorkOrdersPanel({
     setSyncSettingsLoading(true)
     try {
       const response = await apiFetch('/api/cmms/settings')
+      if (response.status === 404) {
+        // Backward-compatible behavior if backend hasn't been restarted on phase 5 yet.
+        setSyncSettings(DEFAULT_SYNC_SETTINGS)
+        return
+      }
       const payload = await parseJsonSafe(response)
       if (!response.ok) {
         throw new Error(payload?.detail || 'Failed to load CMMS sync settings')
@@ -367,6 +372,9 @@ function WorkOrdersPanel({
       })
       const payload = await parseJsonSafe(response)
       if (!response.ok) {
+        if (response.status === 404 && payload?.detail === 'Not Found') {
+          throw new Error('Work Orders API not available. Restart backend on latest code.')
+        }
         throw new Error(payload?.detail || 'Failed to create work order')
       }
 
@@ -540,6 +548,9 @@ function WorkOrdersPanel({
       const response = await apiFetch('/api/cmms/settings', { method: 'PUT', body })
       const payload = await parseJsonSafe(response)
       if (!response.ok) {
+        if (response.status === 404 && payload?.detail === 'Not Found') {
+          throw new Error('CMMS sync API not available. Restart backend on latest code.')
+        }
         throw new Error(payload?.detail || 'Failed to save CMMS sync settings')
       }
 
@@ -572,6 +583,9 @@ function WorkOrdersPanel({
       })
       const payload = await parseJsonSafe(response)
       if (!response.ok) {
+        if (response.status === 404 && payload?.detail === 'Not Found') {
+          throw new Error('CMMS sync API not available. Restart backend on latest code.')
+        }
         throw new Error(payload?.detail || `Failed to ${direction} work order`)
       }
       if (!payload || typeof payload.id !== 'number') {
