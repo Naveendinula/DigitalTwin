@@ -8,7 +8,6 @@ Includes:
 """
 
 from pathlib import Path
-import glob
 import json
 import traceback
 from typing import Any, Optional
@@ -19,6 +18,7 @@ from pydantic import BaseModel
 from auth_deps import get_current_user
 from config import UPLOAD_DIR, OUTPUT_DIR
 from job_security import ensure_job_access
+from utils import find_ifc_for_job
 _IFC_VALIDATION_AVAILABLE = True
 _IFC_VALIDATION_IMPORT_ERROR: Optional[Exception] = None
 try:
@@ -145,14 +145,10 @@ def _require_ids_manager() -> None:
 
 def _find_ifc_for_job(job_id: str) -> Path:
     """Find the IFC file associated with a job ID."""
-    search_pattern = str(UPLOAD_DIR / f"{job_id}_*.ifc")
-    matching_files = glob.glob(search_pattern)
-    if not matching_files:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No IFC file found for job ID {job_id}",
-        )
-    return Path(matching_files[0])
+    try:
+        return find_ifc_for_job(job_id, UPLOAD_DIR)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
 
 def _get_validation_cache_path(job_id: str) -> Path:

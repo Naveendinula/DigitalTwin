@@ -9,8 +9,11 @@ producing a nested JSON structure suitable for tree views in the frontend.
 import ifcopenshell
 import json
 import sys
+import logging
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 def get_element_info(element) -> dict[str, Any]:
@@ -338,13 +341,13 @@ def extract_spatial_hierarchy(ifc_path: str) -> dict[str, Any]:
     Returns:
         Nested dictionary representing the spatial tree
     """
-    print(f"Loading IFC file: {ifc_path}")
+    logger.info(f"Loading IFC file: {ifc_path}")
     ifc_file = ifcopenshell.open(ifc_path)
     
     # Find the project
     projects = ifc_file.by_type('IfcProject')
     if not projects:
-        print("Warning: No IfcProject found in the IFC file. Returning empty hierarchy.")
+        logger.warning("No IfcProject found in the IFC file. Returning empty hierarchy.")
         # Return a minimal placeholder hierarchy for files without structure
         return {
             "type": "IfcProject",
@@ -356,14 +359,14 @@ def extract_spatial_hierarchy(ifc_path: str) -> dict[str, Any]:
         # raise ValueError("No IfcProject found in the IFC file")
     
     project = projects[0]
-    print(f"Found project: {project.Name}")
+    logger.info(f"Found project: {project.Name}")
     
     # Pre-compute element assignments for efficiency
-    print("Computing element assignments...")
+    logger.info("Computing element assignments...")
     elements_by_storey = precompute_element_assignments(ifc_file)
     
     # Build the hierarchy starting from project
-    print("Building spatial hierarchy...")
+    logger.info("Building spatial hierarchy...")
     hierarchy = get_element_info(project)
     
     # Add sites (or buildings directly if no site)
@@ -443,20 +446,23 @@ def save_hierarchy(hierarchy: dict, output_path: str) -> None:
         json.dump(hierarchy, f, indent=2, ensure_ascii=False)
     
     stats = hierarchy.get('statistics', {})
-    print(f"\nHierarchy saved to: {output_path}")
-    print(f"Statistics:")
-    print(f"  - Sites: {stats.get('sites', 0)}")
-    print(f"  - Buildings: {stats.get('buildings', 0)}")
-    print(f"  - Storeys: {stats.get('storeys', 0)}")
-    print(f"  - Spaces: {stats.get('spaces', 0)}")
-    print(f"  - Total Elements: {stats.get('totalElements', 0)}")
+    logger.info(f"Hierarchy saved to: {output_path}")
+    logger.info("Statistics:")
+    logger.info(f"  - Sites: {stats.get('sites', 0)}")
+    logger.info(f"  - Buildings: {stats.get('buildings', 0)}")
+    logger.info(f"  - Storeys: {stats.get('storeys', 0)}")
+    logger.info(f"  - Spaces: {stats.get('spaces', 0)}")
+    logger.info(f"  - Total Elements: {stats.get('totalElements', 0)}")
 
 
 def main():
     """Main entry point for command-line usage."""
+    if not logging.getLogger().handlers:
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
+
     if len(sys.argv) != 3:
-        print("Usage: python ifc_spatial_hierarchy.py <input.ifc> <output.json>")
-        print("Example: python ifc_spatial_hierarchy.py model.ifc hierarchy.json")
+        logger.error("Usage: python ifc_spatial_hierarchy.py <input.ifc> <output.json>")
+        logger.error("Example: python ifc_spatial_hierarchy.py model.ifc hierarchy.json")
         sys.exit(1)
     
     input_file = sys.argv[1]
@@ -464,20 +470,20 @@ def main():
     
     # Validate input file
     if not Path(input_file).exists():
-        print(f"Error: Input file not found: {input_file}", file=sys.stderr)
+        logger.error(f"Error: Input file not found: {input_file}")
         sys.exit(1)
     
     if not input_file.lower().endswith('.ifc'):
-        print(f"Error: Input file must be an IFC file", file=sys.stderr)
+        logger.error("Error: Input file must be an IFC file")
         sys.exit(1)
     
     try:
         hierarchy = extract_spatial_hierarchy(input_file)
         save_hierarchy(hierarchy, output_file)
-        print("\nDone!")
+        logger.info("Done!")
         sys.exit(0)
     except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
+        logger.error(f"Error: {e}")
         sys.exit(1)
 
 

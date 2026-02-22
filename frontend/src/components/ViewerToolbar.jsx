@@ -15,6 +15,7 @@ import {
   WorkOrdersIcon,
   ViewCubeIcon,
   EyeIcon,
+  GraphIcon,
   SidebarLeftIcon,
   SidebarRightIcon
 } from './ViewerIcons'
@@ -48,6 +49,7 @@ function ViewerToolbar({
   onFitToModel,
   onOpenEcPanel,
   onOpenHvacPanel,
+  onOpenGraphPanel,
   onOpenWorkOrdersPanel,
   onOpenIdsValidationPanel,
   onToggleSpaceOverlay,
@@ -132,6 +134,14 @@ function ViewerToolbar({
       title: 'Analyze HVAC/FM',
       icon: <FanIcon />,
       label: 'HVAC/FM'
+    },
+    {
+      key: 'graph-query',
+      show: hasModel,
+      onClick: onOpenGraphPanel,
+      title: 'Open Graph Query',
+      icon: <GraphIcon />,
+      label: 'Graph'
     },
     {
       key: 'ids-validation',

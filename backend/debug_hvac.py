@@ -9,11 +9,14 @@ Or use an existing job_id:
 """
 
 import sys
+import logging
 from pathlib import Path
 
 import ifcopenshell
 from ifcopenshell.util import element as ifc_element
 from ifcopenshell.util import system as ifc_system
+
+logger = logging.getLogger(__name__)
 
 from fm_hvac_core import (
     HVAC_KEYWORDS,
@@ -36,19 +39,19 @@ def debug_element(element, reason: str):
     ifc_type = element.is_a()
     global_id = _element_key(element)
     
-    print(f"\n{'='*60}")
-    print(f"  Name:       {name or '(none)'}")
-    print(f"  IFC Type:   {ifc_type}")
-    print(f"  ObjectType: {obj_type or '(none)'}")
-    print(f"  GlobalId:   {global_id}")
-    print(f"  Reason:     {reason}")
-    print(f"  Is Terminal: {_is_terminal(element)}")
+    logger.info(f"\n{'='*60}")
+    logger.info(f"  Name:       {name or '(none)'}")
+    logger.info(f"  IFC Type:   {ifc_type}")
+    logger.info(f"  ObjectType: {obj_type or '(none)'}")
+    logger.info(f"  GlobalId:   {global_id}")
+    logger.info(f"  Reason:     {reason}")
+    logger.info(f"  Is Terminal: {_is_terminal(element)}")
     
     # Show systems
     try:
         systems = ifc_system.get_element_systems(element) or []
         if systems:
-            print(f"  Systems:    {[_clean_text(getattr(s, 'Name', '')) for s in systems]}")
+            logger.info(f"  Systems:    {[_clean_text(getattr(s, 'Name', '')) for s in systems]}")
     except Exception:
         pass
     
@@ -57,16 +60,16 @@ def debug_element(element, reason: str):
         space = ifc_element.get_container(element, ifc_class="IfcSpace")
         if space:
             space_name = _clean_text(getattr(space, "Name", None))
-            print(f"  In Space:   {space_name}")
+            logger.info(f"  In Space:   {space_name}")
     except Exception:
         pass
 
 
 def debug_all_terminals(model):
     """List all terminals in the model."""
-    print("\n" + "="*60)
-    print("ALL TERMINALS IN MODEL")
-    print("="*60)
+    logger.info("\n" + "="*60)
+    logger.info("ALL TERMINALS IN MODEL")
+    logger.info("="*60)
     
     terminals = []
     for ifc_type in TERMINAL_TYPE_HINTS:
@@ -76,7 +79,7 @@ def debug_all_terminals(model):
         except Exception:
             pass
     
-    print(f"Found {len(terminals)} terminals")
+    logger.info(f"Found {len(terminals)} terminals")
     for t in terminals:
         name = _clean_text(getattr(t, "Name", None))
         ifc_type = t.is_a()
@@ -91,17 +94,17 @@ def debug_all_terminals(model):
         except Exception:
             pass
         
-        print(f"  - {name or '(unnamed)'} [{ifc_type}] in {space_name}")
+        logger.info(f"  - {name or '(unnamed)'} [{ifc_type}] in {space_name}")
 
 
 def debug_equipment_detection(model):
     """Show what would be detected as equipment and why."""
-    print("\n" + "="*60)
-    print("EQUIPMENT DETECTION DEBUG")
-    print("="*60)
+    logger.info("\n" + "="*60)
+    logger.info("EQUIPMENT DETECTION DEBUG")
+    logger.info("="*60)
     
     # 1. Type-based detection
-    print("\n--- By IFC Type Hints ---")
+    logger.info("\n--- By IFC Type Hints ---")
     for ifc_type in EQUIPMENT_TYPE_HINTS:
         try:
             elements = model.by_type(ifc_type)
@@ -111,26 +114,26 @@ def debug_equipment_detection(model):
         non_terminal = [e for e in elements if not _is_terminal(e)]
         terminal = [e for e in elements if _is_terminal(e)]
         
-        print(f"\n{ifc_type}: {len(non_terminal)} equipment, {len(terminal)} terminals (excluded)")
+        logger.info(f"\n{ifc_type}: {len(non_terminal)} equipment, {len(terminal)} terminals (excluded)")
         for element in non_terminal[:5]:  # Limit output
             debug_element(element, f"Type: {ifc_type}")
         if len(non_terminal) > 5:
-            print(f"  ... and {len(non_terminal) - 5} more")
+            logger.info(f"  ... and {len(non_terminal) - 5} more")
     
     # 2. Keyword-based detection (Proxies)
-    print("\n--- By Keyword (IfcBuildingElementProxy) ---")
+    logger.info("\n--- By Keyword (IfcBuildingElementProxy) ---")
     try:
         proxies = model.by_type("IfcBuildingElementProxy")
     except Exception:
         proxies = []
     
     matched = [e for e in proxies if _element_matches_keywords(e) and not _is_terminal(e)]
-    print(f"Found {len(matched)} matching proxies")
+    logger.info(f"Found {len(matched)} matching proxies")
     for element in matched[:5]:
         debug_element(element, "Keyword match (Proxy)")
     
     # 3. Keyword-based detection (DistributionElements)
-    print("\n--- By Keyword (IfcDistributionElement) ---")
+    logger.info("\n--- By Keyword (IfcDistributionElement) ---")
     try:
         dist = model.by_type("IfcDistributionElement")
     except Exception:
@@ -139,58 +142,61 @@ def debug_equipment_detection(model):
     matched_dist = [e for e in dist if _element_matches_keywords(e) and not _is_terminal(e)]
     matched_terminal = [e for e in dist if _element_matches_keywords(e) and _is_terminal(e)]
     
-    print(f"Found {len(matched_dist)} matching distribution elements")
-    print(f"Excluded {len(matched_terminal)} terminals that matched keywords")
+    logger.info(f"Found {len(matched_dist)} matching distribution elements")
+    logger.info(f"Excluded {len(matched_terminal)} terminals that matched keywords")
     
     for element in matched_dist[:5]:
         debug_element(element, "Keyword match (Distribution)")
     
     if matched_terminal:
-        print("\n  Excluded terminals (keyword matched but are terminals):")
+        logger.info("\n  Excluded terminals (keyword matched but are terminals):")
         for t in matched_terminal[:5]:
             name = _clean_text(getattr(t, "Name", None))
             ifc_type = t.is_a()
-            print(f"    - {name} [{ifc_type}]")
+            logger.info(f"    - {name} [{ifc_type}]")
 
 
 def debug_analysis_result(model):
     """Run the full analysis and show results."""
-    print("\n" + "="*60)
-    print("FULL ANALYSIS RESULT")
-    print("="*60)
+    logger.info("\n" + "="*60)
+    logger.info("FULL ANALYSIS RESULT")
+    logger.info("="*60)
     
     result = analyze_hvac_fm(model)
     summary = result["summary"]
     
-    print(f"\nSummary:")
-    print(f"  Equipment Count:        {summary['equipment_count']}")
-    print(f"  With Terminals:         {summary['equipment_with_terminals']}")
-    print(f"  Served Terminal Count:  {summary['served_terminal_count']}")
-    print(f"  Served Space Count:     {summary['served_space_count']}")
+    logger.info(f"\nSummary:")
+    logger.info(f"  Equipment Count:        {summary['equipment_count']}")
+    logger.info(f"  With Terminals:         {summary['equipment_with_terminals']}")
+    logger.info(f"  Served Terminal Count:  {summary['served_terminal_count']}")
+    logger.info(f"  Served Space Count:     {summary['served_space_count']}")
     
-    print(f"\nEquipment Details:")
+    logger.info(f"\nEquipment Details:")
     for eq in result["equipment"]:
         name = eq["name"] or "(unnamed)"
         terminal_count = len(eq["servedTerminals"])
         space_count = len(eq["servedSpaces"])
         storey = eq["storey"] or "(no storey)"
         
-        print(f"\n  {name}")
-        print(f"    GlobalId:   {eq['globalId']}")
-        print(f"    Storey:     {storey}")
-        print(f"    Terminals:  {terminal_count}")
-        print(f"    Spaces:     {space_count}")
+        logger.info(f"\n  {name}")
+        logger.info(f"    GlobalId:   {eq['globalId']}")
+        logger.info(f"    Storey:     {storey}")
+        logger.info(f"    Terminals:  {terminal_count}")
+        logger.info(f"    Spaces:     {space_count}")
         
         if eq["servedSpaces"]:
-            print(f"    Served Spaces:")
+            logger.info(f"    Served Spaces:")
             for space in eq["servedSpaces"][:5]:
-                print(f"      - {space.get('name', '(unnamed)')}")
+                logger.info(f"      - {space.get('name', '(unnamed)')}")
 
 
 def main():
+    if not logging.getLogger().handlers:
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
+
     if len(sys.argv) < 2:
-        print("Usage: python debug_hvac.py <path_to_ifc_file>")
-        print("       python debug_hvac.py --job <job_id>")
+        logger.info("Usage: python debug_hvac.py <path_to_ifc_file>")
+        logger.info("       python debug_hvac.py --job <job_id>")
         sys.exit(1)
     
     if sys.argv[1] == "--job":
@@ -204,16 +210,16 @@ def main():
                 for f in Path("uploads").glob("*.ifc"):
                     # This is a simplification - you may need to track the mapping
                     pass
-            print(f"Could not find IFC file for job {job_id}")
+            logger.info(f"Could not find IFC file for job {job_id}")
             sys.exit(1)
     else:
         ifc_path = Path(sys.argv[1])
     
     if not ifc_path.exists():
-        print(f"File not found: {ifc_path}")
+        logger.info(f"File not found: {ifc_path}")
         sys.exit(1)
     
-    print(f"Loading IFC file: {ifc_path}")
+    logger.info(f"Loading IFC file: {ifc_path}")
     model = ifcopenshell.open(str(ifc_path))
     
     debug_all_terminals(model)
@@ -223,3 +229,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

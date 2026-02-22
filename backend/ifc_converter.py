@@ -10,8 +10,10 @@ which is crucial for linking 3D geometry with BIM data.
 
 import subprocess
 import sys
-import os
+import logging
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def convert_ifc_to_glb(input_ifc_path: str, output_glb_path: str) -> bool:
@@ -43,9 +45,9 @@ def convert_ifc_to_glb(input_ifc_path: str, output_glb_path: str) -> bool:
         str(output_path)
     ]
 
-    print(f"Converting: {input_ifc_path}")
-    print(f"Output: {output_glb_path}")
-    print(f"Command: {' '.join(command)}")
+    logger.info("Converting: %s", input_ifc_path)
+    logger.info("Output: %s", output_glb_path)
+    logger.info("Command: %s", " ".join(command))
 
     try:
         # Run IfcConvert
@@ -90,13 +92,13 @@ def convert_ifc_to_glb(input_ifc_path: str, output_glb_path: str) -> bool:
             )
 
         file_size = output_path.stat().st_size
-        print(f"Conversion successful! Output size: {file_size} bytes")
+        logger.info("Conversion successful! Output size: %s bytes", file_size)
         
         # Log IfcConvert output for debugging
         if stdout_text:
-            print(f"IfcConvert stdout: {stdout_text[:200]}")
+            logger.info("IfcConvert stdout: %s", stdout_text[:200])
         if stderr_text:
-            print(f"IfcConvert stderr: {stderr_text[:200]}")
+            logger.info("IfcConvert stderr: %s", stderr_text[:200])
         
         return True
 
@@ -110,9 +112,12 @@ def convert_ifc_to_glb(input_ifc_path: str, output_glb_path: str) -> bool:
 
 def main():
     """Main entry point for command-line usage."""
+    if not logging.getLogger().handlers:
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
+
     if len(sys.argv) != 3:
-        print("Usage: python ifc_converter.py <input.ifc> <output.glb>")
-        print("Example: python ifc_converter.py model.ifc model.glb")
+        logger.error("Usage: python ifc_converter.py <input.ifc> <output.glb>")
+        logger.error("Example: python ifc_converter.py model.ifc model.glb")
         sys.exit(1)
 
     input_file = sys.argv[1]
@@ -120,10 +125,10 @@ def main():
 
     try:
         convert_ifc_to_glb(input_file, output_file)
-        print("Done!")
+        logger.info("Done!")
         sys.exit(0)
     except RuntimeError as e:
-        print(f"Error: {e}", file=sys.stderr)
+        logger.error("Error: %s", e)
         sys.exit(2)
 
 

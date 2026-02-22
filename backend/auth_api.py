@@ -7,6 +7,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import logging
 import secrets
 import uuid
 from collections import defaultdict, deque
@@ -41,6 +42,8 @@ from config import (
     SECRET_KEY,
 )
 from db import get_db, utc_now_iso
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -610,9 +613,11 @@ async def request_password_reset(payload: PasswordResetRequest, request: Request
         user_row = await _get_user_by_email(db, email)
         if user_row:
             reset_stub_token = secrets.token_urlsafe(32)
-            print(
-                "[auth.reset.stub] user_id=%s email=%s token=%s"
-                % (user_row["id"], email, reset_stub_token)
+            logger.info(
+                "[auth.reset.stub] user_id=%s email=%s token=%s",
+                user_row["id"],
+                email,
+                reset_stub_token,
             )
             await _log_audit(
                 db,

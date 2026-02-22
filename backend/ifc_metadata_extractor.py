@@ -15,11 +15,13 @@ import ifcopenshell.util.element
 import json
 import math
 import sys
+import logging
 from pathlib import Path
 from typing import Any
 
 # Current metadata schema version
 METADATA_SCHEMA_VERSION = 2
+logger = logging.getLogger(__name__)
 
 
 def get_property_sets(element) -> dict[str, dict[str, Any]]:
@@ -122,13 +124,13 @@ def extract_project_orientation(ifc_file) -> dict:
             model_context = contexts[0]
         
         if model_context is None:
-            print("  No GeometricRepresentationContext found, using default orientation")
+            logger.info("No GeometricRepresentationContext found, using default orientation")
             return orientation
         
         # Extract WorldCoordinateSystem (IfcAxis2Placement3D)
         wcs = getattr(model_context, 'WorldCoordinateSystem', None)
         if wcs is None:
-            print("  No WorldCoordinateSystem defined, using default orientation")
+            logger.info("No WorldCoordinateSystem defined, using default orientation")
             return orientation
         
         # Get RefDirection (X-axis) - defaults to (1,0,0) if not specified
@@ -144,9 +146,9 @@ def extract_project_orientation(ifc_file) -> dict:
             yaw_rad = math.atan2(ref_y, ref_x)
             orientation["modelYawDeg"] = round(math.degrees(yaw_rad), 4)
             orientation["orientationSource"] = "explicit"
-            print(f"  RefDirection: ({ref_x:.4f}, {ref_y:.4f}) -> yaw = {orientation['modelYawDeg']}°")
+            logger.info(f"RefDirection: ({ref_x:.4f}, {ref_y:.4f}) -> yaw = {orientation['modelYawDeg']}")
         else:
-            print("  RefDirection not specified, using default (1,0,0)")
+            logger.info("RefDirection not specified, using default (1,0,0)")
         
         # Extract TrueNorth if present
         true_north = getattr(model_context, 'TrueNorth', None)
@@ -159,12 +161,12 @@ def extract_project_orientation(ifc_file) -> dict:
             # atan2(x, y) gives angle from Y-axis
             tn_rad = math.atan2(tn_x, tn_y)
             orientation["trueNorthDeg"] = round(math.degrees(tn_rad), 4)
-            print(f"  TrueNorth: ({tn_x:.4f}, {tn_y:.4f}) -> {orientation['trueNorthDeg']}° from Y")
+            logger.info(f"TrueNorth: ({tn_x:.4f}, {tn_y:.4f}) -> {orientation['trueNorthDeg']} from Y")
         else:
-            print("  TrueNorth not specified")
+            logger.info("TrueNorth not specified")
             
     except Exception as e:
-        print(f"  Error extracting orientation: {e}")
+        logger.warning(f"Error extracting orientation: {e}")
     
     return orientation
 
@@ -273,11 +275,11 @@ def extract_metadata(ifc_path: str, original_filename: str = None) -> dict:
             "elements": { GlobalId -> element data }
         }
     """
-    print(f"Loading IFC file: {ifc_path}")
+    logger.info(f"Loading IFC file: {ifc_path}")
     ifc_file = ifcopenshell.open(ifc_path)
     
     # Extract project orientation first
-    print("Extracting project orientation...")
+    logger.info("Extracting project orientation...")
     orientation = extract_project_orientation(ifc_file)
     
     # Extract schema and filename
@@ -288,7 +290,7 @@ def extract_metadata(ifc_path: str, original_filename: str = None) -> dict:
     products = ifc_file.by_type('IfcProduct')
     total = len(products)
     
-    print(f"Processing {total} IfcProduct entities...")
+    logger.info(f"Processing {total} IfcProduct entities...")
     
     for i, element in enumerate(products, 1):
         # Skip spatial elements like IfcSite, IfcBuilding (optional)
@@ -318,7 +320,7 @@ def extract_metadata(ifc_path: str, original_filename: str = None) -> dict:
         
         # Progress indicator
         if i % 100 == 0 or i == total:
-            print(f"Processed {i}/{total} elements ({i*100//total}%)")
+            logger.info(f"Processed {i}/{total} elements ({i*100//total}%)")
     
     # Return wrapped structure with schema version
     return {
@@ -347,17 +349,20 @@ def save_metadata(metadata: dict, output_path: str) -> None:
     # Count elements (handle both old flat format and new wrapped format)
     element_count = len(metadata.get("elements", metadata))
     
-    print(f"Metadata saved to: {output_path}")
-    print(f"Schema version: {metadata.get('schemaVersion', 1)}")
-    print(f"Total elements: {element_count}")
-    print(f"File size: {output_file.stat().st_size / 1024:.1f} KB")
+    logger.info(f"Metadata saved to: {output_path}")
+    logger.info(f"Schema version: {metadata.get('schemaVersion', 1)}")
+    logger.info(f"Total elements: {element_count}")
+    logger.info(f"File size: {output_file.stat().st_size / 1024:.1f} KB")
 
 
 def main():
     """Main entry point for command-line usage."""
+    if not logging.getLogger().handlers:
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
+
     if len(sys.argv) != 3:
-        print("Usage: python ifc_metadata_extractor.py <input.ifc> <output.json>")
-        print("Example: python ifc_metadata_extractor.py model.ifc metadata.json")
+        logger.error("Usage: python ifc_metadata_extractor.py <input.ifc> <output.json>")
+        logger.error("Example: python ifc_metadata_extractor.py model.ifc metadata.json")
         sys.exit(1)
     
     input_file = sys.argv[1]
@@ -367,10 +372,10 @@ def main():
         # Extract and save metadata
         metadata = extract_metadata(input_file)
         save_metadata(metadata, output_file)
-        print("Done!")
+        logger.info("Done!")
         sys.exit(0)
     except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
+        logger.error(f"Error: {e}")
         sys.exit(1)
 
 

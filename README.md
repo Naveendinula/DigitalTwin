@@ -1,79 +1,156 @@
-# Digital Twin
+# Digital Twin Platform (BIM + FM)
 
-Web BIM viewer and embodied carbon analysis tool (FastAPI backend + React/Three.js frontend).
+Web-based Digital Twin platform for BIM visualization, relationship querying, FM operations, and sustainability workflows.
 
-Web app documentation: `docs/WEB_APP.md`.
-Architecture docs: `ARCHITECTURE.md` and `SYSTEM_MAP.md`.
+This project combines:
+- IFC processing and geometry conversion
+- Interactive 3D model navigation
+- Graph-powered BIM relationship querying
+- HVAC/FM operational analysis
+- Work-order management with CMMS sync
+- Embodied carbon and occupancy workflows
+- Authenticated, job-scoped multi-user access
 
-## Refactor Notes (App.jsx)
-- `frontend/src/App.jsx` is now a thin orchestrator that wires hooks and UI shells.
-- Viewer lifecycle, selection/isolation, space overlay, and floating panels are handled by hooks in `frontend/src/hooks/`.
-- Major UI blocks are composed via `frontend/src/components/ViewerShell.jsx` and `frontend/src/components/AppHeader.jsx`.
+Documentation:
+- Architecture: `ARCHITECTURE.md`
+- System map: `SYSTEM_MAP.md`
+- Web app notes: `docs/WEB_APP.md`
 
-## Demo (videos)
+## Why This Project Matters
 
-- **Upload + Structure + Properties** - Upload an IFC model, explore the structure panel (including tools like X-ray and isolation to focus on specific parts), and view detailed element information in the properties panel as you click items in the model or tree.
-  
+Most BIM tools are either authoring-heavy or disconnected from day-to-day facilities operations. This platform is built to bridge that gap:
+- **For FM teams:** convert model data into actionable work-order and service-impact workflows.
+- **For Digital Twin teams:** query building relationships as a graph (systems, spaces, equipment, materials).
+- **For sustainability teams:** quantify embodied carbon at element level with override controls.
 
+## What's New (Recent Additions)
 
-https://github.com/user-attachments/assets/5caacdaf-e5f5-4609-9d76-c7590edba9b3
+- **Graph Query Layer (Phase 1-4):**
+  - Builds a relationship graph per job (`graph.json`) during IFC processing.
+  - New graph API endpoints for stats, neighbors, shortest paths, and structured traversal queries.
+  - New Graph Query panel with list + optional network visualization (`reagraph`).
+- **Work Orders + CMMS Sync:**
+  - Geometry-native work order module with CRUD, summary, and COBie-style export (CSV/JSON).
+  - CMMS sync settings and push/pull/webhook endpoints (adapter model).
+- **Model Reopen + Dedupe:**
+  - Reopen previously processed models without re-upload.
+  - File-hash dedupe for identical IFC uploads.
+- **Security & Access Hardening:**
+  - Cookie-based JWT auth with refresh-token rotation and CSRF protection.
+  - Job ownership enforcement across job-scoped endpoints.
+  - Protected file access via job-scoped tokenized URLs.
+- **Stability Improvements:**
+  - R3F/Reagraph compatibility pinning for graph visualization.
+  - X-ray safety fixes to avoid applying material swaps to non-IFC overlay text meshes.
 
+## Feature Highlights
 
-- **Views + Section Tools** - Use the view buttons to jump between standard camera angles, then activate the section tools to cut through the model and reveal interior details by adjusting the section planes.
+### 1. BIM Ingestion and 3D Viewing
+- Upload IFC, convert to GLB, extract metadata and spatial hierarchy.
+- Navigate with orbit/pan/zoom, isolate model regions, section-cut the building, and inspect element properties.
 
+### 2. Graph-Powered BIM Query
+- Traverse relationships such as `FEEDS`, `SERVES`, `IN_SYSTEM`, `CONTAINED_IN`, `HAS_MATERIAL`.
+- Query by IFC type, storey, material, name, related node, relationship type, and hop depth.
+- Optional graph view for visual network exploration.
 
+### 3. HVAC/FM Operational Intelligence
+- Analyze equipment-to-terminal-to-space service chains.
+- Inspect physically connected terminals separately from inferred system-associated terminals.
+- Link selected results directly back to model highlighting.
 
+### 4. Work Orders and CMMS Integration
+- Create, update, prioritize, assign, and close work orders tied to model elements.
+- Export in CSV/JSON using COBie-compatible column naming.
+- Push/pull work-order sync with CMMS adapters and webhook ingestion.
 
-https://github.com/user-attachments/assets/9c3861dc-4bb2-4867-a476-722d60ca3815
+### 5. Embodied Carbon and Occupancy
+- Calculate embodied carbon from BIM-derived quantities and material mappings.
+- Apply material/type/element-level overrides for calibration.
+- Visualize occupancy snapshots and space heatmaps for operational scenario analysis.
 
+## Architecture at a Glance
 
+### Backend (`FastAPI`, Python)
+- IFC conversion and extraction pipeline (`IfcOpenShell`, `IfcConvert`)
+- Graph build/query (`networkx`)
+- HVAC/FM, EC, validation, occupancy, work orders, CMMS sync
+- SQLite for auth/session audit + FM operation records
 
+### Frontend (`React`, `Vite`, `Three.js`, `R3F`)
+- 3D viewer and interaction tools
+- Floating operational panels (EC, HVAC/FM, Graph Query, Work Orders, IDS, Occupancy)
+- Auth-aware API usage and selection-linked workflows
 
-- **Embodied Carbon Calculator** - Run the carbon analysis to estimate material impacts, highlight high-impact components, and apply overrides when you have better material data.
+### Job Artifacts
+Per processed model/job (`backend/output/{job_id}/`), key artifacts include:
+- `model.glb`
+- `metadata.json`
+- `hierarchy.json`
+- `graph.json`
+- `hvac_fm.json`
+- `space_bboxes.json`
+- `fm_merge_report.json` (when sidecar merge used)
 
+## API Snapshot
 
+Core job/model:
+- `POST /upload`
+- `GET /job/{job_id}`
+- `GET /jobs`
+- `GET /models`
+- `POST /models/{job_id}/open`
+- `DELETE /job/{job_id}`
 
-https://github.com/user-attachments/assets/e25e34d2-4185-449d-afad-c4aa15fcf472
+Graph:
+- `GET /api/graph/{job_id}/stats`
+- `GET /api/graph/{job_id}/neighbors/{global_id}`
+- `GET /api/graph/{job_id}/path/{source_id}/{target_id}`
+- `POST /api/graph/{job_id}/query`
+- `GET /api/graph/{job_id}/subgraph`
 
+HVAC/FM + Spaces + Occupancy:
+- `POST /api/fm/hvac/analyze/{job_id}`
+- `GET /api/fm/hvac/{job_id}`
+- `GET /api/spaces/bboxes/{job_id}`
+- `GET /api/occupancy/{job_id}`
+- `POST /api/occupancy/tick/{job_id}`
+- `POST /api/occupancy/reset/{job_id}`
 
+Work Orders + CMMS:
+- `GET /api/work-orders/{job_id}`
+- `GET /api/work-orders/{job_id}/summary`
+- `POST /api/work-orders/{job_id}`
+- `PATCH /api/work-orders/{job_id}/{wo_id}`
+- `DELETE /api/work-orders/{job_id}/{wo_id}`
+- `GET /api/work-orders/{job_id}/export?format=csv|json`
+- `GET /api/cmms/settings`
+- `PUT /api/cmms/settings`
+- `POST /api/work-orders/{job_id}/{wo_id}/sync/push`
+- `POST /api/work-orders/{job_id}/{wo_id}/sync/pull`
+- `POST /api/cmms/webhooks/{system}`
 
-- **Spaces Overlay** - Turn on the spaces feature to see translucent room boxes, then step through spaces to quickly locate and understand areas within the building.
+Auth:
+- `POST /auth/register`
+- `POST /auth/login`
+- `GET /auth/me`
+- `POST /auth/refresh`
+- `POST /auth/logout`
 
+## 5-Minute Demo Script (Snowdon Towers Sample HVAC 2)
 
+1. Upload/open the Snowdon IFC.
+2. Run HVAC/FM analysis and inspect equipment impact.
+3. Open Graph Query panel:
+   - Query `Name Contains = Heat Recovery Unit`
+   - Use one HRU `GlobalId` in `Related To`, set `Edge = FEEDS`, `Depth = 1`
+   - Clear `Name Contains` and run to see fed terminals
+4. Switch to Work Orders panel and create a geometry-linked work order.
+5. Export work orders (CSV) and show CMMS settings tab.
+6. Toggle occupancy and space overlays to demonstrate operational context.
 
-https://github.com/user-attachments/assets/04fcfb27-0578-4980-8f95-00eed78bf4fb
+## Local Development
 
-
-
-
-- **HVAC/FM Analysis** -  Run the HVAC/FM analysis to review served systems and terminals, use filters to narrow results, and click items to highlight related elements in the model.
-
-
-
-https://github.com/user-attachments/assets/3f89bbb1-c049-4563-ae02-9d0836781753
-
-
-- **Occupancy Simulation** -  Show the simulated people flow and room usage over time, which helps teams validate space planning and spot potential congestion or underused areas before making real-world changes.
-
-
-
-
-https://github.com/user-attachments/assets/0e63b918-75be-4829-ab4d-d15c80d37fd1
-
-
-
-
-## Features (code refs)
-- 3D viewer with selection, focus, isolate, section planes, and view presets (`frontend/src/components/Viewer.jsx`, `frontend/src/components/SelectableModelWithVisibility.jsx`).
-- Spatial tree and property inspection (`frontend/src/components/StructureTree.jsx`, `frontend/src/components/PropertyPanel.jsx`).
-- X-Ray/ghost highlighting with wireframe and ghosted solid modes (`frontend/src/hooks/useXRayMode.js`, `frontend/src/App.jsx`).
-- IDS validation panel for IDS uploads and IFC checks (`frontend/src/components/IdsValidationPanel.jsx`, `backend/validation_api.py`).
-- Embodied carbon calculation with override UI (`frontend/src/components/EcPanel.jsx`) backed by FastAPI (`backend/ec_api.py`, `backend/ec_core.py`).
-- HVAC/FM analysis panel with served terminals/spaces, filters, and selection-driven highlights (`frontend/src/components/HvacFmPanel.jsx`) backed by FastAPI (`backend/fm_api.py`, `backend/fm_hvac_core.py`).
-- Space bbox overlay toggle and navigator for translucent room boxes (`frontend/src/components/SpaceBboxOverlay.jsx`, `frontend/src/components/SpaceNavigator.jsx`, `backend/fm_api.py`).
-- Live occupancy simulation with time-based patterns and heatmap visualization (`frontend/src/components/OccupancyPanel.jsx`, `frontend/src/components/OccupancyLegend.jsx`, `backend/occupancy_sim.py`).
-
-## Run locally
 Backend (from `backend/`):
 ```bash
 python -m venv venv
@@ -88,32 +165,24 @@ npm install
 npm run dev
 ```
 
-## API (backend)
-- `POST /upload` - upload an IFC for processing.
-- `GET /job/{job_id}` - check job status and output URLs.
-- `GET /job/{job_id}/metadata/schema` - get metadata schema info for a job.
-- `POST /job/{job_id}/metadata/upgrade` - re-extract metadata to the latest schema version.
-- `GET /jobs` - list jobs.
-- `DELETE /job/{job_id}` - delete a job.
-- `GET /health` - health check.
-- `POST /api/ec/calculate/{job_id}` - compute embodied carbon for an uploaded IFC (supports overrides).
-- `POST /api/fm/hvac/analyze/{job_id}` - run HVAC/FM analysis and cache results.
-- `GET /api/fm/hvac/{job_id}` - fetch cached HVAC/FM analysis JSON.
-- `GET /api/spaces/bboxes/{job_id}` - fetch cached space bounding boxes for overlay rendering.
-- `GET /api/occupancy/{job_id}` - get current occupancy snapshot for all spaces.
-- `POST /api/occupancy/tick/{job_id}` - advance occupancy simulation by one tick.
-- `POST /api/occupancy/reset/{job_id}` - reset occupancy simulation to fresh state.
-- `POST /api/occupancy/demo/{job_id}` - generate a demo loop of occupancy frames.
-- `GET /api/occupancy/demo/{job_id}` - fetch the pre-generated demo loop.
+## Demo Videos
 
-Notes:
-- HVAC/FM output keeps `servedTerminals` strictly physical (port-connected traversal).
-- HVAC/FM output includes `systemAssociatedTerminals` as a separate inferred list (same IFC system, not merged into `servedTerminals`).
-- HVAC/FM output includes served spaces with `room_no`, `room_name`, and grouped system names when available.
-- Space bbox output includes world-space `bbox`/footprints; `transform` is currently null.
-- Occupancy simulation uses absolute headcount as canonical data; percentage is derived for UX display.
+- Upload + Structure + Properties  
+  https://github.com/user-attachments/assets/5caacdaf-e5f5-4609-9d76-c7590edba9b3
+- Views + Section Tools  
+  https://github.com/user-attachments/assets/9c3861dc-4bb2-4867-a476-722d60ca3815
+- Embodied Carbon  
+  https://github.com/user-attachments/assets/e25e34d2-4185-449d-afad-c4aa15fcf472
+- Spaces Overlay  
+  https://github.com/user-attachments/assets/04fcfb27-0578-4980-8f95-00eed78bf4fb
+- HVAC/FM Analysis  
+  https://github.com/user-attachments/assets/3f89bbb1-c049-4563-ae02-9d0836781753
+- Occupancy Simulation  
+  https://github.com/user-attachments/assets/0e63b918-75be-4829-ab4d-d15c80d37fd1
 
 ## Notes
-- Backend requires Python 3.10+ and IfcOpenShell with `IfcConvert` available in PATH.
-- Keep video files small (H.264, 960x540-1280x720, 800-1500 kbps) to avoid repo bloat.
+
+- Backend target: Python 3.10+.
+- IFC processing requires IfcOpenShell and `IfcConvert` available.
+- For full feature detail and internal flow diagrams, see `ARCHITECTURE.md`.
 

@@ -95,7 +95,8 @@ export default function useViewerSelection({
     const result = focusOnElements(ids)
     
     if (!result.found) {
-      showToast(`No geometry found for "${ids.length === 1 ? 'element' : ids.length + ' elements'}"`, 'warning')
+      const targetLabel = ids.length === 1 ? String(ids[0]) : `${ids.length} elements`
+      showToast(`No geometry found for "${targetLabel}"`, 'warning')
     } else if (result.count > 1) {
       showToast(`Focused on ${result.count} elements`, 'info', 2000)
     }

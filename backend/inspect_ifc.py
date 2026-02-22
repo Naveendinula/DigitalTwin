@@ -1,7 +1,10 @@
 import sys
 import os
 import glob
+import logging
 import ifcopenshell
+
+logger = logging.getLogger(__name__)
 
 def inspect(job_id):
     # Determine paths
@@ -20,53 +23,55 @@ def inspect(job_id):
     files = glob.glob(pattern)
     
     if not files:
-        print(f"Error: No IFC file found for job ID '{job_id}'")
-        print(f"Searched in: {os.path.abspath(upload_dir)}")
+        logger.error(f"Error: No IFC file found for job ID '{job_id}'")
+        logger.error(f"Searched in: {os.path.abspath(upload_dir)}")
         return
 
     ifc_path = files[0]
-    print(f"\n=== Inspecting Job: {job_id} ===")
-    print(f"File: {os.path.basename(ifc_path)}")
-    print(f"Path: {ifc_path}")
+    logger.info(f"\n=== Inspecting Job: {job_id} ===")
+    logger.info(f"File: {os.path.basename(ifc_path)}")
+    logger.info(f"Path: {ifc_path}")
     
     try:
-        print("Loading model (this may take a moment)...")
+        logger.info("Loading model (this may take a moment)...")
         model = ifcopenshell.open(ifc_path)
-        print(f"Schema: {model.schema}")
+        logger.info(f"Schema: {model.schema}")
         
         project = model.by_type("IfcProject")
         if project:
-            print(f"Project Name: {getattr(project[0], 'Name', 'N/A')}")
-            print(f"GlobalId: {project[0].GlobalId}")
+            logger.info(f"Project Name: {getattr(project[0], 'Name', 'N/A')}")
+            logger.info(f"GlobalId: {project[0].GlobalId}")
             
-        print("\n--- Spatial Structure ---")
+        logger.info("\n--- Spatial Structure ---")
         sites = model.by_type("IfcSite")
-        print(f"Sites: {len(sites)}")
+        logger.info(f"Sites: {len(sites)}")
         buildings = model.by_type("IfcBuilding")
-        print(f"Buildings: {len(buildings)}")
+        logger.info(f"Buildings: {len(buildings)}")
         storeys = model.by_type("IfcBuildingStorey")
-        print(f"Storeys: {len(storeys)}")
+        logger.info(f"Storeys: {len(storeys)}")
         spaces = model.by_type("IfcSpace")
-        print(f"Spaces: {len(spaces)}")
+        logger.info(f"Spaces: {len(spaces)}")
 
-        print("\n--- Common Elements ---")
+        logger.info("\n--- Common Elements ---")
         for type_name in ["IfcWall", "IfcWindow", "IfcDoor", "IfcSlab", "IfcCovering", "IfcMember", "IfcBeam", "IfcColumn"]:
             count = len(model.by_type(type_name))
             if count > 0:
-                print(f"{type_name}: {count}")
+                logger.info(f"{type_name}: {count}")
 
-        print("\n--- MEP Elements ---")
+        logger.info("\n--- MEP Elements ---")
         for type_name in ["IfcDistributionElement", "IfcFlowTerminal", "IfcFlowController", "IfcFlowMovingDevice", "IfcFlowSegment", "IfcFlowFitting"]:
             count = len(model.by_type(type_name))
             if count > 0:
-                print(f"{type_name}: {count}")
+                logger.info(f"{type_name}: {count}")
                 
     except Exception as e:
-        print(f"Error loading IFC: {e}")
+        logger.error(f"Error loading IFC: {e}")
 
 if __name__ == "__main__":
+    if not logging.getLogger().handlers:
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
     if len(sys.argv) < 2:
-        print("Usage: python inspect_ifc.py <job_id>")
-        print("Example: python inspect_ifc.py 30ab18ce")
+        logger.error("Usage: python inspect_ifc.py <job_id>")
+        logger.error("Example: python inspect_ifc.py 30ab18ce")
     else:
         inspect(sys.argv[1])

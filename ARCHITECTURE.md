@@ -1,10 +1,48 @@
 # Architecture Documentation
 
 > **Status**: Living Document  
-> **Last Updated**: February 18, 2026  
+> **Last Updated**: February 21, 2026  
 > **Owner**: Naveen Panditharatne
 
 ## Recent additions / changes
+
+- **Date:** 2026-02-21
+- **Tooling & safety baseline (phase 6):** Pinned backend dependencies (plus `numpy`) and added `backend/requirements-dev.txt`; added frontend `tsconfig.json`, ESLint/Prettier configs, Vitest setup/config, and first hook tests (`usePanelStacking`, `useFloatingPanels`, `usePanelResize`); tightened backend CORS methods/headers; added in-memory rate limiting middleware and centralized 5xx response sanitization handlers in `backend/main.py`.
+
+- **Date:** 2026-02-21
+- **Frontend state refactor (phase 5):** Added `ViewerContext` (`frontend/src/hooks/useViewerContext.js`) to replace the large `viewer` prop bag, extracted panel drag-resize logic into `frontend/src/hooks/usePanelResize.js`, moved side-panel workspace composition into `frontend/src/components/ViewerWorkspace.jsx`, and updated `ViewerShell` to consume context directly.
+
+- **Date:** 2026-02-21
+- **EC extractor hardening:** `backend/ec_core.py` now resolves schema-compatible IFC element bases (`IfcBuildingElement` -> `IfcBuiltElement` -> `IfcElement`) and always returns a stable empty DataFrame shape when no rows are extracted, preventing EC failures on IFC4X3 models and low-material edge cases.
+
+- **Date:** 2026-02-21
+- **EC/data-layer refactor (phase 4):** Fixed `prac-database.csv` CSV quoting so the canonical headers parse correctly, removed the EC column-remapping hack in `backend/ec_core.py`, split EC computation into staged helpers (`load_ifc_elements`, `match_materials`, `apply_overrides`, `compute_statistics`), added non-override EC result caching at `output/{job_id}/ec_results.json`, and introduced a small in-process SQLite connection pool in `backend/db.py` with shutdown cleanup in `main.py` lifespan.
+
+- **Date:** 2026-02-21
+- **Backend logging refactor (phase 3):** Added startup logging configuration in `main.py` (human-readable in non-production, JSON in production) and replaced runtime `print()` diagnostics across API/task/IFC-processing modules with `logging` calls.
+
+- **Date:** 2026-02-21
+- **Viewer stability fix:** Hardened X-ray material application/restoration to avoid touching non-IFC overlay text meshes (Troika/Drei `Text`), preventing runtime crashes during X-ray disable/update flows.
+
+- **Date:** 2026-02-21
+- **Graph runtime compatibility fix:** Pinned `reagraph` to `4.22.0`, pinned `@react-three/fiber` to `8.18.0`, and added an npm override to keep a single Fiber runtime instance and avoid Canvas hook-context crashes.
+
+- **Date:** 2026-02-21
+- **Graph visualization (phase 4):** Added `frontend/src/components/GraphView.jsx` using `reagraph` to render query results as an interactive force-directed network.
+- **Frontend updates:** `GraphQueryPanel` now supports toggling between result-list mode and graph-visual mode; node clicks in the visualization reuse existing model selection/focus behavior.
+
+- **Date:** 2026-02-21
+- **Graph query panel (phase 3):** Added `frontend/src/components/GraphQueryPanel.jsx` as a draggable relational query panel for BIM graph exploration.
+- **Frontend updates:** Wired Graph panel open/close and z-index stacking via `useFloatingPanels` / `usePanelStacking`, added toolbar button, and connected result selection/highlight to existing viewer selection + X-ray workflows.
+
+- **Date:** 2026-02-21
+- **Graph query API (phase 2):** Added `backend/graph_api.py` with authenticated graph endpoints for stats, neighbors, shortest path, structured query, and filtered subgraph export.
+- **Backend updates:** `main.py` now mounts the graph router under `/api/graph/*` and clears in-memory graph cache entries when a job is deleted.
+
+- **Date:** 2026-02-21
+- **Graph query layer (phase 1):** Added `backend/graph_builder.py` to build a lightweight relationship graph during IFC processing.
+- **Backend updates:** `process_ifc_file` now writes `output/{job_id}/graph.json` after metadata extraction (non-fatal if graph build fails).
+- **Dependency update:** Added `networkx` for directed multigraph build + node-link JSON serialization.
 
 - **Date:** 2026-02-19
 - **Model reopen + dedupe (phase 6):** Added persistent model listing/open endpoints so users can reopen prior uploads by `job_id` without re-uploading. Added IFC hash dedupe so identical re-uploads can reuse completed artifacts.
@@ -119,13 +157,17 @@ The system bridges the gap between complex BIM files and accessible web visualiz
 ### Backend (`/backend`)
 *   `main.py`: **Entrypoint**. Configures the FastAPI app, CORS, and routes.
 *   `config.py`: Centralized configuration (paths, constants).
+*   `models.py`: Shared Pydantic models and job status/stage enums.
+*   `tasks.py`: Background IFC-processing orchestration (`process_ifc_file`).
+*   `url_helpers.py`: Shared helpers for protected/authenticated artifact URLs.
 *   `auth_api.py`: API router for registration/login/logout/me/refresh/password-reset-stub.
 *   `auth_deps.py`: Reusable auth dependencies for resolving current user from access-cookie JWT.
 *   `auth_models.py`: Pydantic request/response models for auth endpoints.
 *   `db.py`: SQLite helpers and schema initialization for server-side maintenance logs.
 *   `ec_api.py`: API router specifically for Embodied Carbon endpoints.
 *   `ec_core.py`: Orchestrator for EC calculations.
-*   `fm_api.py`: API router for HVAC/FM analysis, space bbox, and occupancy simulation endpoints.
+*   `fm_api.py`: API router for HVAC/FM analysis endpoints.
+*   `occupancy_api.py`: API router for space-bbox extraction and occupancy simulation endpoints.
 *   `maintenance_api.py`: API router for maintenance logs CRUD and summary queries.
 *   `maintenance_models.py`: Pydantic models for maintenance log requests/responses.
 *   `work_order_api.py`: API router for work orders CRUD/list/summary endpoints.
@@ -141,13 +183,16 @@ The system bridges the gap between complex BIM files and accessible web visualiz
 *   `occupancy_sim.py`: Synthetic occupancy data generation with time-based patterns.
 *   `domain/`:
     *   `materials.py`: Material classification and extraction logic.
-    *   `geometry.py`: IfcOpenShell geometry processing.
+    *   `geometry.py`: IfcOpenShell geometry processing (volume computation + floor-footprint extraction helpers).
 *   `ifc_converter.py`: Wrapper around `IfcConvert` to generate GLB files.
 *   `ifc_metadata_extractor.py`: Parses IFC files to extract property sets into JSON.
 *   `ifc_spatial_hierarchy.py`: Extracts the building tree (Site -> Building -> Storey -> Space -> Element).
+*   `graph_api.py`: Graph-query API endpoints for per-job graph stats, neighbors, paths, and filtered traversals.
+*   `graph_builder.py`: Builds a lightweight IFC relationship graph and writes `graph.json` artifact.
+*   `utils.py`: Shared helper functions for text normalization, space identifier extraction, and IFC-file lookup by `job_id`.
 *   `prac-database.csv`: The reference database for material carbon factors.
 *   `uploads/`: Storage for raw uploaded IFC files.
-*   `output/`: Storage for processed artifacts (GLB, JSON).
+*   `output/`: Storage for processed artifacts (GLB, JSON, graph artifacts).
 
 ### Frontend (`/frontend`)
 *   `src/main.jsx`: **Entrypoint**. Bootstraps the React application.
@@ -159,6 +204,8 @@ The system bridges the gap between complex BIM files and accessible web visualiz
 *   `src/components/DraggablePanel.jsx`: Shared wrapper that handles drag/resize/focus behavior for floating tool panels.
 *   `src/components/EcPanel.jsx`: UI for triggering and displaying EC analysis results.
 *   `src/components/HvacFmPanel.jsx`: UI for HVAC/FM analysis results and filters.
+*   `src/components/GraphQueryPanel.jsx`: Graph-query UI for type/storey/material/relationship filters, related-node traversal, and model selection highlighting.
+*   `src/components/GraphView.jsx`: Reagraph-based force-graph visualization for graph query results (optional visual mode).
 *   `src/components/WorkOrdersPanel.jsx`: Floating CMMS-style work order queue linked to geometry selection.
 *   `src/components/SpaceBboxOverlay.jsx`: Renders space bbox overlays in the viewer (with optional occupancy heatmap).
 *   `src/components/SpaceNavigator.jsx`: Cycles and highlights spaces when overlays are enabled.
@@ -279,6 +326,29 @@ graph TB
 6.  **Report**: A merge report is saved to `output/{jobId}/fm_merge_report.json` for debugging.
 7.  **Display**: `PropertyPanel.jsx` displays the merged FM properties like any other Pset when an element is selected.
 
+### Data Flow: Graph Build (Phase 1)
+1.  **Process stage**: During background IFC processing, after metadata extraction, backend calls `graph_builder.py`.
+2.  **Build graph**: The module opens IFC and builds a directed multigraph of key BIM relationships (containment, decomposition, boundaries, materials, systems, HVAC feed/serve links).
+3.  **Persist**: Graph is serialized as node-link JSON to `output/{jobId}/graph.json`.
+4.  **Failure behavior**: Graph generation is non-fatal; processing continues even if graph build fails.
+
+### Data Flow: Graph Query API (Phase 2)
+1.  **Authorize**: Frontend calls `/api/graph/{jobId}/*`; backend enforces per-job ownership with `require_job_access_user`.
+2.  **Load cache**: `graph_api.py` loads `output/{jobId}/graph.json` into memory and reuses it per job while file timestamp/size stays unchanged.
+3.  **Query**: Endpoints expose graph stats, 1-hop neighbors, shortest path, structured traversal query, and filtered subgraph export.
+4.  **Invalidate**: On job deletion, backend clears the in-memory graph cache entry for that `job_id`.
+
+### Data Flow: Graph Query Panel (Phase 3)
+1.  **Open panel**: User clicks Graph in the viewer toolbar to open `GraphQueryPanel`.
+2.  **Load filter options**: Frontend calls `GET /api/graph/{jobId}/stats` to populate type/storey/material filter dropdowns.
+3.  **Run query**: Frontend posts filter/traversal criteria to `POST /api/graph/{jobId}/query` and renders returned nodes/edges in a result list.
+4.  **Model linking**: Clicking a result reuses existing selection/focus flow; "Highlight Results" reuses batch X-ray selection to emphasize all returned elements in 3D.
+
+### Data Flow: Graph Visualization (Phase 4)
+1.  **Toggle visual mode**: User clicks "Show Graph View" in `GraphQueryPanel`.
+2.  **Render network**: `GraphView.jsx` maps query `nodes` and `edges` to Reagraph graph entities and displays a force-directed layout.
+3.  **Node interaction**: Clicking a graph node reuses the same model selection callback as list rows, keeping 3D linking behavior consistent.
+
 ### Data Flow: Maintenance Logs
 1.  **Select element**: User selects an element in the viewer/tree; frontend has `jobId` and `globalId`.
 2.  **Fetch logs**: `MaintenanceLog.jsx` calls `GET /api/maintenance/{jobId}?global_id={globalId}`.
@@ -346,6 +416,7 @@ graph TB
 ### Backend
 *   **FastAPI**: Web framework.
 *   **IfcOpenShell**: Parsing and manipulating IFC files.
+*   **NetworkX**: Directed multigraph representation and node-link JSON serialization for `graph.json`.
 *   **SQLite + aiosqlite**: Lightweight async persistence for maintenance logs, work orders, auth, and job ownership.
 *   **Pandas**: Data manipulation for the EC database and material merging.
 *   **IfcConvert**: External executable (must be present in `backend/`) for geometry conversion.
@@ -355,6 +426,7 @@ graph TB
 *   **Vite**: Build tool.
 *   **Three.js / React Three Fiber**: 3D rendering engine.
 *   **Drei**: Helpers for R3F (OrbitControls, etc.).
+*   **Reagraph**: Force-directed graph visualization for query-result network view in the Graph panel.
 
 ## 6. Operational View
 

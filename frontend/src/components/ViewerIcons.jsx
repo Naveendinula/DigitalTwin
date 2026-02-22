@@ -322,3 +322,28 @@ export function WorkOrdersIcon({ size = 20, stroke = '#1d1d1f', strokeWidth = 1.
     </svg>
   )
 }
+
+export function GraphIcon({ size = 20, stroke = '#1d1d1f', strokeWidth = 1.5 }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={stroke}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="5" cy="6" r="2" />
+      <circle cx="19" cy="5" r="2" />
+      <circle cx="12" cy="12" r="2" />
+      <circle cx="6" cy="18" r="2" />
+      <circle cx="19" cy="18" r="2" />
+      <line x1="7" y1="7" x2="10.6" y2="10.6" />
+      <line x1="17" y1="6" x2="13.4" y2="10.6" />
+      <line x1="10.2" y1="13.2" x2="7.6" y2="16.2" />
+      <line x1="13.8" y1="13.2" x2="17.2" y2="16.2" />
+    </svg>
+  )
+}

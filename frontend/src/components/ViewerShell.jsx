@@ -1,5 +1,6 @@
 import AxisViewWidget from './AxisViewWidget'
 import EcPanel from './EcPanel'
+import GraphQueryPanel from './GraphQueryPanel'
 import HvacFmPanel from './HvacFmPanel'
 import IdsValidationPanel from './IdsValidationPanel'
 import KeyboardHints from './KeyboardHints'
@@ -14,15 +15,10 @@ import SpaceNavigator from './SpaceNavigator'
 import UploadPanel from './UploadPanel'
 import Viewer from './Viewer'
 import ViewerToolbar from './ViewerToolbar'
+import { useViewerContext } from '../hooks/useViewerContext'
 
-export default function ViewerShell({ 
-  containerStyle, 
-  viewer, 
-  structureTreeVisible,
-  propertiesPanelVisible,
-  onToggleStructureTree,
-  onTogglePropertiesPanel
-}) {
+export default function ViewerShell({ containerStyle }) {
+  const viewer = useViewerContext()
   const {
     modelUrls,
     jobId,
@@ -41,6 +37,8 @@ export default function ViewerShell({
     handleToggleOccupancy,
     handleToggleOccupancyPanel,
     handleToggleGeometry,
+    handleGraphSelectResult,
+    handleGraphSelectBatch,
     handleHvacSelectDetail,
     handleTreeSelect,
     handleSceneReady,
@@ -60,6 +58,7 @@ export default function ViewerShell({
     onFitToModel: viewModeState.fitToModel,
     onOpenEcPanel: floatingPanels.handleToggleEcPanel,
     onOpenHvacPanel: floatingPanels.handleToggleHvacPanel,
+    onOpenGraphPanel: floatingPanels.handleToggleGraphPanel,
     onOpenWorkOrdersPanel: floatingPanels.handleToggleWorkOrdersPanel,
     onOpenIdsValidationPanel: floatingPanels.handleToggleIdsValidationPanel,
     onToggleSpaceOverlay: spaceOverlay.toggleSpaceOverlay,
@@ -162,6 +161,17 @@ export default function ViewerShell({
     zIndex: floatingPanels.idsValidationPanelZIndex
   }
 
+  const graphQueryPanelProps = {
+    isOpen: floatingPanels.graphPanelOpen,
+    onClose: floatingPanels.handleCloseGraphPanel,
+    jobId,
+    selectedId: selection.selectedId,
+    onSelectResult: handleGraphSelectResult,
+    onSelectResultBatch: handleGraphSelectBatch,
+    focusToken: floatingPanels.graphPanelZIndex,
+    zIndex: floatingPanels.graphPanelZIndex
+  }
+
   const workOrdersPanelProps = {
     isOpen: floatingPanels.workOrdersPanelOpen,
     onClose: floatingPanels.handleCloseWorkOrdersPanel,
@@ -246,6 +256,7 @@ export default function ViewerShell({
 
       <EcPanel {...ecPanelProps} />
       <HvacFmPanel {...hvacPanelProps} />
+      <GraphQueryPanel {...graphQueryPanelProps} />
       <IdsValidationPanel {...idsValidationPanelProps} />
       <WorkOrdersPanel {...workOrdersPanelProps} />
       <OccupancyPanel {...occupancyPanelProps} />

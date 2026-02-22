@@ -9,22 +9,25 @@ import uuid
 import json
 import shutil
 import hashlib
+import logging
+import os
+import time
+from collections import deque
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Optional
 from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Depends, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from fastapi.responses import FileResponse, JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 import asyncio
-from enum import Enum
 
 # Import our conversion modules
-from ifc_converter import convert_ifc_to_glb
 from ifc_metadata_extractor import extract_metadata, save_metadata, METADATA_SCHEMA_VERSION
-from ifc_spatial_hierarchy import extract_spatial_hierarchy, save_hierarchy
 from ec_api import router as ec_router
 from fm_api import router as fm_router
+from occupancy_api import router as occupancy_router
+from graph_api import router as graph_router, invalidate_graph_cache
 from validation_api import router as validation_router
 from maintenance_api import router as maintenance_router
 from work_order_api import router as work_order_router
@@ -32,6 +35,7 @@ from cmms_sync_api import router as cmms_sync_router
 from auth_api import router as auth_router
 from auth_deps import get_current_user, get_current_user_optional
 from config import (
+    APP_ENV,
     FRONTEND_ORIGINS,
     MAX_FM_SIDECAR_UPLOAD_BYTES,
     MAX_IFC_UPLOAD_BYTES,
@@ -54,18 +58,64 @@ from job_security import (
     update_job_record_status,
     user_can_access_job,
 )
-from fm_sidecar_merger import find_fm_sidecar, merge_fm_sidecar
-from db import init_db
+from fm_sidecar_merger import merge_fm_sidecar
+from db import close_db_pool, init_db
+from models import ConversionJob, JobStage, JobStatus, UserModelSummary
+from tasks import process_ifc_file
+from utils import find_ifc_for_job
+from url_helpers import build_authenticated_file_url, build_protected_file_url
 
 
 # Ensure directories exist
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
+
+class _JsonFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        payload = {
+            "timestamp": self.formatTime(record, "%Y-%m-%dT%H:%M:%S%z"),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+        }
+        if record.exc_info:
+            payload["exception"] = self.formatException(record.exc_info)
+        return json.dumps(payload, ensure_ascii=False)
+
+
+def _configure_logging() -> None:
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+    root_logger.handlers.clear()
+
+    handler = logging.StreamHandler()
+    if APP_ENV == "production":
+        handler.setFormatter(_JsonFormatter())
+    else:
+        handler.setFormatter(
+            logging.Formatter("%(asctime)s %(levelname)s [%(name)s] %(message)s")
+        )
+
+    root_logger.addHandler(handler)
+
+
+logger = logging.getLogger(__name__)
+RATE_LIMIT_WINDOW_SECONDS = max(1, int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60")))
+RATE_LIMIT_MAX_REQUESTS = max(1, int(os.getenv("RATE_LIMIT_MAX_REQUESTS", "180")))
+RATE_LIMIT_EXEMPT_PATHS = {"/health"}
+_rate_limit_buckets: dict[str, deque[float]] = {}
+_rate_limit_lock = asyncio.Lock()
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    _configure_logging()
     await init_db()
-    yield
+    try:
+        yield
+    finally:
+        await close_db_pool()
 
 
 # Create FastAPI app
@@ -79,6 +129,8 @@ app = FastAPI(
 # Include EC router
 app.include_router(ec_router)
 app.include_router(fm_router)
+app.include_router(occupancy_router)
+app.include_router(graph_router)
 app.include_router(validation_router)
 app.include_router(maintenance_router)
 app.include_router(work_order_router)
@@ -90,9 +142,86 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=FRONTEND_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "X-CSRF-Token", "Authorization"],
 )
+
+
+def _get_client_ip(request: Request) -> str:
+    forwarded_for = request.headers.get("x-forwarded-for")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    if request.client and request.client.host:
+        return request.client.host
+    return "unknown"
+
+
+@app.middleware("http")
+async def rate_limit_requests(request: Request, call_next):
+    if request.method == "OPTIONS" or request.url.path in RATE_LIMIT_EXEMPT_PATHS:
+        return await call_next(request)
+
+    key = f"{_get_client_ip(request)}:{request.url.path}"
+    now = time.time()
+    retry_after = None
+
+    async with _rate_limit_lock:
+        bucket = _rate_limit_buckets.get(key)
+        if bucket is None:
+            bucket = deque()
+            _rate_limit_buckets[key] = bucket
+
+        cutoff = now - RATE_LIMIT_WINDOW_SECONDS
+        while bucket and bucket[0] <= cutoff:
+            bucket.popleft()
+
+        if len(bucket) >= RATE_LIMIT_MAX_REQUESTS:
+            retry_after = max(1, int(bucket[0] + RATE_LIMIT_WINDOW_SECONDS - now))
+        else:
+            bucket.append(now)
+
+        if not bucket:
+            _rate_limit_buckets.pop(key, None)
+
+    if retry_after is not None:
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "Too many requests"},
+            headers={"Retry-After": str(retry_after)},
+        )
+
+    return await call_next(request)
+
+
+@app.exception_handler(StarletteHTTPException)
+async def handle_http_exception(request: Request, exc: StarletteHTTPException):
+    if exc.status_code >= 500:
+        logger.error(
+            "Sanitizing HTTP %s response for %s %s",
+            exc.status_code,
+            request.method,
+            request.url.path,
+        )
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": "Internal server error"},
+            headers=exc.headers or {},
+        )
+
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers=exc.headers or {},
+    )
+
+
+@app.exception_handler(Exception)
+async def handle_unexpected_exception(request: Request, exc: Exception):
+    logger.exception("Unhandled exception on %s %s: %s", request.method, request.url.path, exc)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+    )
 
 
 @app.middleware("http")
@@ -109,45 +238,6 @@ async def add_security_headers(request: Request, call_next):
     return response
 
 
-class JobStatus(str, Enum):
-    PENDING = "pending"
-    PROCESSING = "processing"
-    COMPLETED = "completed"
-    FAILED = "failed"
-
-class JobStage(str, Enum):
-    QUEUED = "queued"
-    CONVERTING_GLB = "converting_glb"
-    EXTRACTING_METADATA = "extracting_metadata"
-    EXTRACTING_HIERARCHY = "extracting_hierarchy"
-    FINALIZING = "finalizing"
-    COMPLETED = "completed"
-    FAILED = "failed"
-
-class ConversionJob(BaseModel):
-    job_id: str
-    status: JobStatus
-    ifc_filename: str
-    ifc_schema: Optional[str] = None
-    stage: Optional[JobStage] = None
-    glb_url: Optional[str] = None
-    metadata_url: Optional[str] = None
-    hierarchy_url: Optional[str] = None
-    error: Optional[str] = None
-    fm_params_filename: Optional[str] = None  # FM sidecar filename if provided
-
-
-class UserModelSummary(BaseModel):
-    job_id: str
-    ifc_filename: str
-    ifc_schema: Optional[str] = None
-    status: JobStatus
-    created_at: str
-    updated_at: Optional[str] = None
-    last_opened_at: Optional[str] = None
-    has_geometry: bool = False
-
-
 # In-memory job storage (use Redis/DB in production)
 jobs: dict[str, ConversionJob] = {}
 
@@ -159,14 +249,6 @@ def _sanitize_filename(filename: str) -> str:
     if cleaned in {".", ".."}:
         raise HTTPException(status_code=400, detail="Invalid filename")
     return cleaned
-
-
-def _build_protected_file_url(job_id: str, filename: str, file_access_token: str) -> str:
-    return f"/files/{job_id}/{filename}?t={file_access_token}"
-
-
-def _build_authenticated_file_url(job_id: str, filename: str) -> str:
-    return f"/files/{job_id}/{filename}"
 
 
 def _coerce_job_status(value: str | None) -> JobStatus:
@@ -208,13 +290,13 @@ def _build_persisted_job(
         stage = JobStage.COMPLETED
         error = None
         if file_access_token:
-            glb_url = _build_protected_file_url(job_id, "model.glb", file_access_token) if glb_exists else None
-            metadata_url = _build_protected_file_url(job_id, "metadata.json", file_access_token)
-            hierarchy_url = _build_protected_file_url(job_id, "hierarchy.json", file_access_token)
+            glb_url = build_protected_file_url(job_id, "model.glb", file_access_token) if glb_exists else None
+            metadata_url = build_protected_file_url(job_id, "metadata.json", file_access_token)
+            hierarchy_url = build_protected_file_url(job_id, "hierarchy.json", file_access_token)
         else:
-            glb_url = _build_authenticated_file_url(job_id, "model.glb") if glb_exists else None
-            metadata_url = _build_authenticated_file_url(job_id, "metadata.json")
-            hierarchy_url = _build_authenticated_file_url(job_id, "hierarchy.json")
+            glb_url = build_authenticated_file_url(job_id, "model.glb") if glb_exists else None
+            metadata_url = build_authenticated_file_url(job_id, "metadata.json")
+            hierarchy_url = build_authenticated_file_url(job_id, "hierarchy.json")
     else:
         status = _coerce_job_status(record.get("status"))
         stage = _coerce_job_stage(None, status)
@@ -281,203 +363,6 @@ def check_metadata_schema(metadata_path: Path) -> int:
         return 0
 
 
-async def process_ifc_file(
-    job_id: str,
-    ifc_path: Path,
-    sidecar_path: Optional[Path] = None,
-    file_access_token: Optional[str] = None,
-) -> None:
-    """
-    Background task to process IFC file.
-    Converts to GLB and extracts metadata.
-    
-    Args:
-        job_id: The job ID
-        ifc_path: Path to the uploaded IFC file
-        sidecar_path: Optional path to FM sidecar JSON file
-    """
-    job = jobs.get(job_id)
-    if not job:
-        return
-    
-    try:
-        job.status = JobStatus.PROCESSING
-        job.stage = JobStage.CONVERTING_GLB
-        await update_job_record_status(job_id, status=JobStatus.PROCESSING.value)
-        
-        # Create output directory for this job
-        job_output_dir = OUTPUT_DIR / job_id
-        job_output_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Define output paths
-        glb_path = job_output_dir / "model.glb"
-        metadata_path = job_output_dir / "metadata.json"
-        hierarchy_path = job_output_dir / "hierarchy.json"
-        
-        # Run conversions (these are CPU-bound, run in thread pool)
-        loop = asyncio.get_event_loop()
-        
-        # 1. Convert IFC to GLB (optional - may fail for geometry-less test files)
-        print(f"[{job_id}] Converting IFC to GLB...")
-        glb_conversion_success = False
-        try:
-            await loop.run_in_executor(
-                None, 
-                convert_ifc_to_glb, 
-                str(ifc_path), 
-                str(glb_path)
-            )
-            glb_conversion_success = True
-            print(f"[{job_id}] GLB conversion successful")
-        except Exception as glb_err:
-            print(f"[{job_id}] GLB conversion failed (non-fatal for data-only files): {glb_err}")
-            # Continue processing - file may still contain metadata and hierarchy
-        
-        # 2. Extract metadata (always uses latest schema)
-        job.stage = JobStage.EXTRACTING_METADATA
-        print(f"[{job_id}] Extracting metadata (schema v{METADATA_SCHEMA_VERSION})...")
-        try:
-            metadata = await loop.run_in_executor(
-                None,
-                extract_metadata,
-                str(ifc_path),
-                job.ifc_filename
-            )
-            
-            if "ifcSchema" in metadata:
-                job.ifc_schema = metadata["ifcSchema"]
-                await update_job_record_status(
-                    job_id,
-                    status=JobStatus.PROCESSING.value,
-                    ifc_schema=job.ifc_schema,
-                )
-
-            await loop.run_in_executor(
-                None,
-                save_metadata,
-                metadata,
-                str(metadata_path)
-            )
-            
-            # 2b. Merge FM sidecar if present (explicit path or auto-discovered)
-            fm_sidecar = sidecar_path  # Use explicit path if provided
-            if not fm_sidecar:
-                # Fallback: auto-discover sidecar in upload directory
-                fm_sidecar = find_fm_sidecar(job.ifc_filename, ifc_path.parent)
-            
-            if fm_sidecar and fm_sidecar.exists():
-                print(f"[{job_id}] Found FM sidecar: {fm_sidecar.name}")
-                try:
-                    merge_result = await loop.run_in_executor(
-                        None,
-                        merge_fm_sidecar,
-                        metadata_path,
-                        fm_sidecar
-                    )
-                    print(f"[{job_id}] FM sidecar merged: {merge_result['elements_merged']} elements")
-                    print(f"[{job_id}]   - Elements in sidecar: {merge_result['elements_in_sidecar']}")
-                    print(f"[{job_id}]   - Elements not found in IFC: {merge_result['elements_not_found']}")
-                    
-                    # Save merge report for debugging
-                    merge_report_path = job_output_dir / "fm_merge_report.json"
-                    with open(merge_report_path, 'w', encoding='utf-8') as f:
-                        json.dump(merge_result, f, indent=2)
-                except Exception as fm_err:
-                    print(f"[{job_id}] FM sidecar merge failed (non-fatal): {fm_err}")
-                    # Continue processing - sidecar errors should not fail the job
-        except Exception as meta_err:
-            print(f"[{job_id}] Metadata extraction failed (non-fatal): {meta_err}")
-            # Save minimal fallback metadata
-            fallback_metadata = {
-                "schemaVersion": METADATA_SCHEMA_VERSION,
-                "ifcSchema": "UNKNOWN",
-                "fileName": job.ifc_filename,
-                "orientation": {"modelYawDeg": 0, "trueNorthDeg": 0, "orientationSource": "default"},
-                "elements": {}
-            }
-            await loop.run_in_executor(
-                None,
-                save_metadata,
-                fallback_metadata,
-                str(metadata_path)
-            )
-
-        
-        # 3. Extract spatial hierarchy
-        job.stage = JobStage.EXTRACTING_HIERARCHY
-        print(f"[{job_id}] Extracting spatial hierarchy...")
-        try:
-            hierarchy = await loop.run_in_executor(
-                None,
-                extract_spatial_hierarchy,
-                str(ifc_path)
-            )
-            await loop.run_in_executor(
-                None,
-                save_hierarchy,
-                hierarchy,
-                str(hierarchy_path)
-            )
-        except Exception as hier_err:
-             print(f"[{job_id}] Hierarchy extraction failed (non-fatal): {hier_err}")
-             # Create a minimal fallback hierarchy so frontend doesn't break
-             fallback_hierarchy = {
-                 "type": "IfcProject",
-                 "name": "Hierarchy Extraction Failed",
-                 "globalId": "0000000000000000000000",
-                 "children": [],
-                 "properties": {}
-             }
-             await loop.run_in_executor(
-                None,
-                save_hierarchy,
-                fallback_hierarchy, 
-                str(hierarchy_path)
-            )
-
-        # Update job with URLs
-        job.stage = JobStage.FINALIZING
-        job.status = JobStatus.COMPLETED
-        job.stage = JobStage.COMPLETED
-        # Only include GLB URL if conversion succeeded
-        if glb_conversion_success:
-            if file_access_token:
-                job.glb_url = _build_protected_file_url(job_id, "model.glb", file_access_token)
-            else:
-                job.glb_url = f"/files/{job_id}/model.glb"
-        else:
-            job.glb_url = None  # No geometry available
-        if file_access_token:
-            job.metadata_url = _build_protected_file_url(job_id, "metadata.json", file_access_token)
-            job.hierarchy_url = _build_protected_file_url(job_id, "hierarchy.json", file_access_token)
-        else:
-            job.metadata_url = f"/files/{job_id}/metadata.json"
-            job.hierarchy_url = f"/files/{job_id}/hierarchy.json"
-        
-        print(f"[{job_id}] Processing completed successfully")
-        await update_job_record_status(
-            job_id,
-            status=JobStatus.COMPLETED.value,
-            ifc_schema=job.ifc_schema,
-        )
-        
-    except Exception as e:
-        print(f"[{job_id}] Processing failed: {e}")
-        job.status = JobStatus.FAILED
-        job.stage = JobStage.FAILED
-        job.error = str(e)
-        await update_job_record_status(
-            job_id,
-            status=JobStatus.FAILED.value,
-            ifc_schema=job.ifc_schema,
-        )
-    
-    finally:
-        # Clean up uploaded IFC file (optional - keep for debugging)
-        # ifc_path.unlink(missing_ok=True)
-        pass
-
-
 @app.post("/upload", response_model=ConversionJob)
 async def upload_ifc(
     background_tasks: BackgroundTasks,
@@ -534,7 +419,7 @@ async def upload_ifc(
                 sidecar_path,
                 max_bytes=MAX_FM_SIDECAR_UPLOAD_BYTES,
             )
-            print(f"[{job_id}] FM sidecar saved: {fm_params.filename}")
+            logger.info("[%s] FM sidecar saved: %s", job_id, fm_params.filename)
         except ValueError as exc:
             sidecar_path = None
             fm_params_filename = None
@@ -542,7 +427,7 @@ async def upload_ifc(
         except HTTPException:
             raise
         except Exception as e:
-            print(f"[{job_id}] Warning: Failed to save FM sidecar: {e}")
+            logger.warning("[%s] Failed to save FM sidecar: %s", job_id, e)
             sidecar_path = None
             fm_params_filename = None
         finally:
@@ -601,6 +486,7 @@ async def upload_ifc(
 
     background_tasks.add_task(
         process_ifc_file,
+        jobs,
         job_id,
         ifc_path,
         sidecar_path,
@@ -721,6 +607,7 @@ async def delete_job(job_id: str, current_user: dict[str, Any] = Depends(get_cur
     job_output_dir = OUTPUT_DIR / job_id
     if job_output_dir.exists():
         shutil.rmtree(job_output_dir)
+    invalidate_graph_cache(job_id)
     
     # Remove from jobs dict
     if job_id in jobs:
@@ -781,18 +668,17 @@ async def upgrade_metadata_schema(
         }
     
     # Find the original IFC file
-    ifc_files = list(UPLOAD_DIR.glob(f"{job_id}_*.ifc"))
-    if not ifc_files:
+    try:
+        ifc_path = find_ifc_for_job(job_id, UPLOAD_DIR)
+    except FileNotFoundError:
         raise HTTPException(
             status_code=404, 
             detail="Original IFC file not found. Cannot upgrade metadata without source file."
         )
     
-    ifc_path = ifc_files[0]
-    
     # Re-extract metadata with latest schema
     try:
-        print(f"[{job_id}] Upgrading metadata to schema v{METADATA_SCHEMA_VERSION}...")
+        logger.info("[%s] Upgrading metadata to schema v%s...", job_id, METADATA_SCHEMA_VERSION)
         metadata = extract_metadata(str(ifc_path))
         save_metadata(metadata, str(metadata_path))
         

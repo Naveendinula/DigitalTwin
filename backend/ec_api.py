@@ -4,20 +4,21 @@ FastAPI router exposing an endpoint to compute embodied carbon
 from an uploaded IFC model (identified by job_id).
 """
 
-from pathlib import Path
-import glob
 from typing import Dict, Optional
+import logging
+import json
 
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-import traceback
 
 from auth_deps import get_current_user
 from ec_core import compute_ec_from_ifc
-from config import UPLOAD_DIR, EC_DB_PATH
+from config import UPLOAD_DIR, OUTPUT_DIR, EC_DB_PATH
 from job_security import ensure_job_access
+from utils import find_ifc_for_job
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # --- Request Models for Overrides ---
 
@@ -54,22 +55,22 @@ async def calculate_ec(
             detail=f"EC database not found at {EC_DB_PATH}",
         )
 
-    # Find the file in uploads directory starting with job_id
-    # The pattern is {job_id}_*.ifc
-    search_pattern = str(UPLOAD_DIR / f"{job_id}_*.ifc")
-    matching_files = glob.glob(search_pattern)
-    
-    if not matching_files:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No IFC file found for job ID {job_id}",
-        )
-        
-    # Use the first matching file
-    ifc_path = Path(matching_files[0])
+    try:
+        ifc_path = find_ifc_for_job(job_id, UPLOAD_DIR)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
     # Extract overrides if present
     overrides_dict = request.overrides.dict() if request and request.overrides else None
+    use_cache = overrides_dict is None
+    cache_path = OUTPUT_DIR / job_id / "ec_results.json"
+
+    if use_cache and cache_path.exists():
+        try:
+            with cache_path.open("r", encoding="utf-8") as cache_file:
+                return json.load(cache_file)
+        except Exception as cache_err:
+            logger.warning("Failed to read EC cache for job %s: %s", job_id, cache_err)
 
     # Compute EC
     try:
@@ -79,11 +80,18 @@ async def calculate_ec(
             overrides=overrides_dict
         )
     except Exception as e:
-        print(f"Error calculating EC: {e}")
-        traceback.print_exc()
+        logger.exception("Error calculating EC for job %s: %s", job_id, e)
         raise HTTPException(
             status_code=500,
             detail=f"EC calculation failed: {type(e).__name__}: {e}",
         )
+
+    if use_cache:
+        try:
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            with cache_path.open("w", encoding="utf-8") as cache_file:
+                json.dump(result, cache_file, ensure_ascii=False)
+        except Exception as cache_err:
+            logger.warning("Failed to write EC cache for job %s: %s", job_id, cache_err)
 
     return result

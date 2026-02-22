@@ -4,6 +4,7 @@ import usePanelStacking from './usePanelStacking'
 export default function useFloatingPanels(disableXRay) {
   const [ecPanelOpen, setEcPanelOpen] = useState(false)
   const [hvacPanelOpen, setHvacPanelOpen] = useState(false)
+  const [graphPanelOpen, setGraphPanelOpen] = useState(false)
   const [idsValidationPanelOpen, setIdsValidationPanelOpen] = useState(false)
   const [workOrdersPanelOpen, setWorkOrdersPanelOpen] = useState(false)
   const panelStacking = usePanelStacking()
@@ -17,6 +18,10 @@ export default function useFloatingPanels(disableXRay) {
     setHvacPanelOpen(false)
     disableXRay()
   }, [disableXRay])
+
+  const handleCloseGraphPanel = useCallback(() => {
+    setGraphPanelOpen(false)
+  }, [])
 
   const handleCloseIdsValidationPanel = useCallback(() => {
     setIdsValidationPanelOpen(false)
@@ -45,6 +50,16 @@ export default function useFloatingPanels(disableXRay) {
       onClose: handleCloseHvacPanel
     })
   }, [panelStacking.togglePanel, panelStacking.hvacPanelZIndex, panelStacking.setHvacPanelZIndex, hvacPanelOpen, handleCloseHvacPanel])
+
+  const handleToggleGraphPanel = useCallback(() => {
+    panelStacking.togglePanel({
+      isOpen: graphPanelOpen,
+      panelZIndex: panelStacking.graphPanelZIndex,
+      setIsOpen: setGraphPanelOpen,
+      setPanelZIndex: panelStacking.setGraphPanelZIndex,
+      onClose: handleCloseGraphPanel
+    })
+  }, [panelStacking.togglePanel, panelStacking.graphPanelZIndex, panelStacking.setGraphPanelZIndex, graphPanelOpen, handleCloseGraphPanel])
 
   const handleToggleIdsValidationPanel = useCallback(() => {
     panelStacking.togglePanel({
@@ -80,18 +95,22 @@ export default function useFloatingPanels(disableXRay) {
   return {
     ecPanelOpen,
     hvacPanelOpen,
+    graphPanelOpen,
     idsValidationPanelOpen,
     workOrdersPanelOpen,
     ecPanelZIndex: panelStacking.ecPanelZIndex,
     hvacPanelZIndex: panelStacking.hvacPanelZIndex,
+    graphPanelZIndex: panelStacking.graphPanelZIndex,
     idsValidationPanelZIndex: panelStacking.idsValidationPanelZIndex,
     workOrdersPanelZIndex: panelStacking.workOrdersPanelZIndex,
     handleCloseEcPanel,
     handleCloseHvacPanel,
+    handleCloseGraphPanel,
     handleCloseIdsValidationPanel,
     handleCloseWorkOrdersPanel,
     handleToggleEcPanel,
     handleToggleHvacPanel,
+    handleToggleGraphPanel,
     handleToggleIdsValidationPanel,
     handleToggleWorkOrdersPanel,
     handleOpenWorkOrdersPanel

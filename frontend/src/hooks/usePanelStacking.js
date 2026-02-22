@@ -6,6 +6,7 @@ export default function usePanelStacking() {
   const [panelZCounter, setPanelZCounter] = useState(INITIAL_PANEL_Z_INDEX)
   const [ecPanelZIndex, setEcPanelZIndex] = useState(INITIAL_PANEL_Z_INDEX)
   const [hvacPanelZIndex, setHvacPanelZIndex] = useState(INITIAL_PANEL_Z_INDEX)
+  const [graphPanelZIndex, setGraphPanelZIndex] = useState(INITIAL_PANEL_Z_INDEX)
   const [idsValidationPanelZIndex, setIdsValidationPanelZIndex] = useState(INITIAL_PANEL_Z_INDEX)
   const [workOrdersPanelZIndex, setWorkOrdersPanelZIndex] = useState(INITIAL_PANEL_Z_INDEX)
 
@@ -41,10 +42,12 @@ export default function usePanelStacking() {
   return {
     ecPanelZIndex,
     hvacPanelZIndex,
+    graphPanelZIndex,
     idsValidationPanelZIndex,
     workOrdersPanelZIndex,
     setEcPanelZIndex,
     setHvacPanelZIndex,
+    setGraphPanelZIndex,
     setIdsValidationPanelZIndex,
     setWorkOrdersPanelZIndex,
     togglePanel

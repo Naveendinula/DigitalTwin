@@ -1,8 +1,13 @@
 """Test script for IDS validation."""
+import logging
 import ifcopenshell
 import ifctester
 import ifctester.ids
 import os
+
+logger = logging.getLogger(__name__)
+if not logging.getLogger().handlers:
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
 
 # Create a minimal IFC file
 ifc_content = '''ISO-10303-21;
@@ -53,33 +58,33 @@ ids_content = '''<?xml version="1.0" encoding="utf-8"?>
 with open('test_temp.ids', 'w') as f:
     f.write(ids_content)
 
-print('Loading IFC...')
+logger.info('Loading IFC...')
 ifc_model = ifcopenshell.open('test_temp.ifc')
-print(f'IFC loaded: {ifc_model}')
-print(f'Walls in IFC: {ifc_model.by_type("IfcWall")}')
+logger.info(f'IFC loaded: {ifc_model}')
+logger.info(f'Walls in IFC: {ifc_model.by_type("IfcWall")}')
 
-print('\nLoading IDS...')
+logger.info('\nLoading IDS...')
 ids_obj = ifctester.ids.open('test_temp.ids')
-print(f'IDS loaded: {ids_obj}')
+logger.info(f'IDS loaded: {ids_obj}')
 
-print('\nValidating...')
+logger.info('\nValidating...')
 try:
     ids_obj.validate(ifc_model)
-    print('Validation completed!')
+    logger.info('Validation completed!')
 except Exception as e:
-    print(f'Validation error: {e}')
+    logger.error(f'Validation error: {e}')
     import traceback
     traceback.print_exc()
 
-print('\nResults:')
+logger.info('\nResults:')
 for spec in ids_obj.specifications:
-    print(f'  Spec: {spec.name}')
-    print(f'  Status: {spec.status}')
+    logger.info(f'  Spec: {spec.name}')
+    logger.info(f'  Status: {spec.status}')
     if hasattr(spec, 'applicable_entities'):
-        print(f'  Applicable entities: {len(spec.applicable_entities)}')
+        logger.info(f'  Applicable entities: {len(spec.applicable_entities)}')
         for entity in spec.applicable_entities:
-            print(f'    - {entity}')
-    print()
+            logger.info(f'    - {entity}')
+    logger.info("")
 
 # Cleanup
 os.remove('test_temp.ifc')

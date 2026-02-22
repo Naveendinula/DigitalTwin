@@ -10,6 +10,7 @@ from typing import Any, Dict, Iterable, Optional
 import ifcopenshell
 from ifcopenshell.util import element as ifc_element
 from ifcopenshell.util import system as ifc_system
+from utils import clean_text as _clean_text, extract_space_identifiers as _extract_space_identifiers
 
 
 DEFAULT_MAX_DEPTH = 35
@@ -42,12 +43,6 @@ TERMINAL_TYPE_HINTS = (
     "IfcAirTerminal",
     "IfcFlowTerminal",
 )
-
-
-def _clean_text(value: Any) -> str:
-    if value is None:
-        return ""
-    return str(value).strip()
 
 
 def _element_key(element) -> str:
@@ -168,42 +163,6 @@ def _get_storey_name(element) -> Optional[str]:
         name = _clean_text(getattr(storey, "Name", None))
         return name or _element_key(storey)
     return None
-
-
-def _extract_space_identifiers(space, psets: dict[str, Any]) -> tuple[str, str]:
-    number = ""
-    for _, props in psets.items():
-        if not isinstance(props, dict):
-            continue
-        for key, value in props.items():
-            if key.lower() in ("number", "roomnumber", "space_number", "space number"):
-                number = _clean_text(value)
-                break
-        if number:
-            break
-
-    base_name = _clean_text(getattr(space, "Name", None))
-    long_name = _clean_text(getattr(space, "LongName", None))
-
-    room_no = number
-    room_name = ""
-
-    if not room_no and base_name and long_name:
-        room_no = base_name
-
-    if not room_no and base_name:
-        tokens = base_name.split()
-        if len(tokens) > 1 and any(char.isdigit() for char in tokens[0]):
-            room_no = tokens[0]
-            room_name = " ".join(tokens[1:]).strip()
-
-    if not room_name:
-        if long_name:
-            room_name = long_name
-        elif base_name and base_name != room_no:
-            room_name = base_name
-
-    return room_no, room_name
 
 
 def _get_space_info(element) -> Optional[dict[str, str]]:

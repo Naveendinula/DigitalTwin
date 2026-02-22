@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react'
 import * as THREE from 'three'
-import { buildMeshIndex, getMeshesForIds, isMeshMatchingIds } from '../utils/sceneIndex'
+import { buildMeshIndex, getMeshesForIds, isLikelyGlobalId, isMeshMatchingIds } from '../utils/sceneIndex'
 import { debugLog, debugWarn } from '../utils/logger'
 
 /**
@@ -76,9 +76,20 @@ function useXRayMode() {
 
   const buildSceneIndex = useCallback((scene) => {
     if (!scene) return
-    const { index, meshes } = buildMeshIndex(scene, { ancestorDepth: 5 })
+    // Only index IFC-like meshes (by GlobalId/userData or GlobalId-like ancestor names).
+    // This avoids applying X-ray materials to overlay text/auxiliary meshes (e.g. troika Text).
+    const { index, meshes } = buildMeshIndex(scene, {
+      ancestorDepth: 5,
+      includeName: false,
+      includeUserData: true,
+      filterAncestorNames: isLikelyGlobalId
+    })
     meshIndexRef.current = index
-    allMeshesRef.current = meshes
+    const indexedMeshes = new Set()
+    index.forEach((meshSet) => {
+      meshSet.forEach((mesh) => indexedMeshes.add(mesh))
+    })
+    allMeshesRef.current = indexedMeshes.size > 0 ? Array.from(indexedMeshes) : meshes
   }, [])
 
   /**
@@ -87,7 +98,16 @@ function useXRayMode() {
    * @param {boolean} isSelected - Whether this mesh is selected
    */
   const setXRayForMesh = useCallback((mesh, isSelected, mode) => {
-    if (!mesh.isMesh || !mesh.material) return
+    if (!mesh.isMesh) return
+
+    let currentMaterial = null
+    try {
+      currentMaterial = mesh.material
+    } catch {
+      // Some custom meshes (e.g. troika text internals) can throw on material access.
+      return
+    }
+    if (!currentMaterial || Array.isArray(currentMaterial)) return
     
     // Skip meshes that are part of helpers, grids, etc.
     if (mesh.type === 'GridHelper' || mesh.type === 'AxesHelper') return
@@ -99,8 +119,8 @@ function useXRayMode() {
     
     if (!originalMat) {
         // If not in userData, check if current is safe to store
-        if (!mesh.material.userData?.isXRay && !mesh.material.userData?.isHighlight) {
-            originalMat = mesh.material
+        if (!currentMaterial.userData?.isXRay && !currentMaterial.userData?.isHighlight) {
+            originalMat = currentMaterial
             mesh.userData.originalMaterial = originalMat
         }
     }
@@ -112,7 +132,7 @@ function useXRayMode() {
       })
     }
     
-    if (!isSelected && mesh.material.userData?.isHighlight) {
+    if (!isSelected && currentMaterial.userData?.isHighlight) {
       // Preserve selection highlight even if ID matching fails while X-ray is active.
       return
     }
@@ -120,7 +140,7 @@ function useXRayMode() {
     if (isSelected) {
       // Keep original material for selected meshes
       // If it's already highlighted, don't overwrite it
-      if (mesh.material.userData?.isHighlight) {
+      if (currentMaterial.userData?.isHighlight) {
         return
       }
 
@@ -193,31 +213,26 @@ function useXRayMode() {
         // Prefer userData.originalMaterial
         const restoreMat = mesh.userData.originalMaterial || material
         
-        if (mesh.material !== restoreMat) {
-            // Dispose X-ray material if it's different and is actually an X-ray material
-            if (mesh.material.userData?.isXRay && mesh.material.dispose) {
+         let meshMaterial = null
+         try {
+           meshMaterial = mesh.material
+         } catch {
+           return
+         }
+
+         if (meshMaterial !== restoreMat) {
+             // Dispose X-ray material if it's different and is actually an X-ray material
+            if (meshMaterial?.userData?.isXRay && meshMaterial.dispose) {
                 // Don't dispose the shared cached material!
                 // Only dispose if it's a clone
-                if (mesh.material !== xRayMaterialRef.current && mesh.material !== ghostMaterialRef.current) {
-                    mesh.material.dispose()
+                if (meshMaterial !== xRayMaterialRef.current && meshMaterial !== ghostMaterialRef.current) {
+                    meshMaterial.dispose()
                 }
             }
             mesh.material = restoreMat
-        }
+         }
       }
     })
-    
-    // Also iterate through scene to catch any stragglers that might be in X-ray mode 
-    // but missed in the map (e.g. if added later)
-    if (sceneRef.current) {
-        sceneRef.current.traverse((object) => {
-            if (object.isMesh && object.material && object.material.userData?.isXRay) {
-                if (object.userData.originalMaterial) {
-                    object.material = object.userData.originalMaterial
-                }
-            }
-        })
-    }
     
     // Clear the stored materials
     originalMaterialsRef.current.clear()

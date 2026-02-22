@@ -4,10 +4,40 @@ SQLite database helpers for lightweight server-side features.
 
 from pathlib import Path
 from datetime import datetime, timezone
+import asyncio
+import os
+from typing import Optional
 
 import aiosqlite
 
 from config import DB_PATH
+
+DB_POOL_SIZE = max(1, int(os.getenv("DB_POOL_SIZE", "5")))
+
+_db_pool_lock: Optional[asyncio.Lock] = None
+_db_pool_queue: Optional[asyncio.Queue[aiosqlite.Connection]] = None
+_db_pool_semaphore: Optional[asyncio.Semaphore] = None
+
+
+class PooledConnection:
+    def __init__(self, connection: aiosqlite.Connection):
+        self._connection = connection
+        self._released = False
+
+    def __getattr__(self, name):
+        return getattr(self._connection, name)
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        await self.close()
+
+    async def close(self) -> None:
+        if self._released:
+            return
+        self._released = True
+        await _release_db_connection(self._connection)
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS maintenance_logs (
@@ -286,10 +316,7 @@ async def _migrate_maintenance_logs_to_work_orders(db: aiosqlite.Connection) -> 
         )
 
 
-async def get_db() -> aiosqlite.Connection:
-    """
-    Open a configured SQLite connection.
-    """
+async def _create_db_connection() -> aiosqlite.Connection:
     db = await aiosqlite.connect(Path(DB_PATH))
     db.row_factory = aiosqlite.Row
     await db.execute("PRAGMA foreign_keys = ON")
@@ -298,6 +325,75 @@ async def get_db() -> aiosqlite.Connection:
     await db.execute("PRAGMA cache_size = -8000")
     await db.execute("PRAGMA busy_timeout = 5000")
     return db
+
+
+async def _ensure_pool_ready() -> None:
+    global _db_pool_lock, _db_pool_queue, _db_pool_semaphore
+    if _db_pool_lock is None:
+        _db_pool_lock = asyncio.Lock()
+
+    async with _db_pool_lock:
+        if _db_pool_queue is None:
+            _db_pool_queue = asyncio.Queue()
+        if _db_pool_semaphore is None:
+            _db_pool_semaphore = asyncio.Semaphore(DB_POOL_SIZE)
+
+
+async def _release_db_connection(db: aiosqlite.Connection) -> None:
+    global _db_pool_queue, _db_pool_semaphore
+    if _db_pool_queue is None or _db_pool_semaphore is None:
+        await db.close()
+        return
+
+    try:
+        await db.rollback()
+    except Exception:
+        # No active transaction is a normal case.
+        pass
+
+    try:
+        _db_pool_queue.put_nowait(db)
+    except asyncio.QueueFull:
+        await db.close()
+    finally:
+        _db_pool_semaphore.release()
+
+
+async def get_db() -> PooledConnection:
+    """
+    Acquire a configured SQLite connection from the in-process pool.
+    """
+    await _ensure_pool_ready()
+    assert _db_pool_queue is not None
+    assert _db_pool_semaphore is not None
+
+    await _db_pool_semaphore.acquire()
+    try:
+        db = _db_pool_queue.get_nowait()
+    except asyncio.QueueEmpty:
+        db = await _create_db_connection()
+
+    return PooledConnection(db)
+
+
+async def close_db_pool() -> None:
+    """
+    Close all idle pooled SQLite connections.
+    """
+    global _db_pool_lock, _db_pool_queue, _db_pool_semaphore
+    if _db_pool_queue is None:
+        return
+
+    while True:
+        try:
+            db = _db_pool_queue.get_nowait()
+        except asyncio.QueueEmpty:
+            break
+        await db.close()
+
+    _db_pool_queue = None
+    _db_pool_semaphore = None
+    _db_pool_lock = None
 
 
 async def init_db() -> None:

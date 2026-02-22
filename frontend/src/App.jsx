@@ -1,10 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import AppHeader from './components/AppHeader'
-import PropertyPanel from './components/PropertyPanel'
-import StructureTree from './components/StructureTree'
 import UploadPanel from './components/UploadPanel'
-import ViewerShell from './components/ViewerShell'
+import ViewerWorkspace from './components/ViewerWorkspace'
 import { useToast } from './components/Toast'
 import useKeyboardShortcuts from './hooks/useKeyboardShortcuts'
 import useFloatingPanels from './hooks/useFloatingPanels'
@@ -19,7 +17,9 @@ import useViewMode from './hooks/useViewMode'
 import useSpaceOverlay from './hooks/useSpaceOverlay'
 import useOccupancy from './hooks/useOccupancy'
 import useViewerScene from './hooks/useViewerScene'
+import usePanelResize from './hooks/usePanelResize'
 import { useAuth } from './hooks/useAuth'
+import { ViewerProvider } from './hooks/useViewerContext'
 import LoginPage from './pages/LoginPage'
 import SignupPage from './pages/SignupPage'
 import appStyles from './constants/appStyles'
@@ -41,9 +41,14 @@ function ViewerApp() {
   // Panel visibility state
   const [structureTreeVisible, setStructureTreeVisible] = useState(true)
   const [propertiesPanelVisible, setPropertiesPanelVisible] = useState(true)
-  const [structurePanelWidth, setStructurePanelWidth] = useState(280)
-  const [propertiesPanelWidth, setPropertiesPanelWidth] = useState(320)
-  const dragStateRef = useRef(null)
+  const {
+    leftPanelWidth: structurePanelWidth,
+    rightPanelWidth: propertiesPanelWidth,
+    handleStartResize,
+  } = usePanelResize({
+    initialLeftWidth: 280,
+    initialRightWidth: 320,
+  })
 
   const selection = useSelection()
   const visibility = useVisibility()
@@ -147,6 +152,7 @@ function ViewerApp() {
     setJobId(null)
     floatingPanels.handleCloseEcPanel()
     floatingPanels.handleCloseHvacPanel()
+    floatingPanels.handleCloseGraphPanel()
     floatingPanels.handleCloseWorkOrdersPanel()
     spaceOverlay.disableSpaceOverlay()
     occupancy.disable()
@@ -156,6 +162,7 @@ function ViewerApp() {
   }, [
     floatingPanels.handleCloseEcPanel,
     floatingPanels.handleCloseHvacPanel,
+    floatingPanels.handleCloseGraphPanel,
     floatingPanels.handleCloseWorkOrdersPanel,
     spaceOverlay.disableSpaceOverlay,
     occupancy.disable,
@@ -200,55 +207,39 @@ function ViewerApp() {
     }
   }, [handleTreeSelect, spaceOverlay.enableSpaceOverlayForSpaces])
 
-  const handleStartResize = useCallback((side, event) => {
-    event.preventDefault()
-    dragStateRef.current = {
-      side,
-      startX: event.clientX,
-      startWidth: side === 'left' ? structurePanelWidth : propertiesPanelWidth
-    }
-    document.body.style.cursor = 'col-resize'
-    document.body.style.userSelect = 'none'
-  }, [structurePanelWidth, propertiesPanelWidth])
+  const handleGraphSelectResult = useCallback((globalId) => {
+    if (!globalId) return
+    handleTreeSelect(globalId)
+  }, [handleTreeSelect])
 
-  useEffect(() => {
-    const minWidth = 220
-    const maxWidth = 520
+  const handleGraphSelectBatch = useCallback((globalIds) => {
+    const ids = Array.isArray(globalIds) ? globalIds.filter(Boolean) : []
+    if (ids.length === 0) return
 
-    const handleMouseMove = (event) => {
-      const dragState = dragStateRef.current
-      if (!dragState) return
-      const delta = event.clientX - dragState.startX
-      const direction = dragState.side === 'left' ? 1 : -1
-      const nextWidth = Math.min(maxWidth, Math.max(minWidth, dragState.startWidth + (direction * delta)))
-      if (dragState.side === 'left') {
-        setStructurePanelWidth(nextWidth)
-      } else {
-        setPropertiesPanelWidth(nextWidth)
-      }
-    }
+    visibility.showAll()
+    xRayMode.enableXRay(ids, { mode: 'wireframe' })
+    selection.selectById(ids)
 
-    const handleMouseUp = () => {
-      if (!dragStateRef.current) return
-      dragStateRef.current = null
-      document.body.style.cursor = ''
-      document.body.style.userSelect = ''
+    const focusResult = cameraFocus.focusOnElements(ids)
+    if (!focusResult.found) {
+      showToast('No geometry found for query results', 'warning')
+    } else if (focusResult.count > 1) {
+      showToast(`Highlighted ${focusResult.count} elements`, 'info', 2000)
     }
-
-    window.addEventListener('mousemove', handleMouseMove)
-    window.addEventListener('mouseup', handleMouseUp)
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove)
-      window.removeEventListener('mouseup', handleMouseUp)
-    }
-  }, [])
+  }, [
+    visibility.showAll,
+    xRayMode.enableXRay,
+    selection.selectById,
+    cameraFocus.focusOnElements,
+    showToast
+  ])
 
   // Show upload panel if no model loaded
   if (!modelUrls) {
     return <UploadPanel onModelReady={handleModelReady} hasModel={false} />
   }
 
-  const viewer = {
+  const viewerContextValue = {
     modelUrls,
     jobId,
     selection,
@@ -266,8 +257,13 @@ function ViewerApp() {
     handleToggleOccupancy,
     handleToggleOccupancyPanel,
     handleToggleGeometry,
+    handleGraphSelectResult,
+    handleGraphSelectBatch,
     handleHvacSelectDetail,
     handleTreeSelect,
+    handleIsolate,
+    focusLock,
+    setFocusLock,
     handleSceneReady,
     handleRendererReady,
     handleControlsReady
@@ -285,106 +281,17 @@ function ViewerApp() {
         logoutPending={logoutPending}
       />
 
-      <div style={appStyles.mainContent}>
-        {/* Subtle Panel Toggle Buttons */}
-        {modelUrls && (
-          <>
-            <button
-              data-panel-toggle
-              onClick={() => setStructureTreeVisible(prev => !prev)}
-              title={structureTreeVisible ? 'Hide Structure Tree' : 'Show Structure Tree'}
-              style={{
-                ...appStyles.panelToggle,
-                ...appStyles.panelToggleLeft,
-                ...(structureTreeVisible ? {} : appStyles.panelToggleHidden)
-              }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                {structureTreeVisible ? (
-                  <polyline points="15 18 9 12 15 6" />
-                ) : (
-                  <polyline points="9 18 15 12 9 6" />
-                )}
-              </svg>
-            </button>
-            <button
-              data-panel-toggle
-              onClick={() => setPropertiesPanelVisible(prev => !prev)}
-              title={propertiesPanelVisible ? 'Hide Properties Panel' : 'Show Properties Panel'}
-              style={{
-                ...appStyles.panelToggle,
-                ...appStyles.panelToggleRight,
-                ...(propertiesPanelVisible ? {} : appStyles.panelToggleHidden)
-              }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                {propertiesPanelVisible ? (
-                  <polyline points="9 18 15 12 9 6" />
-                ) : (
-                  <polyline points="15 18 9 12 15 6" />
-                )}
-              </svg>
-            </button>
-          </>
-        )}
-
-        {structureTreeVisible && (
-          <div style={{ width: structurePanelWidth, position: 'relative', display: 'flex', flexShrink: 0 }}>
-            <StructureTree 
-              hierarchyUrl={modelUrls.hierarchyUrl}
-              onIsolate={handleIsolate}
-              onSelect={handleTreeSelect}
-              selectedId={selection.selectedId}
-              focusLock={focusLock}
-              onToggleFocusLock={() => setFocusLock(prev => !prev)}
-            />
-            <div
-              onMouseDown={(event) => handleStartResize('left', event)}
-              style={{
-                position: 'absolute',
-                top: 0,
-                right: 0,
-                width: '6px',
-                height: '100%',
-                cursor: 'col-resize',
-                background: 'rgba(0, 0, 0, 0.03)',
-                zIndex: 5,
-              }}
-              title="Drag to resize"
-            />
-          </div>
-        )}
-
-        <ViewerShell
-          containerStyle={appStyles.viewerContainer}
-          viewer={viewer}
+      <ViewerProvider value={viewerContextValue}>
+        <ViewerWorkspace
+          structureTreeVisible={structureTreeVisible}
+          propertiesPanelVisible={propertiesPanelVisible}
+          onToggleStructureTree={() => setStructureTreeVisible(prev => !prev)}
+          onTogglePropertiesPanel={() => setPropertiesPanelVisible(prev => !prev)}
+          structurePanelWidth={structurePanelWidth}
+          propertiesPanelWidth={propertiesPanelWidth}
+          onStartResize={handleStartResize}
         />
-
-        {propertiesPanelVisible && (
-          <div style={{ width: propertiesPanelWidth, position: 'relative', display: 'flex', flexShrink: 0 }}>
-            <div
-              onMouseDown={(event) => handleStartResize('right', event)}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '6px',
-                height: '100%',
-                cursor: 'col-resize',
-                background: 'rgba(0, 0, 0, 0.03)',
-                zIndex: 5,
-              }}
-              title="Drag to resize"
-            />
-            <PropertyPanel 
-              selectedId={selection.selectedId}
-              metadataUrl={modelUrls.metadataUrl}
-              jobId={jobId}
-              onOpenWorkOrdersPanel={floatingPanels.handleOpenWorkOrdersPanel}
-            />
-          </div>
-        )}
-      </div>
+      </ViewerProvider>
 
       <ToastContainer />
     </div>

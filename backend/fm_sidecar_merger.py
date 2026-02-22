@@ -50,9 +50,12 @@ Usage:
 """
 
 import json
+import logging
 from pathlib import Path
 from typing import Optional, List
 import re
+
+logger = logging.getLogger(__name__)
 
 
 def validate_global_id(global_id: str) -> bool:
@@ -208,12 +211,12 @@ def merge_fm_sidecar(metadata_path: Path, sidecar_path: Path) -> dict:
         
         if not is_valid:
             result["errors"].append("Sidecar failed validation")
-            print(f"[FM Sidecar] Validation failed: {warnings}")
+            logger.error("[FM Sidecar] Validation failed: %s", warnings)
             return result
         
         if warnings:
             for w in warnings:
-                print(f"[FM Sidecar] Warning: {w}")
+                logger.warning("[FM Sidecar] Warning: %s", w)
         
         result["elements_in_sidecar"] = len(sidecar)
         
@@ -246,23 +249,26 @@ def merge_fm_sidecar(metadata_path: Path, sidecar_path: Path) -> dict:
                         result["unmatched_global_ids"].append(global_id)
             except Exception as elem_err:
                 result["elements_with_errors"] += 1
-                print(f"[FM Sidecar] Error processing element {global_id}: {elem_err}")
+                logger.warning("[FM Sidecar] Error processing element %s: %s", global_id, elem_err)
                 # Continue with next element
         
         # Save updated metadata
         with open(metadata_path, 'w', encoding='utf-8') as f:
             json.dump(metadata, f, indent=2, ensure_ascii=False)
         
-        print(f"[FM Sidecar] Merged {result['elements_merged']} elements from {sidecar_path.name}")
+        logger.info("[FM Sidecar] Merged %s elements from %s", result["elements_merged"], sidecar_path.name)
         if result["elements_not_found"] > 0:
-            print(f"[FM Sidecar] {result['elements_not_found']} GlobalIds not found in metadata")
+            logger.warning(
+                "[FM Sidecar] %s GlobalIds not found in metadata",
+                result["elements_not_found"],
+            )
         
     except json.JSONDecodeError as je:
         result["errors"].append(f"Invalid JSON in sidecar: {je}")
-        print(f"[FM Sidecar] JSON decode error: {je}")
+        logger.exception("[FM Sidecar] JSON decode error: %s", je)
     except Exception as e:
         result["errors"].append(str(e))
-        print(f"[FM Sidecar] Error merging sidecar: {e}")
+        logger.exception("[FM Sidecar] Error merging sidecar: %s", e)
     
     return result
 
