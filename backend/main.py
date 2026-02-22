@@ -33,6 +33,7 @@ from maintenance_api import router as maintenance_router
 from work_order_api import router as work_order_router
 from cmms_sync_api import router as cmms_sync_router
 from auth_api import router as auth_router
+from llm_api import router as llm_router
 from auth_deps import get_current_user, get_current_user_optional
 from config import (
     APP_ENV,
@@ -136,6 +137,7 @@ app.include_router(maintenance_router)
 app.include_router(work_order_router)
 app.include_router(cmms_sync_router)
 app.include_router(auth_router)
+app.include_router(llm_router)
 
 # Enable CORS for frontend
 app.add_middleware(

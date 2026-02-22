@@ -1,6 +1,7 @@
 import AxisViewWidget from './AxisViewWidget'
 import EcPanel from './EcPanel'
 import GraphQueryPanel from './GraphQueryPanel'
+import LlmChatPanel from './LlmChatPanel'
 import HvacFmPanel from './HvacFmPanel'
 import IdsValidationPanel from './IdsValidationPanel'
 import KeyboardHints from './KeyboardHints'
@@ -61,6 +62,7 @@ export default function ViewerShell({ containerStyle }) {
     onOpenGraphPanel: floatingPanels.handleToggleGraphPanel,
     onOpenWorkOrdersPanel: floatingPanels.handleToggleWorkOrdersPanel,
     onOpenIdsValidationPanel: floatingPanels.handleToggleIdsValidationPanel,
+    onOpenLlmChatPanel: floatingPanels.handleToggleLlmChatPanel,
     onToggleSpaceOverlay: spaceOverlay.toggleSpaceOverlay,
     spaceOverlayEnabled: spaceOverlay.spaceOverlayEnabled,
     spaceOverlayLoading: spaceOverlay.spaceOverlayStatus.loading,
@@ -208,6 +210,15 @@ export default function ViewerShell({ containerStyle }) {
     zIndex: 210
   }
 
+  const llmChatPanelProps = {
+    isOpen: floatingPanels.llmChatPanelOpen,
+    onClose: floatingPanels.handleCloseLlmChatPanel,
+    jobId,
+    onSelectResult: handleGraphSelectResult,
+    focusToken: floatingPanels.llmChatPanelZIndex,
+    zIndex: floatingPanels.llmChatPanelZIndex
+  }
+
   return (
     <div style={containerStyle}>
       <ViewerToolbar {...viewerToolbarProps} />
@@ -260,6 +271,7 @@ export default function ViewerShell({ containerStyle }) {
       <IdsValidationPanel {...idsValidationPanelProps} />
       <WorkOrdersPanel {...workOrdersPanelProps} />
       <OccupancyPanel {...occupancyPanelProps} />
+      <LlmChatPanel {...llmChatPanelProps} />
 
       {showSpaceNavigator && <SpaceNavigator {...navigatorProps} />}
 

@@ -66,6 +66,14 @@ if not IS_DEV_ENV and not COOKIE_SECURE:
 if "*" in FRONTEND_ORIGINS:
     raise RuntimeError("Insecure CORS configuration: wildcard origins are not allowed.")
 
+# LLM / OpenRouter
+OPENROUTER_API_KEY = os.getenv(
+    "OPENROUTER_API_KEY",
+    "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",
+)
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "stepfun/step-3.5-flash:free")
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
+
 # Ensure directories exist
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)

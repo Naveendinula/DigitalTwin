@@ -16,6 +16,7 @@ import {
   ViewCubeIcon,
   EyeIcon,
   GraphIcon,
+  ChatIcon,
   SidebarLeftIcon,
   SidebarRightIcon
 } from './ViewerIcons'
@@ -52,6 +53,7 @@ function ViewerToolbar({
   onOpenGraphPanel,
   onOpenWorkOrdersPanel,
   onOpenIdsValidationPanel,
+  onOpenLlmChatPanel,
   onToggleSpaceOverlay,
   spaceOverlayEnabled,
   spaceOverlayLoading = false,
@@ -158,6 +160,14 @@ function ViewerToolbar({
       title: 'Open Work Orders',
       icon: <WorkOrdersIcon />,
       label: 'CMMS'
+    },
+    {
+      key: 'llm-chat',
+      show: hasModel,
+      onClick: onOpenLlmChatPanel,
+      title: 'Ask AI about this model',
+      icon: <ChatIcon />,
+      label: 'Ask AI'
     },
     {
       key: 'spaces',

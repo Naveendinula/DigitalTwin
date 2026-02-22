@@ -6,6 +6,11 @@
 
 ## Recent additions / changes
 
+- **Date:** 2026-02-22
+- **LLM BIM Assistant:** Added an AI chat panel that lets users ask natural language questions about their building model. The LLM (OpenRouter, `stepfun/step-3.5-flash:free`) receives graph context (stats, keyword-matched nodes, relationships) extracted from the NetworkX LPG and returns human-readable answers with clickable `globalId` references for 3D highlighting.
+- **Backend:** Added `backend/llm_chat.py` (context-stuffing engine: graph summary + keyword search + edge context), `backend/llm_api.py` (`POST /api/llm/{job_id}/chat`), OpenRouter config in `backend/config.py`.
+- **Frontend:** Added `LlmChatPanel.jsx` (draggable floating chat), `ChatIcon` in `ViewerIcons.jsx`, wired into `useFloatingPanels`/`usePanelStacking`/`ViewerToolbar`/`ViewerShell`.
+
 - **Date:** 2026-02-21
 - **Tooling & safety baseline (phase 6):** Pinned backend dependencies (plus `numpy`) and added `backend/requirements-dev.txt`; added frontend `tsconfig.json`, ESLint/Prettier configs, Vitest setup/config, and first hook tests (`usePanelStacking`, `useFloatingPanels`, `usePanelResize`); tightened backend CORS methods/headers; added in-memory rate limiting middleware and centralized 5xx response sanitization handlers in `backend/main.py`.
 

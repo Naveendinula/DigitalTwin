@@ -9,6 +9,7 @@ export default function usePanelStacking() {
   const [graphPanelZIndex, setGraphPanelZIndex] = useState(INITIAL_PANEL_Z_INDEX)
   const [idsValidationPanelZIndex, setIdsValidationPanelZIndex] = useState(INITIAL_PANEL_Z_INDEX)
   const [workOrdersPanelZIndex, setWorkOrdersPanelZIndex] = useState(INITIAL_PANEL_Z_INDEX)
+  const [llmChatPanelZIndex, setLlmChatPanelZIndex] = useState(INITIAL_PANEL_Z_INDEX)
 
   const bringToFront = useCallback((setPanelZIndex) => {
     setPanelZCounter(prev => {
@@ -45,11 +46,13 @@ export default function usePanelStacking() {
     graphPanelZIndex,
     idsValidationPanelZIndex,
     workOrdersPanelZIndex,
+    llmChatPanelZIndex,
     setEcPanelZIndex,
     setHvacPanelZIndex,
     setGraphPanelZIndex,
     setIdsValidationPanelZIndex,
     setWorkOrdersPanelZIndex,
+    setLlmChatPanelZIndex,
     togglePanel
   }
 }
