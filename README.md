@@ -25,9 +25,10 @@ Most BIM tools are either authoring-heavy or disconnected from day-to-day facili
 
 ## What's New (Recent Additions)
 
-- **Graph Query Layer (Phase 1-4):**
+- **Graph Query Layer (Phase 1-5):**
   - Builds a relationship graph per job (`graph.json`) during IFC processing.
-  - New graph API endpoints for stats, neighbors, shortest paths, and structured traversal queries.
+  - Syncs graph data into Neo4j and serves graph API/LLM queries from the graph-store backend (Neo4j by default).
+  - Graph API endpoints for stats, neighbors, shortest paths, and structured traversal queries.
   - New Graph Query panel with list + optional network visualization (`reagraph`).
 - **Work Orders + CMMS Sync:**
   - Geometry-native work order module with CRUD, summary, and COBie-style export (CSV/JSON).
@@ -73,7 +74,7 @@ Most BIM tools are either authoring-heavy or disconnected from day-to-day facili
 
 ### Backend (`FastAPI`, Python)
 - IFC conversion and extraction pipeline (`IfcOpenShell`, `IfcConvert`)
-- Graph build/query (`networkx`)
+- Graph build artifact (`networkx`) + graph query backend (`neo4j` default, `networkx` optional)
 - HVAC/FM, EC, validation, occupancy, work orders, CMMS sync
 - SQLite for auth/session audit + FM operation records
 

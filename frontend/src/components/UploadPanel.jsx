@@ -110,6 +110,7 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
   const [savedModels, setSavedModels] = useState([])
   const [modelsLoading, setModelsLoading] = useState(false)
   const [openingModelId, setOpeningModelId] = useState(null)
+  const [deletingModelId, setDeletingModelId] = useState(null)
   
   // FM Sidecar state
   const [fmSidecarFile, setFmSidecarFile] = useState(null)
@@ -650,6 +651,36 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
     }
   }, [API_URL, HEALTH_TIMEOUT_MS, checkBackendHealth, fetchWithTimeout, onModelReady, pollJobStatus])
 
+  const handleDeleteSavedModel = useCallback(async (jobId) => {
+    if (!jobId) return
+    const shouldDelete = window.confirm('Delete this model and all generated artifacts? This cannot be undone.')
+    if (!shouldDelete) return
+
+    setDeletingModelId(jobId)
+    setError(null)
+    try {
+      await checkBackendHealth()
+      const response = await fetchWithTimeout(`${API_URL}/job/${jobId}`, {
+        method: 'DELETE'
+      }, HEALTH_TIMEOUT_MS)
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null)
+        throw new Error(payload?.detail || 'Failed to delete model')
+      }
+
+      setSavedModels((prev) => prev.filter((model) => model.job_id !== jobId))
+      if (openingModelId === jobId) {
+        setOpeningModelId(null)
+      }
+    } catch (err) {
+      console.error('Delete model error:', err)
+      setError(err?.message || 'Failed to delete model')
+    } finally {
+      setDeletingModelId(null)
+    }
+  }, [API_URL, HEALTH_TIMEOUT_MS, checkBackendHealth, fetchWithTimeout, openingModelId])
+
   /**
    * Upload file to backend
    */
@@ -943,14 +974,30 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
                               {model.job_id} · {model.status}
                             </div>
                           </div>
-                          <button
-                            type="button"
-                            style={styles.savedModelOpenBtn}
-                            onClick={() => handleOpenSavedModel(model.job_id)}
-                            disabled={openingModelId === model.job_id}
-                          >
-                            {openingModelId === model.job_id ? 'Opening...' : 'Open'}
-                          </button>
+                          <div style={styles.savedModelActions}>
+                            <button
+                              type="button"
+                              style={{
+                                ...styles.savedModelOpenBtn,
+                                ...(deletingModelId === model.job_id ? styles.savedModelBtnDisabled : null),
+                              }}
+                              onClick={() => handleOpenSavedModel(model.job_id)}
+                              disabled={openingModelId === model.job_id || deletingModelId === model.job_id}
+                            >
+                              {openingModelId === model.job_id ? 'Opening...' : 'Open'}
+                            </button>
+                            <button
+                              type="button"
+                              style={{
+                                ...styles.savedModelDeleteBtn,
+                                ...(openingModelId === model.job_id || deletingModelId === model.job_id ? styles.savedModelBtnDisabled : null),
+                              }}
+                              onClick={() => handleDeleteSavedModel(model.job_id)}
+                              disabled={openingModelId === model.job_id || deletingModelId === model.job_id}
+                            >
+                              {deletingModelId === model.job_id ? 'Deleting...' : 'Delete'}
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1370,6 +1417,11 @@ const styles = {
     fontSize: '10px',
     color: '#6B7280',
   },
+  savedModelActions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+  },
   savedModelOpenBtn: {
     border: 'none',
     borderRadius: '6px',
@@ -1379,6 +1431,20 @@ const styles = {
     padding: '5px 8px',
     cursor: 'pointer',
     whiteSpace: 'nowrap',
+  },
+  savedModelDeleteBtn: {
+    border: 'none',
+    borderRadius: '6px',
+    background: '#dc2626',
+    color: '#fff',
+    fontSize: '11px',
+    padding: '5px 8px',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+  },
+  savedModelBtnDisabled: {
+    opacity: 0.65,
+    cursor: 'not-allowed',
   },
 
   // Processing

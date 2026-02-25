@@ -1,11 +1,5 @@
 """
-LLM-powered BIM chat using the NetworkX graph as context.
-
-Strategy: context-stuffing.
-1. Load graph stats (node types, storeys, materials, edge types).
-2. Extract keywords from the user question to run targeted graph queries.
-3. Inject the graph results into the LLM prompt as context.
-4. Return the LLM answer + any referenced globalIds for 3D highlighting.
+LLM-powered BIM chat using graph-store queries as context source.
 """
 
 from __future__ import annotations
@@ -16,131 +10,18 @@ import re
 from typing import Any
 
 import httpx
-import networkx as nx
 
 from config import OPENROUTER_API_KEY, OPENROUTER_BASE_URL, OPENROUTER_MODEL
+from graph_models import GraphQuery
+from graph_store import get_graph_store
 from utils import clean_text as _clean_text
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Graph context helpers
-# ---------------------------------------------------------------------------
-
-def _graph_summary(graph: nx.MultiDiGraph) -> dict[str, Any]:
-    """Compact summary of the graph for the system prompt."""
-    from collections import Counter
-    node_types: Counter[str] = Counter()
-    edge_types: Counter[str] = Counter()
-    storeys: set[str] = set()
-    materials: set[str] = set()
-
-    for _nid, attrs in graph.nodes(data=True):
-        ifc_type = _clean_text(attrs.get("ifcType")) or "Unknown"
-        node_types[ifc_type] += 1
-        storey = _clean_text(attrs.get("storey"))
-        if storey:
-            storeys.add(storey)
-        for m in attrs.get("materials") or []:
-            text = _clean_text(m)
-            if text:
-                materials.add(text)
-
-    for _src, _tgt, attrs in graph.edges(data=True):
-        edge_types[_clean_text(attrs.get("type")) or "RELATED_TO"] += 1
-
-    return {
-        "node_count": graph.number_of_nodes(),
-        "edge_count": graph.number_of_edges(),
-        "node_types": dict(sorted(node_types.items())),
-        "edge_types": dict(sorted(edge_types.items())),
-        "storeys": sorted(storeys, key=str.lower),
-        "materials": sorted(materials, key=str.lower),
-    }
-
-
-def _keyword_search_nodes(
-    graph: nx.MultiDiGraph,
-    keywords: list[str],
-    *,
-    limit: int = 30,
-) -> list[dict[str, Any]]:
-    """Return nodes whose name / ifcType / storey / materials match any keyword."""
-    if not keywords:
-        return []
-    patterns = [re.compile(re.escape(kw), re.IGNORECASE) for kw in keywords]
-    hits: list[tuple[int, str, dict[str, Any]]] = []
-
-    for nid, attrs in graph.nodes(data=True):
-        searchable = " ".join(
-            filter(None, [
-                _clean_text(attrs.get("name")),
-                _clean_text(attrs.get("ifcType")),
-                _clean_text(attrs.get("storey")),
-                " ".join(_clean_text(m) for m in (attrs.get("materials") or [])),
-            ])
-        )
-        score = sum(1 for p in patterns if p.search(searchable))
-        if score > 0:
-            hits.append((score, str(nid), attrs))
-
-    hits.sort(key=lambda h: -h[0])
-    return [
-        {
-            "id": nid,
-            "name": attrs.get("name"),
-            "ifcType": attrs.get("ifcType"),
-            "storey": attrs.get("storey"),
-            "materials": attrs.get("materials") or [],
-        }
-        for _score, nid, attrs in hits[:limit]
-    ]
-
-
-def _neighbors_of(
-    graph: nx.MultiDiGraph,
-    node_id: str,
-    *,
-    limit: int = 15,
-) -> list[dict[str, Any]]:
-    """Return immediate neighbors of a node."""
-    if node_id not in graph:
-        return []
-    neighbor_ids: set[str] = set()
-    for _src, tgt, _key, _attrs in graph.out_edges(node_id, keys=True, data=True):
-        neighbor_ids.add(str(tgt))
-    for src, _tgt, _key, _attrs in graph.in_edges(node_id, keys=True, data=True):
-        neighbor_ids.add(str(src))
-
-    result: list[dict[str, Any]] = []
-    for nid in list(neighbor_ids)[:limit]:
-        attrs = graph.nodes[nid]
-        result.append({
-            "id": nid,
-            "name": attrs.get("name"),
-            "ifcType": attrs.get("ifcType"),
-            "storey": attrs.get("storey"),
-        })
-    return result
-
-
-def _edges_for_node(graph: nx.MultiDiGraph, node_id: str) -> list[dict[str, Any]]:
-    """Return edges involving a node."""
-    if node_id not in graph:
-        return []
-    edges: list[dict[str, Any]] = []
-    seen: set[tuple[str, str, str]] = set()
-    for src, tgt, _key, attrs in graph.out_edges(node_id, keys=True, data=True):
-        key = (str(src), str(tgt), _clean_text(attrs.get("type")))
-        if key not in seen:
-            seen.add(key)
-            edges.append({"source": str(src), "target": str(tgt), "type": key[2]})
-    for src, tgt, _key, attrs in graph.in_edges(node_id, keys=True, data=True):
-        key = (str(src), str(tgt), _clean_text(attrs.get("type")))
-        if key not in seen:
-            seen.add(key)
-            edges.append({"source": str(src), "target": str(tgt), "type": key[2]})
-    return edges
+_MAX_KEYWORDS = 8
+_MATCH_LIMIT = 30
+_TOP_MATCHES_FOR_EDGES = 5
+_EDGE_LIMIT = 40
 
 
 def _extract_keywords(question: str) -> list[str]:
@@ -162,43 +43,119 @@ def _extract_keywords(question: str) -> list[str]:
     }
     tokens = re.findall(r"[A-Za-z0-9_\-]+", question)
     keywords = [t for t in tokens if t.lower() not in stop_words and len(t) > 1]
-    return keywords
+    return list(dict.fromkeys(keywords))
 
 
-def _build_graph_context(
-    graph: nx.MultiDiGraph,
-    question: str,
-) -> str:
-    """Build a text context block from graph data relevant to the question."""
-    summary = _graph_summary(graph)
+def _node_searchable_text(node: dict[str, Any]) -> str:
+    materials = node.get("materials") or []
+    material_text = " ".join(_clean_text(value) for value in materials)
+    return " ".join(
+        filter(
+            None,
+            [
+                _clean_text(node.get("name")),
+                _clean_text(node.get("ifcType")),
+                _clean_text(node.get("storey")),
+                material_text,
+            ],
+        )
+    )
+
+
+def _keyword_search_nodes(job_id: str, keywords: list[str], *, limit: int = _MATCH_LIMIT) -> list[dict[str, Any]]:
+    """Run targeted store queries and rank matching nodes by keyword hit count."""
+    if not keywords:
+        return []
+
+    store = get_graph_store()
+    capped_keywords = keywords[:_MAX_KEYWORDS]
+
+    candidates_by_id: dict[str, dict[str, Any]] = {}
+    for keyword in capped_keywords:
+        query_variants = (
+            GraphQuery(name_contains=keyword, limit=120, offset=0),
+            GraphQuery(node_type=keyword, limit=120, offset=0),
+            GraphQuery(storey=keyword, limit=120, offset=0),
+            GraphQuery(material=keyword, limit=120, offset=0),
+        )
+        for query in query_variants:
+            result = store.query(job_id, query)
+            for node in result.get("nodes") or []:
+                node_id = _clean_text(node.get("id")) or _clean_text(node.get("globalId"))
+                if not node_id:
+                    continue
+                normalized_node = {
+                    "id": node_id,
+                    "name": node.get("name"),
+                    "ifcType": node.get("ifcType"),
+                    "storey": node.get("storey"),
+                    "materials": node.get("materials") or [],
+                }
+                candidates_by_id[node_id] = normalized_node
+
+    if not candidates_by_id:
+        return []
+
+    patterns = [re.compile(re.escape(kw), re.IGNORECASE) for kw in capped_keywords]
+    scored: list[tuple[int, str, dict[str, Any]]] = []
+    for node_id, node in candidates_by_id.items():
+        searchable = _node_searchable_text(node)
+        score = sum(1 for pattern in patterns if pattern.search(searchable))
+        if score > 0:
+            scored.append((score, node_id, node))
+
+    scored.sort(
+        key=lambda item: (
+            -item[0],
+            _clean_text(item[2].get("name")).lower(),
+            _clean_text(item[2].get("ifcType")).lower(),
+            item[1],
+        )
+    )
+    return [node for _score, _node_id, node in scored[:limit]]
+
+
+def _build_graph_context(job_id: str, question: str) -> str:
+    """Build prompt context from graph-store query results."""
+    store = get_graph_store()
+    summary = store.get_stats(job_id)
     keywords = _extract_keywords(question)
-    matched_nodes = _keyword_search_nodes(graph, keywords, limit=30)
+    matched_nodes = _keyword_search_nodes(job_id, keywords, limit=_MATCH_LIMIT)
 
-    # Also find edges for the top matches
     top_node_edges: list[dict[str, Any]] = []
-    for node in matched_nodes[:5]:
-        top_node_edges.extend(_edges_for_node(graph, node["id"]))
+    name_map: dict[str, str] = {}
+    for node in matched_nodes[:_TOP_MATCHES_FOR_EDGES]:
+        node_id = node["id"]
+        result = store.get_neighbors(job_id, node_id)
+        for neighbor_node in result.get("nodes") or []:
+            neighbor_id = _clean_text(neighbor_node.get("id")) or _clean_text(neighbor_node.get("globalId"))
+            if not neighbor_id:
+                continue
+            display_name = (
+                _clean_text(neighbor_node.get("name"))
+                or _clean_text(neighbor_node.get("ifcType"))
+                or neighbor_id
+            )
+            name_map[neighbor_id] = display_name
+        for edge in result.get("edges") or []:
+            source = _clean_text(edge.get("source"))
+            target = _clean_text(edge.get("target"))
+            edge_type = _clean_text(edge.get("type")) or "RELATED_TO"
+            if source and target:
+                top_node_edges.append({"source": source, "target": target, "type": edge_type})
 
-    # Deduplicate edges
+    for node in matched_nodes:
+        display_name = _clean_text(node.get("name")) or _clean_text(node.get("ifcType")) or node["id"]
+        name_map[node["id"]] = display_name
+
     seen_edges: set[tuple[str, str, str]] = set()
     deduped_edges: list[dict[str, Any]] = []
-    for e in top_node_edges:
-        key = (e["source"], e["target"], e["type"])
-        if key not in seen_edges:
-            seen_edges.add(key)
-            deduped_edges.append(e)
-
-    # Build the name map for referenced node IDs
-    referenced_ids = set()
-    for e in deduped_edges:
-        referenced_ids.add(e["source"])
-        referenced_ids.add(e["target"])
-    name_map: dict[str, str] = {}
-    for nid in referenced_ids:
-        if nid in graph:
-            attrs = graph.nodes[nid]
-            name = _clean_text(attrs.get("name")) or _clean_text(attrs.get("ifcType")) or nid
-            name_map[nid] = name
+    for edge in top_node_edges:
+        key = (edge["source"], edge["target"], edge["type"])
+        if key in seen_edges:
+            continue
+        seen_edges.add(key)
+        deduped_edges.append(edge)
 
     parts: list[str] = []
     parts.append("=== BIM MODEL GRAPH SUMMARY ===")
@@ -206,24 +163,27 @@ def _build_graph_context(
     parts.append(f"Node types: {json.dumps(summary['node_types'])}")
     parts.append(f"Edge types: {json.dumps(summary['edge_types'])}")
     parts.append(f"Storeys: {', '.join(summary['storeys']) or 'none'}")
-    parts.append(f"Materials: {', '.join(summary['materials'][:40]) or 'none'}")
+    parts.append(f"Materials: {', '.join((summary.get('materials') or [])[:40]) or 'none'}")
 
     if matched_nodes:
         parts.append("")
-        parts.append(f"=== MATCHED NODES (keywords: {', '.join(keywords)}) ===")
+        parts.append(f"=== MATCHED NODES (keywords: {', '.join(keywords[:_MAX_KEYWORDS])}) ===")
         for node in matched_nodes:
-            line = f"- {node['name'] or '(unnamed)'} | type={node['ifcType']} | storey={node['storey'] or '?'} | id={node['id']}"
-            if node["materials"]:
+            line = (
+                f"- {node['name'] or '(unnamed)'} | type={node['ifcType']} "
+                f"| storey={node['storey'] or '?'} | id={node['id']}"
+            )
+            if node.get("materials"):
                 line += f" | materials={', '.join(node['materials'])}"
             parts.append(line)
 
     if deduped_edges:
         parts.append("")
         parts.append("=== RELATIONSHIPS (for top matched nodes) ===")
-        for e in deduped_edges[:40]:
-            src_name = name_map.get(e["source"], e["source"])
-            tgt_name = name_map.get(e["target"], e["target"])
-            parts.append(f"- {src_name} --[{e['type']}]--> {tgt_name}")
+        for edge in deduped_edges[:_EDGE_LIMIT]:
+            src_name = name_map.get(edge["source"], edge["source"])
+            tgt_name = name_map.get(edge["target"], edge["target"])
+            parts.append(f"- {src_name} --[{edge['type']}]--> {tgt_name}")
 
     return "\n".join(parts)
 
@@ -243,16 +203,16 @@ When answering:
 
 
 async def ask_about_model(
-    graph: nx.MultiDiGraph,
+    job_id: str,
     messages: list[dict[str, Any]],
 ) -> dict[str, Any]:
     """
-    Send a chat completion request to OpenRouter with graph context.
+    Send a chat completion request to OpenRouter with graph-store context.
 
     Parameters
     ----------
-    graph : nx.MultiDiGraph
-        The loaded BIM relationship graph.
+    job_id : str
+        Job identifier used to run graph store queries.
     messages : list[dict]
         Chat history in OpenAI format: [{role, content}, ...].
         The last message should be the user's new question.
@@ -260,9 +220,9 @@ async def ask_about_model(
     Returns
     -------
     dict with keys:
-        answer (str) – The LLM's response text.
-        referenced_ids (list[str]) – globalIds mentioned in the answer.
-        reasoning (str | None) – Reasoning details if available.
+        answer (str): The LLM response text.
+        referenced_ids (list[str]): globalIds mentioned in the answer and found in graph store.
+        reasoning (str | None): Reasoning details if available.
     """
     if not OPENROUTER_API_KEY:
         return {
@@ -271,34 +231,28 @@ async def ask_about_model(
             "reasoning": None,
         }
 
-    # Find the latest user question for context building
     latest_question = ""
-    for msg in reversed(messages):
-        if msg.get("role") == "user":
-            latest_question = msg.get("content", "")
+    for message in reversed(messages):
+        if message.get("role") == "user":
+            latest_question = message.get("content", "")
             break
 
-    # Build graph context from the question
-    graph_context = _build_graph_context(graph, latest_question)
-
-    # Assemble the full message list with system prompt + graph context
+    graph_context = _build_graph_context(job_id, latest_question)
     system_message = {
         "role": "system",
         "content": f"{SYSTEM_PROMPT}\n\n{graph_context}",
     }
 
-    # Build request messages: system + conversation history
     request_messages = [system_message] + [
-        {"role": m["role"], "content": m["content"]}
-        for m in messages
-        if m.get("role") in ("user", "assistant") and m.get("content")
+        {"role": message["role"], "content": message["content"]}
+        for message in messages
+        if message.get("role") in ("user", "assistant") and message.get("content")
     ]
 
     payload = {
         "model": OPENROUTER_MODEL,
         "messages": request_messages,
     }
-
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
@@ -328,13 +282,11 @@ async def ask_about_model(
             "reasoning": None,
         }
 
-    # Parse response
     choice = data.get("choices", [{}])[0]
     message = choice.get("message", {})
     answer = message.get("content") or ""
     reasoning_raw = message.get("reasoning_details") or message.get("reasoning") or None
 
-    # Normalize reasoning: OpenRouter may return a list of dicts
     reasoning: str | None = None
     if isinstance(reasoning_raw, str):
         reasoning = reasoning_raw
@@ -347,9 +299,7 @@ async def ask_about_model(
                 parts.append(item)
         reasoning = "\n".join(parts) if parts else None
 
-    # Extract globalIds referenced in the answer (22-char alphanumeric IFC GUIDs)
-    referenced_ids = _extract_global_ids(answer, graph)
-
+    referenced_ids = _extract_referenced_ids(answer, job_id)
     return {
         "answer": answer,
         "referenced_ids": referenced_ids,
@@ -357,12 +307,17 @@ async def ask_about_model(
     }
 
 
-def _extract_global_ids(text: str, graph: nx.MultiDiGraph) -> list[str]:
-    """Pull out IFC GlobalIds mentioned in the LLM response."""
-    # IFC GlobalIds are 22-char base64-ish strings
+def _extract_referenced_ids(text: str, job_id: str) -> list[str]:
+    """Extract node ids/globalIds from answer and keep only ids present in graph store."""
     candidates = re.findall(r"\b([0-9A-Za-z_$]{22})\b", text)
-    valid = [c for c in candidates if c in graph]
-    # Also check for node IDs explicitly mentioned (mat:, sys: prefixed)
     prefixed = re.findall(r"\b((?:mat|sys):[^\s\)]+)", text)
-    valid.extend(p for p in prefixed if p in graph)
-    return list(dict.fromkeys(valid))  # dedupe, preserve order
+    all_candidates = list(dict.fromkeys(candidates + prefixed))
+    if not all_candidates:
+        return []
+
+    store = get_graph_store()
+    try:
+        existing = store.get_existing_node_ids(job_id, all_candidates)
+    except Exception:
+        existing = []
+    return list(dict.fromkeys(existing))

@@ -12,7 +12,7 @@ from ifc_converter import convert_ifc_to_glb
 from ifc_metadata_extractor import extract_metadata, save_metadata, METADATA_SCHEMA_VERSION
 from ifc_spatial_hierarchy import extract_spatial_hierarchy, save_hierarchy
 from fm_sidecar_merger import find_fm_sidecar, merge_fm_sidecar
-from config import OUTPUT_DIR
+from config import GRAPH_BACKEND, OUTPUT_DIR
 from job_security import update_job_record_status
 from models import ConversionJob, JobStage, JobStatus
 from url_helpers import build_protected_file_url
@@ -145,7 +145,8 @@ async def process_ifc_file(
                 str(metadata_path)
             )
 
-        # 2c. Build lightweight relationship graph (non-fatal enhancement)
+        # 2c. Build lightweight relationship graph.
+        # When GRAPH_BACKEND=neo4j, build + sync are required and failures are fatal.
         logger.info("[%s] Building relationship graph...", job_id)
         try:
             from graph_builder import build_graph  # Lazy import to keep graph feature optional
@@ -162,7 +163,37 @@ async def process_ifc_file(
                 graph_stats["nodes"],
                 graph_stats["edges"],
             )
+
+            # 2d. Sync graph artifact to Neo4j
+            try:
+                from graph_store_neo4j import sync_graph_json_to_neo4j  # Lazy import
+
+                sync_result = await loop.run_in_executor(
+                    None,
+                    sync_graph_json_to_neo4j,
+                    job_id,
+                    str(graph_path),
+                )
+                sync_enabled = bool(sync_result.get("enabled"))
+                sync_error = sync_result.get("error")
+                if GRAPH_BACKEND == "neo4j" and (not sync_enabled or sync_error):
+                    raise RuntimeError(
+                        f"Neo4j graph sync required but failed: {sync_error or 'driver unavailable'}"
+                    )
+                if sync_enabled and not sync_error:
+                    logger.info(
+                        "[%s] Neo4j graph sync complete: %s nodes, %s edges",
+                        job_id,
+                        sync_result.get("nodes", 0),
+                        sync_result.get("edges", 0),
+                    )
+            except Exception as neo4j_err:
+                if GRAPH_BACKEND == "neo4j":
+                    raise
+                logger.warning("[%s] Neo4j graph sync failed (non-fatal): %s", job_id, neo4j_err)
         except Exception as graph_err:
+            if GRAPH_BACKEND == "neo4j":
+                raise RuntimeError(f"Graph stage failed for neo4j backend: {graph_err}") from graph_err
             logger.warning("[%s] Graph build failed (non-fatal): %s", job_id, graph_err)
 
         # 3. Extract spatial hierarchy

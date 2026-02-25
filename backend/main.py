@@ -61,6 +61,8 @@ from job_security import (
 )
 from fm_sidecar_merger import merge_fm_sidecar
 from db import close_db_pool, init_db
+from graph_store_neo4j import delete_job_graph_from_neo4j
+from neo4j_client import close_neo4j, initialize_neo4j
 from models import ConversionJob, JobStage, JobStatus, UserModelSummary
 from tasks import process_ifc_file
 from utils import find_ifc_for_job
@@ -113,9 +115,11 @@ _rate_limit_lock = asyncio.Lock()
 async def lifespan(_app: FastAPI):
     _configure_logging()
     await init_db()
+    initialize_neo4j()
     try:
         yield
     finally:
+        close_neo4j()
         await close_db_pool()
 
 
@@ -444,7 +448,8 @@ async def upload_ifc(
             existing_job_id = str(existing_record["job_id"])
             existing_job = _build_persisted_job(existing_job_id, existing_record)
 
-            if existing_job.status == JobStatus.COMPLETED:
+            has_required_outputs = bool(existing_job.metadata_url and existing_job.hierarchy_url)
+            if existing_job.status == JobStatus.COMPLETED and has_required_outputs:
                 existing_file_access_token = await rotate_job_file_access_token(existing_job_id, owner_user_id)
                 existing_job = _build_persisted_job(
                     existing_job_id,
@@ -610,6 +615,7 @@ async def delete_job(job_id: str, current_user: dict[str, Any] = Depends(get_cur
     if job_output_dir.exists():
         shutil.rmtree(job_output_dir)
     invalidate_graph_cache(job_id)
+    delete_job_graph_from_neo4j(job_id)
     
     # Remove from jobs dict
     if job_id in jobs:

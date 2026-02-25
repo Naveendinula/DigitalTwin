@@ -1,13 +1,36 @@
 # Architecture Documentation
 
 > **Status**: Living Document  
-> **Last Updated**: February 21, 2026  
+> **Last Updated**: February 25, 2026  
 > **Owner**: Naveen Panditharatne
 
 ## Recent additions / changes
 
+- **Date:** 2026-02-25
+- **Neo4j-first graph cutover (phase 5):** Graph query/LLM paths now default to Neo4j (`GRAPH_BACKEND=neo4j`) with no silent read fallback path.
+- **Backend updates:** `backend/config.py` now defaults `GRAPH_BACKEND` to `neo4j`; `backend/graph_store.py` selects a single active backend without auto-fallback; `backend/graph_api.py` uses only the graph-store router path; `backend/tasks.py` now treats graph build + Neo4j sync as required when `GRAPH_BACKEND=neo4j`; `backend/neo4j_client.py` now fails fast during startup when required Neo4j connectivity/config is missing.
+- **Operational note:** `backend/.env.example` now defaults to Neo4j and includes ingest batch tuning.
+
+- **Date:** 2026-02-25
+- **LLM graph-store migration (phase 4):** LLM context generation no longer depends on directly loading a NetworkX graph in `llm_chat.py`; it now uses graph-store queries (`stats`, targeted node queries, neighbor edges) so the same path works with Neo4j-backed graph reads.
+- **Backend updates:** Updated `backend/llm_chat.py` to query via `get_graph_store()` and validate referenced IDs through store lookups; updated `backend/llm_api.py` to pass `job_id` directly into the LLM context pipeline.
+
+- **Date:** 2026-02-25
+- **Neo4j read backend (phase 3):** Added Neo4j-backed read implementations for stats, neighbors, shortest path, structured query, and subgraph responses.
+- **Backend updates:** Extended `backend/graph_store_neo4j.py` with query implementations for stats, neighbors, shortest path, structured query, and subgraph responses; updated `backend/graph_store.py` to activate Neo4j store based on config.
+
+- **Date:** 2026-02-25
+- **Graph dual-write to Neo4j (phase 2):** Added graph artifact persistence into Neo4j after IFC graph build.
+- **Backend updates:** Added `backend/graph_store_neo4j.py` with Neo4j schema bootstrap (constraints/indexes), batched `graph.json` ingest, and per-job deletion helper; `backend/tasks.py` syncs after writing `graph.json`; `backend/main.py` deletes Neo4j graph rows on job delete.
+- **Config updates:** Added `NEO4J_INGEST_BATCH_SIZE` env setting in `backend/config.py` and `.env.example`.
+
+- **Date:** 2026-02-25
+- **Graph backend abstraction (phase 0-1):** Added initial graph-store abstraction so API routes call a backend store instead of directly coupling to NetworkX internals.
+- **Backend updates:** Added `backend/graph_models.py`, `backend/graph_store.py`, and `backend/graph_store_networkx.py`; simplified `backend/graph_api.py` into a thin router over the store; kept response contracts unchanged.
+- **Neo4j readiness:** Added `neo4j` dependency, environment config (`GRAPH_BACKEND`, `NEO4J_*`), and driver lifecycle helpers in `backend/neo4j_client.py` wired into FastAPI lifespan.
+
 - **Date:** 2026-02-22
-- **LLM BIM Assistant:** Added an AI chat panel that lets users ask natural language questions about their building model. The LLM (OpenRouter, `stepfun/step-3.5-flash:free`) receives graph context (stats, keyword-matched nodes, relationships) extracted from the NetworkX LPG and returns human-readable answers with clickable `globalId` references for 3D highlighting.
+- **LLM BIM Assistant:** Added an AI chat panel that lets users ask natural language questions about their building model. The LLM (OpenRouter, `stepfun/step-3.5-flash:free`) receives graph context (stats, keyword-matched nodes, relationships) extracted through the graph-store layer and returns human-readable answers with clickable `globalId` references for 3D highlighting.
 - **Backend:** Added `backend/llm_chat.py` (context-stuffing engine: graph summary + keyword search + edge context), `backend/llm_api.py` (`POST /api/llm/{job_id}/chat`), OpenRouter config in `backend/config.py`.
 - **Frontend:** Added `LlmChatPanel.jsx` (draggable floating chat), `ChatIcon` in `ViewerIcons.jsx`, wired into `useFloatingPanels`/`usePanelStacking`/`ViewerToolbar`/`ViewerShell`.
 
@@ -42,11 +65,11 @@
 
 - **Date:** 2026-02-21
 - **Graph query API (phase 2):** Added `backend/graph_api.py` with authenticated graph endpoints for stats, neighbors, shortest path, structured query, and filtered subgraph export.
-- **Backend updates:** `main.py` now mounts the graph router under `/api/graph/*` and clears in-memory graph cache entries when a job is deleted.
+- **Backend updates:** `main.py` mounts the graph router under `/api/graph/*` and invalidates graph-store state when a job is deleted.
 
 - **Date:** 2026-02-21
 - **Graph query layer (phase 1):** Added `backend/graph_builder.py` to build a lightweight relationship graph during IFC processing.
-- **Backend updates:** `process_ifc_file` now writes `output/{job_id}/graph.json` after metadata extraction (non-fatal if graph build fails).
+- **Backend updates:** `process_ifc_file` writes `output/{job_id}/graph.json` after metadata extraction.
 - **Dependency update:** Added `networkx` for directed multigraph build + node-link JSON serialization.
 
 - **Date:** 2026-02-19
@@ -194,6 +217,10 @@ The system bridges the gap between complex BIM files and accessible web visualiz
 *   `ifc_spatial_hierarchy.py`: Extracts the building tree (Site -> Building -> Storey -> Space -> Element).
 *   `graph_api.py`: Graph-query API endpoints for per-job graph stats, neighbors, paths, and filtered traversals.
 *   `graph_builder.py`: Builds a lightweight IFC relationship graph and writes `graph.json` artifact.
+*   `graph_store.py`: Graph backend selector for API/LLM query paths (`neo4j` or `networkx`).
+*   `graph_store_neo4j.py`: Neo4j ingest + query store implementation (stats, traversal, path, subgraph).
+*   `graph_store_networkx.py`: NetworkX graph artifact query store implementation (optional backend).
+*   `neo4j_client.py`: Shared Neo4j driver lifecycle and connectivity checks.
 *   `utils.py`: Shared helper functions for text normalization, space identifier extraction, and IFC-file lookup by `job_id`.
 *   `prac-database.csv`: The reference database for material carbon factors.
 *   `uploads/`: Storage for raw uploaded IFC files.
@@ -335,13 +362,14 @@ graph TB
 1.  **Process stage**: During background IFC processing, after metadata extraction, backend calls `graph_builder.py`.
 2.  **Build graph**: The module opens IFC and builds a directed multigraph of key BIM relationships (containment, decomposition, boundaries, materials, systems, HVAC feed/serve links).
 3.  **Persist**: Graph is serialized as node-link JSON to `output/{jobId}/graph.json`.
-4.  **Failure behavior**: Graph generation is non-fatal; processing continues even if graph build fails.
+4.  **Sync**: Backend syncs `graph.json` into Neo4j in batches.
+5.  **Failure behavior**: If `GRAPH_BACKEND=neo4j`, graph build/sync failure fails the processing job; otherwise graph generation remains non-fatal.
 
-### Data Flow: Graph Query API (Phase 2)
+### Data Flow: Graph Query API (Phase 2-5)
 1.  **Authorize**: Frontend calls `/api/graph/{jobId}/*`; backend enforces per-job ownership with `require_job_access_user`.
-2.  **Load cache**: `graph_api.py` loads `output/{jobId}/graph.json` into memory and reuses it per job while file timestamp/size stays unchanged.
-3.  **Query**: Endpoints expose graph stats, 1-hop neighbors, shortest path, structured traversal query, and filtered subgraph export.
-4.  **Invalidate**: On job deletion, backend clears the in-memory graph cache entry for that `job_id`.
+2.  **Select backend**: `graph_store.py` returns the configured query backend (`neo4j` by default, `networkx` optional).
+3.  **Query**: Endpoints expose graph stats, 1-hop neighbors, shortest path, structured traversal query, and filtered subgraph export through the active store.
+4.  **Invalidate**: On job deletion, backend invalidates graph-store state and deletes Neo4j graph rows for that `job_id`.
 
 ### Data Flow: Graph Query Panel (Phase 3)
 1.  **Open panel**: User clicks Graph in the viewer toolbar to open `GraphQueryPanel`.
@@ -421,7 +449,8 @@ graph TB
 ### Backend
 *   **FastAPI**: Web framework.
 *   **IfcOpenShell**: Parsing and manipulating IFC files.
-*   **NetworkX**: Directed multigraph representation and node-link JSON serialization for `graph.json`.
+*   **NetworkX**: Directed multigraph representation and node-link JSON serialization for `graph.json` build artifact (also optional query backend).
+*   **Neo4j + neo4j Python driver**: Default graph query backend for API and LLM paths.
 *   **SQLite + aiosqlite**: Lightweight async persistence for maintenance logs, work orders, auth, and job ownership.
 *   **Pandas**: Data manipulation for the EC database and material merging.
 *   **IfcConvert**: External executable (must be present in `backend/`) for geometry conversion.

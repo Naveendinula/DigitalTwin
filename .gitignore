@@ -18,6 +18,12 @@ backend/*.db-wal
 backend/*.db-shm
 media_sources/
 HELICOPTER_VIEW.md
+.env
+.env.*
+backend/.env
+backend/.env.*
+frontend/.env
+frontend/.env.*
 
 # OS
 .DS_Store

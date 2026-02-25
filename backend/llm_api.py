@@ -7,10 +7,9 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field, field_validator
+from fastapi import APIRouter, Depends
+from pydantic import BaseModel, Field
 
-from graph_api import _load_graph
 from job_security import require_job_access_user
 from llm_chat import ask_about_model
 
@@ -44,11 +43,9 @@ async def chat_with_model(
     Ask the LLM a question about the BIM model.
     Sends conversation history; the graph is used as context automatically.
     """
-    graph = _load_graph(job_id)
-
     messages = [{"role": m.role, "content": m.content} for m in request.messages]
 
-    result = await ask_about_model(graph, messages)
+    result = await ask_about_model(job_id, messages)
 
     return ChatResponse(
         answer=result["answer"],
