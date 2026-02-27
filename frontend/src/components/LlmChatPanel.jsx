@@ -3,6 +3,8 @@ import DraggablePanel from './DraggablePanel'
 import { apiFetch, parseJsonSafe } from '../utils/api'
 import { ensureStyleInjected } from '../utils/styleInjection'
 
+const LLM_CHAT_TIMEOUT_MS = Number(import.meta.env.VITE_LLM_CHAT_TIMEOUT_MS || 300000)
+
 /**
  * Floating chat panel that lets users ask natural language questions
  * about the BIM model. Powered by an LLM with graph context.
@@ -58,7 +60,7 @@ function LlmChatPanel({
       const response = await apiFetch(`/api/llm/${jobId}/chat`, {
         method: 'POST',
         body: { messages: historySlice },
-        timeoutMs: 60000,
+        timeoutMs: LLM_CHAT_TIMEOUT_MS,
       })
 
       if (!response.ok) {

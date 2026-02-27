@@ -16,7 +16,7 @@ import networkx as nx
 from ifcopenshell.util import system as ifc_system
 
 from fm_hvac_core import analyze_hvac_fm
-from ifc_metadata_extractor import get_containing_storey, get_element_materials
+from ifc_metadata_extractor import get_containing_storey, get_element_materials, get_property_sets, convert_value
 from utils import clean_text as _clean_text
 
 logger = logging.getLogger(__name__)
@@ -103,6 +103,66 @@ def _ensure_system_node(graph: nx.MultiDiGraph, system_name: str) -> str:
             storey=None,
             materials=[],
         )
+    return node_id
+
+
+def _coerce_prop_value(value: Any) -> str:
+    """Coerce a property value to a short string for graph storage."""
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return str(value).lower()
+    if isinstance(value, (int, float)):
+        return str(value)
+    if isinstance(value, (list, tuple)):
+        return ", ".join(str(v) for v in value[:10])
+    return str(value)[:500]
+
+
+def _value_type(value: Any) -> str:
+    """Classify a property value for downstream filtering."""
+    if isinstance(value, bool):
+        return "bool"
+    if isinstance(value, int):
+        return "int"
+    if isinstance(value, float):
+        return "float"
+    if isinstance(value, (list, tuple)):
+        return "list"
+    return "string"
+
+
+def _ensure_property_node(
+    graph: nx.MultiDiGraph,
+    parent_id: str,
+    pset_name: str,
+    prop_name: str,
+    prop_value: Any,
+    seen_edges: set[tuple[str, str, str]],
+) -> str | None:
+    """Create a Property node and connect it to its parent element."""
+    clean_pset = _clean_text(pset_name)
+    clean_prop = _clean_text(prop_name)
+    if not clean_pset or not clean_prop:
+        return None
+
+    node_id = f"prop:{parent_id}:{clean_pset}:{clean_prop}"
+    if node_id not in graph:
+        str_value = _coerce_prop_value(prop_value)
+        graph.add_node(
+            node_id,
+            globalId=node_id,
+            label="Property",
+            ifcType="Property",
+            name=f"{clean_pset}.{clean_prop}",
+            storey=None,
+            materials=[],
+            psetName=clean_pset,
+            propName=clean_prop,
+            value=str_value,
+            valueType=_value_type(prop_value),
+        )
+    _add_typed_edge_once(graph, seen_edges, parent_id, node_id, "HAS_PROPERTY")
     return node_id
 
 
@@ -220,7 +280,7 @@ def build_graph_from_ifc_model(ifc_file: ifcopenshell.file) -> nx.MultiDiGraph:
         target_id = _ensure_element_node(graph, element)
         _add_typed_edge_once(graph, seen_edges, source_id, target_id, "BOUNDED_BY")
 
-    # Materials + system associations from products
+    # Materials, properties, and system associations from products
     for product in products:
         product_id = _ensure_element_node(graph, product)
         if not product_id:
@@ -229,6 +289,18 @@ def build_graph_from_ifc_model(ifc_file: ifcopenshell.file) -> nx.MultiDiGraph:
         for material_name in _normalize_materials(get_element_materials(product)):
             material_id = _ensure_material_node(graph, material_name)
             _add_typed_edge_once(graph, seen_edges, product_id, material_id, "HAS_MATERIAL")
+
+        # Property sets / quantity sets
+        try:
+            psets = get_property_sets(product)
+        except Exception:
+            psets = {}
+        for pset_name, properties in psets.items():
+            for prop_name, prop_value in properties.items():
+                _ensure_property_node(
+                    graph, product_id, pset_name, prop_name,
+                    prop_value, seen_edges,
+                )
 
         try:
             systems = ifc_system.get_element_systems(product) or []

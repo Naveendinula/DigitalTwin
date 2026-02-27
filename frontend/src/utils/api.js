@@ -98,7 +98,7 @@ async function fetchWithTimeout(url, options = {}) {
     return await fetch(url, requestInit)
   } catch (error) {
     if (error?.name === 'AbortError') {
-      throw new Error('Request timed out. Check that backend is running on http://localhost:8000.')
+      throw new Error('Request timed out before a response was received. The backend may still be processing.')
     }
     throw error
   } finally {

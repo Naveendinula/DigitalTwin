@@ -81,3 +81,31 @@ async def get_graph_subgraph(
         offset=offset,
     )
     return get_graph_store().subgraph(job_id, query)
+
+
+@router.get("/{job_id}/properties/{global_id}")
+async def get_element_properties(
+    job_id: str,
+    global_id: str,
+    pset_name: str | None = Query(default=None),
+    _: dict[str, Any] = Depends(require_job_access_user),
+):
+    """Return property sets attached to a single element."""
+    store = get_graph_store()
+    method = getattr(store, "get_element_properties", None)
+    if not method:
+        return {"properties": [], "note": "Property queries not supported by current graph backend."}
+    return {"properties": method(job_id, global_id, pset_name=pset_name)}
+
+
+@router.get("/{job_id}/property-stats")
+async def get_property_stats(
+    job_id: str,
+    _: dict[str, Any] = Depends(require_job_access_user),
+):
+    """Return aggregate property counts for the model."""
+    store = get_graph_store()
+    method = getattr(store, "get_property_stats", None)
+    if not method:
+        return {"total_properties": 0, "note": "Property queries not supported by current graph backend."}
+    return method(job_id)

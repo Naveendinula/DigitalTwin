@@ -9,19 +9,23 @@ from __future__ import annotations
 import logging
 
 from config import GRAPH_BACKEND
-from graph_store_neo4j import Neo4jGraphStore
-from graph_store_networkx import NetworkXGraphStore
 
 logger = logging.getLogger(__name__)
 
 if GRAPH_BACKEND == "neo4j":
+    from graph_store_neo4j import Neo4jGraphStore
+
     _graph_store = Neo4jGraphStore()
     _active_backend = "neo4j"
 elif GRAPH_BACKEND == "networkx":
+    from graph_store_networkx import NetworkXGraphStore
+
     _graph_store = NetworkXGraphStore()
     _active_backend = "networkx"
 else:
     logger.warning("Unknown GRAPH_BACKEND '%s'; using neo4j.", GRAPH_BACKEND)
+    from graph_store_neo4j import Neo4jGraphStore
+
     _graph_store = Neo4jGraphStore()
     _active_backend = "neo4j"
 

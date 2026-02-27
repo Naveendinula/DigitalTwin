@@ -1,10 +1,35 @@
 # Architecture Documentation
 
 > **Status**: Living Document  
-> **Last Updated**: February 25, 2026  
+> **Last Updated**: February 27, 2026  
 > **Owner**: Naveen Panditharatne
 
 ## Recent additions / changes
+
+- **Date:** 2026-02-27
+- **Landing loader progress UI:** Updated the `UploadPanel` landing preload overlay to show real frame-loading progress with a percentage (`0-100%`) and a thin progress bar while scrollytelling frames load.
+- **Landing loader race fix:** Hardened landing frame preload state updates against React `StrictMode` double-effect races by scoping callbacks to the active preload run; loader now reliably reaches `100%` and holds briefly before dismissing.
+
+- **Date:** 2026-02-26
+- **Deterministic COBie HRU query path:** Added a targeted non-LLM answer path for questions about HRUs with COBie parameters to prevent overcounting from prompt inference.
+- **Backend (`llm_chat.py`):** Before Cypher/keyword LLM flows, COBie+HRU questions now run a strict property check over HRU elements and only count elements with at least one non-empty `COBie.*` property value. Responses include exact matched `globalId`s.
+- **HRU level count hardening:** Added a deterministic non-LLM path for count questions like "how many HRUs are on level 2", using `Constraints.Level` first and `storey` as fallback so counts are not under-reported when spatial containment storey is sparse.
+- **Air terminal by space hardening:** Added a deterministic non-LLM path for questions like "how many air terminals are connected to the residential lobby". Space matching now includes key `IfcSpace` property values (`Identity Data.Name`, `Room Name`, `Number`, `Room Number`, `Pset_SpaceCommon.Reference`) instead of relying only on `IfcSpace.name`.
+- **LLM chat timeout hardening (frontend):** Increased LLM panel request timeout from 60s to a configurable `VITE_LLM_CHAT_TIMEOUT_MS` (default 300s) and updated timeout wording to reflect that backend processing may still be in progress.
+
+- **Date:** 2026-02-25
+- **Self-correcting Cypher loop (LLM Phase 3):** Hardened the text-to-Cypher pipeline with pre-execution auto-correction, schema validation, and enriched repair context.
+- **Backend (`cypher_agent.py`):**
+  - `_sanitize_cypher()` — auto-fixes common LLM mistakes without an LLM round-trip: relationship-type-as-label (`[:CONTAINED_IN]` → `[:BIM_REL {type: 'CONTAINED_IN'}]`), missing `job_id` on `:BIM_REL`, stripping LIMIT from pure count queries.
+  - `_validate_cypher_labels()` — checks node labels and parameter usage against the schema before execution; warnings are included in reasoning output.
+  - Enhanced repair prompt — `_build_repair_hints()` detects specific mistakes in failed Cypher and injects targeted hints (valid labels, correct relationship patterns) so the repair LLM call is more likely to succeed.
+  - Repaired queries also run through `_sanitize_cypher()` before re-execution.
+  - Structured attempt tracking — `_build_reasoning()` formats the full retry chain (attempt number, status, Cypher) into the `reasoning` field for transparency.
+
+- **Date:** 2026-02-25
+- **Text-to-Cypher agent (LLM Phase 2):** Added a two-step text-to-Cypher pipeline that translates natural-language questions into Neo4j Cypher queries, executes them, and synthesises answers — with automatic repair/retry on query failures. The keyword-search context path remains as a fallback.
+- **Backend:** Added `backend/cypher_agent.py` (schema-aware Cypher generation, few-shot examples, self-correcting repair loop, read-only execution, answer synthesis). Updated `backend/llm_chat.py` to route through the Cypher agent first when `GRAPH_BACKEND=neo4j`, falling back to the existing keyword-search path on failure.
+- **Flow:** User question → `generate_cypher()` (LLM + schema + few-shot) → `_execute_cypher()` (Neo4j read-only) → repair loop (up to 2 retries) → `_synthesise_answer()` (LLM) → response with `answer`, `referenced_ids`, `reasoning` (contains the Cypher query).
 
 - **Date:** 2026-02-25
 - **Neo4j-first graph cutover (phase 5):** Graph query/LLM paths now default to Neo4j (`GRAPH_BACKEND=neo4j`) with no silent read fallback path.

@@ -58,11 +58,32 @@ _SCHEMA_QUERIES = (
     FOR ()-[r:BIM_REL]-()
     ON (r.job_id, r.type)
     """,
+    # Phase 6 – Property nodes
+    """
+    CREATE CONSTRAINT bim_prop_job_id_unique IF NOT EXISTS
+    FOR (p:BIMProp)
+    REQUIRE (p.job_id, p.id) IS UNIQUE
+    """,
+    """
+    CREATE INDEX bim_prop_job_propname IF NOT EXISTS
+    FOR (p:BIMProp)
+    ON (p.job_id, p.propName)
+    """,
+    """
+    CREATE INDEX bim_prop_job_psetname IF NOT EXISTS
+    FOR (p:BIMProp)
+    ON (p.job_id, p.psetName)
+    """,
 )
 
 _DELETE_JOB_GRAPH_CYPHER = """
 MATCH (n:BIMNode {job_id: $job_id})
 DETACH DELETE n
+"""
+
+_DELETE_JOB_PROPS_CYPHER = """
+MATCH (p:BIMProp {job_id: $job_id})
+DETACH DELETE p
 """
 
 _UPSERT_NODES_CYPHER = """
@@ -84,6 +105,24 @@ MERGE (source)-[r:BIM_REL {job_id: $job_id, edge_key: row.edge_key}]->(target)
 SET r.type = row.type,
     r.source = row.source,
     r.target = row.target
+"""
+
+_UPSERT_PROPS_CYPHER = """
+UNWIND $rows AS row
+MERGE (p:BIMProp {job_id: $job_id, id: row.id})
+SET p.globalId   = row.globalId,
+    p.psetName   = row.psetName,
+    p.propName   = row.propName,
+    p.value      = row.value,
+    p.valueType  = row.valueType,
+    p.parentId   = row.parentId
+"""
+
+_UPSERT_PROP_EDGES_CYPHER = """
+UNWIND $rows AS row
+MATCH (parent:BIMNode {job_id: $job_id, id: row.parentId})
+MATCH (prop:BIMProp  {job_id: $job_id, id: row.id})
+MERGE (parent)-[r:HAS_PROP {job_id: $job_id, edge_key: row.edge_key}]->(prop)
 """
 
 
@@ -154,7 +193,10 @@ def _normalize_edge(raw_edge: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
-def _load_graph_rows(graph_json_path: str | Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def _load_graph_rows(graph_json_path: str | Path) -> tuple[
+    list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]
+]:
+    """Return (element_nodes, edges, property_rows) from graph.json."""
     graph_path = Path(graph_json_path)
     with open(graph_path, "r", encoding="utf-8") as handle:
         payload = json.load(handle)
@@ -165,24 +207,50 @@ def _load_graph_rows(graph_json_path: str | Path) -> tuple[list[dict[str, Any]],
 
     nodes: list[dict[str, Any]] = []
     edges: list[dict[str, Any]] = []
+    prop_rows: list[dict[str, Any]] = []
 
     if isinstance(raw_nodes, list):
         for raw in raw_nodes:
             if not isinstance(raw, dict):
                 continue
-            normalized = _normalize_node(raw)
-            if normalized:
-                nodes.append(normalized)
+            # Property nodes have ifcType=="Property"
+            if raw.get("ifcType") == "Property":
+                prop_id = _clean_text(raw.get("id")) or _clean_text(raw.get("globalId"))
+                if not prop_id:
+                    continue
+                # Derive parentId from the node id pattern "prop:{parentId}:{pset}:{prop}"
+                parent_id = ""
+                if prop_id.startswith("prop:"):
+                    parts = prop_id.split(":", 3)
+                    if len(parts) >= 3:
+                        parent_id = parts[1]
+                prop_rows.append({
+                    "id": prop_id,
+                    "globalId": prop_id,
+                    "psetName": _clean_text(raw.get("psetName")) or "",
+                    "propName": _clean_text(raw.get("propName")) or "",
+                    "value": _clean_text(raw.get("value")) or "",
+                    "valueType": _clean_text(raw.get("valueType")) or "string",
+                    "parentId": parent_id,
+                    "edge_key": f"{parent_id}|HAS_PROP|{prop_id}",
+                })
+            else:
+                normalized = _normalize_node(raw)
+                if normalized:
+                    nodes.append(normalized)
 
     if isinstance(raw_edges, list):
         for raw in raw_edges:
             if not isinstance(raw, dict):
                 continue
+            # Skip HAS_PROPERTY edges (handled via prop_rows above)
+            if _clean_text(raw.get("type")) == "HAS_PROPERTY":
+                continue
             normalized = _normalize_edge(raw)
             if normalized:
                 edges.append(normalized)
 
-    return nodes, edges
+    return nodes, edges, prop_rows
 
 
 def sync_graph_json_to_neo4j(job_id: str, graph_json_path: str | Path) -> dict[str, Any]:
@@ -197,10 +265,11 @@ def sync_graph_json_to_neo4j(job_id: str, graph_json_path: str | Path) -> dict[s
     if not _ensure_schema():
         return {"enabled": True, "nodes": 0, "edges": 0, "error": "schema_init_failed"}
 
-    nodes, edges = _load_graph_rows(graph_json_path)
+    nodes, edges, prop_rows = _load_graph_rows(graph_json_path)
 
     try:
         with driver.session(database=NEO4J_DATABASE) as session:
+            session.execute_write(lambda tx: tx.run(_DELETE_JOB_PROPS_CYPHER, job_id=job_id).consume())
             session.execute_write(lambda tx: tx.run(_DELETE_JOB_GRAPH_CYPHER, job_id=job_id).consume())
 
             for batch in _iter_batches(nodes, NEO4J_INGEST_BATCH_SIZE):
@@ -212,11 +281,21 @@ def sync_graph_json_to_neo4j(job_id: str, graph_json_path: str | Path) -> dict[s
                 session.execute_write(
                     lambda tx, rows=batch: tx.run(_UPSERT_EDGES_CYPHER, job_id=job_id, rows=rows).consume()
                 )
+
+            # Property nodes + edges
+            for batch in _iter_batches(prop_rows, NEO4J_INGEST_BATCH_SIZE):
+                session.execute_write(
+                    lambda tx, rows=batch: tx.run(_UPSERT_PROPS_CYPHER, job_id=job_id, rows=rows).consume()
+                )
+            for batch in _iter_batches(prop_rows, NEO4J_INGEST_BATCH_SIZE):
+                session.execute_write(
+                    lambda tx, rows=batch: tx.run(_UPSERT_PROP_EDGES_CYPHER, job_id=job_id, rows=rows).consume()
+                )
     except Exception as exc:
         logger.warning("[%s] Neo4j graph sync failed: %s", job_id, exc)
         return {"enabled": True, "nodes": 0, "edges": 0, "error": str(exc)}
 
-    return {"enabled": True, "nodes": len(nodes), "edges": len(edges)}
+    return {"enabled": True, "nodes": len(nodes), "edges": len(edges), "properties": len(prop_rows)}
 
 
 def delete_job_graph_from_neo4j(job_id: str) -> bool:
@@ -226,6 +305,7 @@ def delete_job_graph_from_neo4j(job_id: str) -> bool:
         return False
     try:
         with driver.session(database=NEO4J_DATABASE) as session:
+            session.execute_write(lambda tx: tx.run(_DELETE_JOB_PROPS_CYPHER, job_id=job_id).consume())
             session.execute_write(lambda tx: tx.run(_DELETE_JOB_GRAPH_CYPHER, job_id=job_id).consume())
         return True
     except Exception as exc:
@@ -577,6 +657,9 @@ class Neo4jGraphStore:
 
     def _query_impl(self, job_id: str, query: Any) -> dict[str, Any]:
         relationship = _clean_text(query.relationship) or None
+        property_name = _clean_text(getattr(query, "property_name", None)) or None
+        property_value = _clean_text(getattr(query, "property_value", None)) or None
+
         related_node_ids = self._collect_related_node_ids(
             job_id,
             query.related_to,
@@ -585,6 +668,26 @@ class Neo4jGraphStore:
         )
         if not related_node_ids:
             return {"nodes": [], "edges": [], "total": 0}
+
+        # When filtering by property, narrow the candidate set first
+        if property_name or property_value:
+            prop_filter_rows = self._execute_read(
+                """
+                MATCH (n:BIMNode {job_id: $job_id})-[:HAS_PROP]->(p:BIMProp {job_id: $job_id})
+                WHERE n.id IN $related_ids
+                  AND ($prop_name IS NULL OR toLower(p.propName) CONTAINS toLower($prop_name))
+                  AND ($prop_value IS NULL OR toLower(p.value) CONTAINS toLower($prop_value))
+                RETURN DISTINCT n.id AS id
+                """,
+                job_id=job_id,
+                related_ids=list(related_node_ids),
+                prop_name=property_name,
+                prop_value=property_value,
+            )
+            prop_matched_ids = {str(row.get("id")) for row in prop_filter_rows if _clean_text(row.get("id"))}
+            related_node_ids = related_node_ids & prop_matched_ids
+            if not related_node_ids:
+                return {"nodes": [], "edges": [], "total": 0}
 
         node_rows = self._execute_read(
             """
@@ -670,3 +773,85 @@ class Neo4jGraphStore:
         )
         existing = [str(row.get("id")) for row in rows if _clean_text(row.get("id"))]
         return list(dict.fromkeys(existing))
+
+    # ---- Property query helpers (Phase 6) ----
+
+    def get_element_properties(
+        self, job_id: str, global_id: str, *, pset_name: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """
+        Return all properties attached to a single element node.
+        Optionally filter by pset name.
+        """
+        self._ensure_job_graph_exists(job_id)
+        node_id = _clean_text(global_id)
+        if not self._get_node_by_id(job_id, node_id):
+            raise HTTPException(status_code=404, detail=f"Node not found: {node_id}")
+
+        rows = self._execute_read(
+            """
+            MATCH (n:BIMNode {job_id: $job_id, id: $node_id})
+                  -[:HAS_PROP]->
+                  (p:BIMProp {job_id: $job_id})
+            WHERE $pset_name IS NULL
+               OR toLower(p.psetName) = toLower($pset_name)
+            RETURN p.psetName  AS psetName,
+                   p.propName  AS propName,
+                   p.value     AS value,
+                   p.valueType AS valueType
+            ORDER BY toLower(p.psetName), toLower(p.propName)
+            """,
+            job_id=job_id,
+            node_id=node_id,
+            pset_name=_clean_text(pset_name) or None,
+        )
+        return [
+            {
+                "psetName": row.get("psetName") or "",
+                "propName": row.get("propName") or "",
+                "value": row.get("value") or "",
+                "valueType": row.get("valueType") or "string",
+            }
+            for row in rows
+        ]
+
+    def get_property_stats(self, job_id: str) -> dict[str, Any]:
+        """Return aggregate counts of property sets and property names."""
+        self._ensure_job_graph_exists(job_id)
+
+        total_rows = self._execute_read(
+            "MATCH (p:BIMProp {job_id: $job_id}) RETURN count(p) AS count",
+            job_id=job_id,
+        )
+        pset_rows = self._execute_read(
+            """
+            MATCH (p:BIMProp {job_id: $job_id})
+            RETURN p.psetName AS psetName, count(*) AS count
+            ORDER BY count DESC
+            LIMIT 50
+            """,
+            job_id=job_id,
+        )
+        prop_rows = self._execute_read(
+            """
+            MATCH (p:BIMProp {job_id: $job_id})
+            RETURN p.propName AS propName, count(*) AS count
+            ORDER BY count DESC
+            LIMIT 50
+            """,
+            job_id=job_id,
+        )
+
+        return {
+            "total_properties": int((total_rows[0] if total_rows else {}).get("count") or 0),
+            "pset_counts": {
+                row["psetName"]: int(row["count"])
+                for row in pset_rows
+                if row.get("psetName")
+            },
+            "property_name_counts": {
+                row["propName"]: int(row["count"])
+                for row in prop_rows
+                if row.get("propName")
+            },
+        }

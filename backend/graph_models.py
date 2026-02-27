@@ -12,6 +12,10 @@ class GraphQuery(BaseModel):
     material: str | None = None
     name_contains: str | None = None
 
+    # Property filters (Phase 6)
+    property_name: str | None = None
+    property_value: str | None = None
+
     # Relationship traversal
     related_to: str | None = None
     relationship: str | None = None

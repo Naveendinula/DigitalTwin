@@ -43,6 +43,7 @@ const getStageLabel = (stage, status) => {
 // Frame animation configuration
 const FRAME_COUNT = 191
 const FRAME_PATH = '/media/frames_max2/ezgif-frame-'
+const LOADER_COMPLETE_HOLD_MS = 150
 
 // Story beats configuration - Updated for new scroll pattern
 const STORY_BEATS = [
@@ -117,6 +118,7 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
 
   // Scroll animation states
   const [imagesLoaded, setImagesLoaded] = useState(false)
+  const [landingLoadProgress, setLandingLoadProgress] = useState(0)
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   
@@ -124,6 +126,8 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
   const currentFrameRef = useRef(0)
   const pendingFrameRef = useRef(0)
   const rafRef = useRef(null)
+  const preloadRunIdRef = useRef(0)
+  const preloadCompleteTimerRef = useRef(null)
   const containerRef = useRef(null)
   const heroRef = useRef(null)
   const canvasRef = useRef(null)
@@ -242,42 +246,58 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
   useEffect(() => {
     if (hasModel) return
 
+    preloadRunIdRef.current += 1
+    const runId = preloadRunIdRef.current
+    let cancelled = false
+
+    if (preloadCompleteTimerRef.current) {
+      clearTimeout(preloadCompleteTimerRef.current)
+      preloadCompleteTimerRef.current = null
+    }
+
     const images = new Array(FRAME_COUNT)
-    let loadedCount = 0
+    let settledCount = 0
+    let completionScheduled = false
     framesRef.current = images
+    setImagesLoaded(false)
+    setLandingLoadProgress(0)
+
+    const isActiveRun = () => !cancelled && preloadRunIdRef.current === runId
+
+    const handleFrameSettled = () => {
+      if (!isActiveRun()) return
+      settledCount++
+      const percent = Math.min(100, Math.round((settledCount / FRAME_COUNT) * 100))
+      setLandingLoadProgress(percent)
+      if (settledCount === FRAME_COUNT && !completionScheduled) {
+        completionScheduled = true
+        setLandingLoadProgress(100)
+        preloadCompleteTimerRef.current = setTimeout(() => {
+          if (!isActiveRun()) return
+          setImagesLoaded(true)
+          preloadCompleteTimerRef.current = null
+        }, LOADER_COMPLETE_HOLD_MS)
+      }
+    }
 
     for (let i = 0; i < FRAME_COUNT; i++) {
       const img = new Image()
       img.src = getFramePath(i)
-      img.onload = async () => {
-        let frame = img
-
-        if (typeof createImageBitmap === 'function') {
-          try {
-            frame = await createImageBitmap(img)
-          } catch {
-            try {
-              await img.decode()
-            } catch {}
-            frame = img
-          }
-        } else {
-          try {
-            await img.decode()
-          } catch {}
-        }
-
-        images[i] = frame
-        loadedCount++
-        if (loadedCount === FRAME_COUNT) {
-          setImagesLoaded(true)
-        }
+      img.onload = () => {
+        if (!isActiveRun()) return
+        images[i] = img
+        handleFrameSettled()
       }
       img.onerror = () => {
-        loadedCount++
-        if (loadedCount === FRAME_COUNT) {
-          setImagesLoaded(true)
-        }
+        handleFrameSettled()
+      }
+    }
+
+    return () => {
+      cancelled = true
+      if (preloadCompleteTimerRef.current) {
+        clearTimeout(preloadCompleteTimerRef.current)
+        preloadCompleteTimerRef.current = null
       }
     }
   }, [hasModel])
@@ -810,7 +830,15 @@ function UploadPanel({ onModelReady, hasModel, onReset }) {
         <div style={styles.loadingOverlay}>
           <div style={styles.loadingContent}>
             <div style={styles.loadingSpinner}></div>
-            <p style={styles.loadingText}>Loading</p>
+            <p style={styles.loadingText}>Loading {landingLoadProgress}%</p>
+            <div style={styles.loadingProgressTrack}>
+              <div
+                style={{
+                  ...styles.loadingProgressFill,
+                  width: `${landingLoadProgress}%`
+                }}
+              />
+            </div>
           </div>
         </div>
       )}
@@ -1150,6 +1178,20 @@ const styles = {
     color: '#111827',
     fontSize: '16px',
     fontWeight: 500,
+  },
+  loadingProgressTrack: {
+    width: '180px',
+    height: '6px',
+    background: '#D1D5DB',
+    borderRadius: '999px',
+    overflow: 'hidden',
+    margin: '0 auto',
+  },
+  loadingProgressFill: {
+    height: '100%',
+    background: '#111827',
+    borderRadius: '999px',
+    transition: 'width 0.12s linear',
   },
 
   // Navbar
