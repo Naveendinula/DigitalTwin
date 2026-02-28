@@ -364,6 +364,54 @@ async def export_work_orders(
     )
 
 
+# ---------------------------------------------------------------------------
+# Active-elements endpoint (for 3D work-order markers)
+# Must be registered BEFORE /{job_id}/{wo_id} to avoid route shadowing.
+# ---------------------------------------------------------------------------
+
+@router.get("/{job_id}/active-elements")
+async def get_active_elements(
+    job_id: str,
+    current_user: dict[str, Any] = Depends(get_current_user),
+):
+    """Return every global_id that has at least one active work order,
+    together with the count and highest priority for that element."""
+    await ensure_job_access(job_id, int(current_user["id"]))
+
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            f"""
+            SELECT
+                global_id,
+                COUNT(*) AS count,
+                MIN({PRIORITY_ORDER_EXPR}) AS max_priority_rank
+            FROM work_orders
+            WHERE job_id = ?
+              AND deleted_at IS NULL
+              AND status IN ('open', 'in_progress', 'on_hold')
+            GROUP BY global_id
+            """,
+            (job_id,),
+        )
+        rows = await cursor.fetchall()
+        await cursor.close()
+
+        rank_to_priority = {1: "critical", 2: "high", 3: "medium", 4: "low"}
+        result = [
+            {
+                "global_id": row["global_id"],
+                "count": row["count"],
+                "max_priority": rank_to_priority.get(row["max_priority_rank"], "medium"),
+            }
+            for row in rows
+            if row["global_id"]
+        ]
+        return result
+    finally:
+        await db.close()
+
+
 @router.get("/{job_id}/{wo_id}", response_model=WOResponse)
 async def get_work_order(
     job_id: str,

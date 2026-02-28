@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react'
 import * as THREE from 'three'
-import { buildMeshIndex, getMeshesForIds, isLikelyGlobalId, isMeshMatchingIds } from '../utils/sceneIndex'
+import { getMeshesForIds, isMeshMatchingIds } from '../utils/sceneIndex'
 import { debugLog, debugWarn } from '../utils/logger'
 
 /**
@@ -10,13 +10,19 @@ import { debugLog, debugWarn } from '../utils/logger'
  * When enabled, non-selected meshes become semi-transparent wireframes
  * or ghosted solids while selected meshes remain solid with their original materials.
  * 
+ * Now accepts a shared scene-index via `sceneIndex` parameter
+ * instead of building its own (eliminates a redundant full-scene traversal).
+ *
  * Performance optimizations:
  * - Cached X-ray material to avoid recreation
  * - Batched material updates
+ * - Shared mesh index (no duplicate traversal)
  * 
+ * @param {object} [options]
+ * @param {object} [options.sceneIndex] - Shared index from useSceneIndex
  * @returns {object} X-ray mode state and controls
  */
-function useXRayMode() {
+function useXRayMode({ sceneIndex } = {}) {
   const [xRayEnabled, setXRayEnabled] = useState(false)
   
   // Store original materials for restoration
@@ -33,8 +39,6 @@ function useXRayMode() {
   const xRayMaterialRef = useRef(null)
   const ghostMaterialRef = useRef(null)
   const xRayModeRef = useRef('wireframe')
-  const meshIndexRef = useRef(new Map())
-  const allMeshesRef = useRef([])
   const selectedMeshesRef = useRef(new Set())
   const xrayMeshesRef = useRef(new Set())
 
@@ -74,23 +78,11 @@ function useXRayMode() {
     return xRayMaterialRef.current
   }, [])
 
-  const buildSceneIndex = useCallback((scene) => {
-    if (!scene) return
-    // Only index IFC-like meshes (by GlobalId/userData or GlobalId-like ancestor names).
-    // This avoids applying X-ray materials to overlay text/auxiliary meshes (e.g. troika Text).
-    const { index, meshes } = buildMeshIndex(scene, {
-      ancestorDepth: 5,
-      includeName: false,
-      includeUserData: true,
-      filterAncestorNames: isLikelyGlobalId
-    })
-    meshIndexRef.current = index
-    const indexedMeshes = new Set()
-    index.forEach((meshSet) => {
-      meshSet.forEach((mesh) => indexedMeshes.add(mesh))
-    })
-    allMeshesRef.current = indexedMeshes.size > 0 ? Array.from(indexedMeshes) : meshes
-  }, [])
+  const buildSceneIndex = useCallback(() => {
+    // No-op: index is now managed by the shared useSceneIndex hook.
+    // Kept as a stub so call-sites don't break.
+    if (sceneIndex) sceneIndex.rebuild()
+  }, [sceneIndex])
 
   /**
    * Apply X-ray effect to a single mesh
@@ -132,14 +124,9 @@ function useXRayMode() {
       })
     }
     
-    if (!isSelected && currentMaterial.userData?.isHighlight) {
-      // Preserve selection highlight even if ID matching fails while X-ray is active.
-      return
-    }
-
     if (isSelected) {
-      // Keep original material for selected meshes
-      // If it's already highlighted, don't overwrite it
+      // Keep original or highlight material for selected meshes.
+      // If it's already highlighted by useSelection, leave it alone.
       if (currentMaterial.userData?.isHighlight) {
         return
       }
@@ -159,8 +146,8 @@ function useXRayMode() {
    */
   const setScene = useCallback((scene) => {
     sceneRef.current = scene
-    buildSceneIndex(scene)
-  }, [buildSceneIndex])
+    // Index is built by the shared useSceneIndex hook — no work here.
+  }, [])
 
   /**
    * Enable X-ray mode with selected elements
@@ -179,16 +166,22 @@ function useXRayMode() {
     selectedIdsRef.current = idsSet
     
     debugLog('Enabling X-ray mode:', resolvedMode, 'selected IDs:', selectedIds)
-    
-    if (!meshIndexRef.current.size || !allMeshesRef.current.length) {
-      buildSceneIndex(sceneRef.current)
+
+    const meshIndex = sceneIndex?.indexRef?.current || new Map()
+    const allMeshes = sceneIndex?.allMeshesRef?.current || []
+
+    if (!meshIndex.size || !allMeshes.length) {
+      buildSceneIndex()
     }
 
-    const selectedMeshes = getMeshesForIds(idsSet, meshIndexRef.current)
+    const meshIdx = sceneIndex?.indexRef?.current || meshIndex
+    const meshList = sceneIndex?.allMeshesRef?.current || allMeshes
+
+    const selectedMeshes = getMeshesForIds(idsSet, meshIdx)
     selectedMeshesRef.current = new Set()
     xrayMeshesRef.current = new Set()
 
-    allMeshesRef.current.forEach((mesh) => {
+    meshList.forEach((mesh) => {
       const isSelected = selectedMeshes.has(mesh)
       setXRayForMesh(mesh, isSelected, resolvedMode)
       if (isSelected) {
@@ -199,7 +192,7 @@ function useXRayMode() {
     })
     
     setXRayEnabled(true)
-  }, [buildSceneIndex, setXRayForMesh])
+  }, [buildSceneIndex, setXRayForMesh, sceneIndex])
 
   /**
    * Disable X-ray mode and restore all original materials
@@ -273,14 +266,20 @@ function useXRayMode() {
     }
     selectedIdsRef.current = idsSet
 
-    if (!meshIndexRef.current.size || !allMeshesRef.current.length) {
-      buildSceneIndex(sceneRef.current)
+    const meshIndex = sceneIndex?.indexRef?.current || new Map()
+    const allMeshes = sceneIndex?.allMeshesRef?.current || []
+
+    if (!meshIndex.size || !allMeshes.length) {
+      buildSceneIndex()
     }
 
-    let nextSelectedMeshes = getMeshesForIds(idsSet, meshIndexRef.current)
+    const meshIdx = sceneIndex?.indexRef?.current || meshIndex
+    const meshList = sceneIndex?.allMeshesRef?.current || allMeshes
+
+    let nextSelectedMeshes = getMeshesForIds(idsSet, meshIdx)
     if (selectedIds.length > 0 && nextSelectedMeshes.size === 0) {
       nextSelectedMeshes = new Set()
-      allMeshesRef.current.forEach((mesh) => {
+      meshList.forEach((mesh) => {
         if (isMeshMatchingIds(mesh, idsSet)) {
           nextSelectedMeshes.add(mesh)
         }
@@ -304,7 +303,7 @@ function useXRayMode() {
         xrayMeshesRef.current.delete(mesh)
       }
     })
-  }, [xRayEnabled, setXRayForMesh, buildSceneIndex, getXRayMaterial])
+  }, [xRayEnabled, setXRayForMesh, buildSceneIndex, getXRayMaterial, sceneIndex])
 
   /**
    * Toggle X-ray mode

@@ -8,10 +8,15 @@ import { debugLog, debugWarn } from '../utils/logger'
  * 
  * Provides smooth camera pan and zoom to focus on selected elements.
  * Uses requestAnimationFrame with lerp for smooth animation.
- * 
+ *
+ * Now accepts a shared scene-index via `sceneIndex` parameter for
+ * O(k) mesh lookup instead of O(n) scene.traverse.
+ *
+ * @param {object} [options]
+ * @param {object} [options.sceneIndex] - Shared index from useSceneIndex
  * @returns {object} Camera focus controls
  */
-function useCameraFocus() {
+function useCameraFocus({ sceneIndex } = {}) {
   // Store references
   const sceneRef = useRef(null)
   const cameraRef = useRef(null)
@@ -32,18 +37,26 @@ function useCameraFocus() {
   }, [])
 
   /**
-   * Find all meshes matching the given globalIds
+   * Find all meshes matching the given globalIds.
+   * Uses the shared index for O(k) lookup when available,
+   * falls back to scene.traverse only if index is absent.
    * @param {string[]} globalIds - Array of element GlobalIds
    * @returns {THREE.Mesh[]} Array of matching meshes
    */
   const findMeshesByGlobalIds = useCallback((globalIds) => {
-    if (!sceneRef.current || !globalIds || globalIds.length === 0) {
-      return []
+    if (!globalIds || globalIds.length === 0) return []
+
+    // Fast path: use shared index
+    if (sceneIndex) {
+      const result = sceneIndex.getMeshes(globalIds)
+      return Array.from(result)
     }
 
+    // Fallback: full traverse (should rarely happen)
+    if (!sceneRef.current) return []
     const idsSet = new Set(globalIds)
     return findMeshesByIds(sceneRef.current, idsSet)
-  }, [])
+  }, [sceneIndex])
 
   /**
    * Compute bounding box for all selected meshes

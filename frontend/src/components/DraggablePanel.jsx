@@ -1,7 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { useDockedContext } from '../contexts/DockedContext'
 
 /**
- * Shared floating panel wrapper that centralizes drag/resize behavior.
+ * Shared panel wrapper that centralizes drag/resize behavior.
+ *
+ * Behaviour depends on DockedContext:
+ *  • { docked: true,  onUndock }                  → fills parent, drag-handle triggers undock
+ *  • { docked: false, onDock, setDockZoneActive }  → absolute-positioned, draggable & resizable
  */
 function DraggablePanel({
   position,
@@ -21,6 +26,11 @@ function DraggablePanel({
   resizeHandleClassName,
   children,
 }) {
+  const dockedCtx = useDockedContext()
+  const docked = typeof dockedCtx === 'object' ? !!dockedCtx.docked : !!dockedCtx
+  const dockedCtxRef = useRef(dockedCtx)
+  dockedCtxRef.current = dockedCtx
+
   const [isDragging, setIsDragging] = useState(false)
   const [isResizing, setIsResizing] = useState(false)
   const panelRef = useRef(null)
@@ -29,31 +39,66 @@ function DraggablePanel({
   const resizeStart = useRef({ x: 0, y: 0 })
   const startSize = useRef({ width: 0, height: 0 })
 
+  // Dock-zone tracking (floating → docked)
+  const dockZoneRef = useRef(false)
+
+  // Undock gesture tracking (docked → floating)
+  const undockDragRef = useRef(null)
+  const [undocking, setUndocking] = useState(false)
+
+  // ── Focus token effect (floating only) ──
   useEffect(() => {
+    if (docked) return
     if (!panelRef.current || focusToken === undefined || focusToken === null) return
 
     setPosition((prev) => {
       const maxX = Math.max(focusPadding, window.innerWidth - size.width - focusPadding)
       const maxY = Math.max(focusPadding, window.innerHeight - size.height - focusPadding)
-      const x = Math.min(Math.max(focusPadding, prev.x), maxX)
-      const y = Math.min(Math.max(focusPadding, prev.y), maxY)
-      return { x, y }
+      return {
+        x: Math.min(Math.max(focusPadding, prev.x), maxX),
+        y: Math.min(Math.max(focusPadding, prev.y), maxY),
+      }
     })
 
     const el = panelRef.current
     const original = el.style.boxShadow
     el.style.boxShadow = '0 12px 40px rgba(0,0,0,0.18)'
-    const timeout = setTimeout(() => {
-      el.style.boxShadow = original
-    }, 280)
-
+    const timeout = setTimeout(() => { el.style.boxShadow = original }, 280)
     return () => clearTimeout(timeout)
-  }, [focusToken, focusPadding, setPosition, size.height, size.width])
+  }, [docked, focusToken, focusPadding, setPosition, size.height, size.width])
 
-  const applyDragBounds = (nextPosition) => {
-    if (!dragBounds) return nextPosition
+  // ── Undock drag gesture (docked mode: drag handle > 30 px → undock) ──
+  useEffect(() => {
+    if (!undocking) return
+    const handleMove = (e) => {
+      if (!undockDragRef.current) return
+      const dx = e.clientX - undockDragRef.current.x
+      const dy = e.clientY - undockDragRef.current.y
+      if (Math.sqrt(dx * dx + dy * dy) > 30) {
+        setUndocking(false)
+        undockDragRef.current = null
+        const ctx = dockedCtxRef.current
+        if (typeof ctx === 'object') ctx.onUndock?.()
+      }
+    }
+    const handleUp = () => {
+      setUndocking(false)
+      undockDragRef.current = null
+    }
+    window.addEventListener('mousemove', handleMove)
+    window.addEventListener('mouseup', handleUp)
+    document.body.style.userSelect = 'none'
+    return () => {
+      window.removeEventListener('mousemove', handleMove)
+      window.removeEventListener('mouseup', handleUp)
+      document.body.style.userSelect = ''
+    }
+  }, [undocking])
 
-    const bounded = { ...nextPosition }
+  // ── Helpers ──
+  const applyDragBounds = (nextPos) => {
+    if (!dragBounds) return nextPos
+    const bounded = { ...nextPos }
     if (typeof dragBounds.minX === 'number') bounded.x = Math.max(dragBounds.minX, bounded.x)
     if (typeof dragBounds.maxX === 'number') bounded.x = Math.min(dragBounds.maxX, bounded.x)
     if (typeof dragBounds.minY === 'number') bounded.y = Math.max(dragBounds.minY, bounded.y)
@@ -61,7 +106,9 @@ function DraggablePanel({
     return bounded
   }
 
+  // ── Floating-mode drag handlers ──
   const handleMouseDown = (event) => {
+    if (docked) return
     if (!panelRef.current || !event.target.closest(dragHandleSelector)) return
     setIsDragging(true)
     dragStart.current = { x: event.clientX, y: event.clientY }
@@ -69,24 +116,34 @@ function DraggablePanel({
   }
 
   const handleMouseMove = (event) => {
-    if (isDragging) {
-      event.preventDefault()
-      const dx = event.clientX - dragStart.current.x
-      const dy = event.clientY - dragStart.current.y
-      setPosition(
-        applyDragBounds({
-          x: startPos.current.x + dx,
-          y: startPos.current.y + dy,
-        })
-      )
-    }
+    if (!isDragging) return
+    event.preventDefault()
+    const dx = event.clientX - dragStart.current.x
+    const dy = event.clientY - dragStart.current.y
+    setPosition(applyDragBounds({ x: startPos.current.x + dx, y: startPos.current.y + dy }))
+
+    // Dock-zone detection: cursor near the right edge
+    const nearDock = event.clientX > window.innerWidth - 100
+    dockZoneRef.current = nearDock
+    const ctx = dockedCtxRef.current
+    if (typeof ctx === 'object') ctx.setDockZoneActive?.(nearDock)
   }
 
   const handleMouseUp = () => {
+    if (dockZoneRef.current && isDragging) {
+      const ctx = dockedCtxRef.current
+      if (typeof ctx === 'object') {
+        ctx.onDock?.()
+        ctx.setDockZoneActive?.(false)
+      }
+      dockZoneRef.current = false
+    }
     setIsDragging(false)
   }
 
+  // ── Floating-mode resize handlers ──
   const handleResizeMouseDown = (event) => {
+    if (docked) return
     event.stopPropagation()
     setIsResizing(true)
     resizeStart.current = { x: event.clientX, y: event.clientY }
@@ -96,11 +153,9 @@ function DraggablePanel({
   const handleResizeMouseMove = (event) => {
     if (!isResizing) return
     event.preventDefault()
-    const dx = event.clientX - resizeStart.current.x
-    const dy = event.clientY - resizeStart.current.y
     setSize({
-      width: Math.max(minWidth, startSize.current.width + dx),
-      height: Math.max(minHeight, startSize.current.height + dy),
+      width: Math.max(minWidth, startSize.current.width + (event.clientX - resizeStart.current.x)),
+      height: Math.max(minHeight, startSize.current.height + (event.clientY - resizeStart.current.y)),
     })
   }
 
@@ -108,7 +163,9 @@ function DraggablePanel({
     setIsResizing(false)
   }
 
+  // ── Window listeners for floating drag / resize ──
   useEffect(() => {
+    if (docked) return
     if (isDragging) {
       window.addEventListener('mousemove', handleMouseMove)
       window.addEventListener('mouseup', handleMouseUp)
@@ -118,7 +175,6 @@ function DraggablePanel({
       window.addEventListener('mouseup', handleResizeMouseUp)
       document.body.style.userSelect = 'none'
     }
-
     return () => {
       window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('mouseup', handleMouseUp)
@@ -126,8 +182,38 @@ function DraggablePanel({
       window.removeEventListener('mouseup', handleResizeMouseUp)
       document.body.style.userSelect = ''
     }
-  }, [isDragging, isResizing])
+  }, [docked, isDragging, isResizing])
 
+  // ══════════ Docked-mode render ══════════
+  if (docked) {
+    const handleDockedMouseDown = (e) => {
+      if (!e.target.closest(dragHandleSelector)) return
+      undockDragRef.current = { x: e.clientX, y: e.clientY }
+      setUndocking(true)
+    }
+
+    const {
+      position: _p, left: _l, top: _t,
+      width: _w, height: _h, zIndex: _z,
+      ...dockedStyle
+    } = panelStyle || {}
+
+    return (
+      <div style={{
+        ...dockedStyle,
+        width: '100%',
+        height: '100%',
+        position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
+        cursor: undocking ? 'grabbing' : 'default',
+      }} onMouseDown={handleDockedMouseDown}>
+        {children}
+      </div>
+    )
+  }
+
+  // ══════════ Floating-mode render ══════════
   return (
     <div
       ref={panelRef}

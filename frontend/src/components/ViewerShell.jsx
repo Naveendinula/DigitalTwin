@@ -1,13 +1,6 @@
 import AxisViewWidget from './AxisViewWidget'
-import EcPanel from './EcPanel'
-import GraphQueryPanel from './GraphQueryPanel'
-import LlmChatPanel from './LlmChatPanel'
-import HvacFmPanel from './HvacFmPanel'
-import IdsValidationPanel from './IdsValidationPanel'
 import KeyboardHints from './KeyboardHints'
 import OccupancyLegend from './OccupancyLegend'
-import OccupancyPanel from './OccupancyPanel'
-import WorkOrdersPanel from './WorkOrdersPanel'
 import SectionPlaneHelper from './SectionPlaneHelper'
 import SectionPlanePanel from './SectionPlanePanel'
 import SelectableModel from './SelectableModelWithVisibility'
@@ -15,7 +8,7 @@ import SpaceBboxOverlay from './SpaceBboxOverlay'
 import SpaceNavigator from './SpaceNavigator'
 import UploadPanel from './UploadPanel'
 import Viewer from './Viewer'
-import ViewerToolbar from './ViewerToolbar'
+import { WorkOrderMarkersInner } from './WorkOrderMarkers'
 import { useViewerContext } from '../hooks/useViewerContext'
 
 export default function ViewerShell({ containerStyle }) {
@@ -26,53 +19,19 @@ export default function ViewerShell({ containerStyle }) {
     selection,
     sectionMode,
     viewModeState,
-    floatingPanels,
     spaceOverlay,
     occupancy,
-    occupancyPanelOpen,
-    setOccupancyPanelOpen,
     geometryHidden,
+    sceneIndex,
+    workOrderMarkers,
+    setWoScrollTarget,
     handleModelReady,
     handleResetModel,
     handleSectionPick,
-    handleToggleOccupancy,
-    handleToggleOccupancyPanel,
-    handleToggleGeometry,
-    handleGraphSelectResult,
-    handleGraphSelectBatch,
-    handleHvacSelectDetail,
-    handleTreeSelect,
     handleSceneReady,
     handleRendererReady,
     handleControlsReady
   } = viewer
-
-  const viewerToolbarProps = {
-    sectionModeEnabled: sectionMode.sectionModeEnabled,
-    onToggleSectionMode: sectionMode.toggleSectionMode,
-    hasSectionPlane: !!sectionMode.activeSectionPlane,
-    onClearSectionPlane: sectionMode.clearSectionPlane,
-    viewMode: viewModeState.viewMode,
-    onSetViewMode: viewModeState.setViewMode,
-    availableViews: viewModeState.getAvailableViews(),
-    onResetView: viewModeState.resetView,
-    onFitToModel: viewModeState.fitToModel,
-    onOpenEcPanel: floatingPanels.handleToggleEcPanel,
-    onOpenHvacPanel: floatingPanels.handleToggleHvacPanel,
-    onOpenGraphPanel: floatingPanels.handleToggleGraphPanel,
-    onOpenWorkOrdersPanel: floatingPanels.handleToggleWorkOrdersPanel,
-    onOpenIdsValidationPanel: floatingPanels.handleToggleIdsValidationPanel,
-    onOpenLlmChatPanel: floatingPanels.handleToggleLlmChatPanel,
-    onToggleSpaceOverlay: spaceOverlay.toggleSpaceOverlay,
-    spaceOverlayEnabled: spaceOverlay.spaceOverlayEnabled,
-    spaceOverlayLoading: spaceOverlay.spaceOverlayStatus.loading,
-    onToggleOccupancy: handleToggleOccupancy,
-    occupancyEnabled: occupancy.enabled,
-    onOpenOccupancyPanel: handleToggleOccupancyPanel,
-    geometryHidden,
-    onToggleGeometry: handleToggleGeometry,
-    hasModel: !!modelUrls
-  }
 
   const sectionPanelProps = {
     sectionModeEnabled: sectionMode.sectionModeEnabled,
@@ -134,57 +93,6 @@ export default function ViewerShell({ containerStyle }) {
     onReset: handleResetModel
   }
 
-  const ecPanelProps = {
-    isOpen: floatingPanels.ecPanelOpen,
-    onClose: floatingPanels.handleCloseEcPanel,
-    jobId,
-    selectedId: selection.selectedId,
-    onSelectContributor: handleTreeSelect,
-    focusToken: floatingPanels.ecPanelZIndex,
-    zIndex: floatingPanels.ecPanelZIndex
-  }
-
-  const hvacPanelProps = {
-    isOpen: floatingPanels.hvacPanelOpen,
-    onClose: floatingPanels.handleCloseHvacPanel,
-    jobId,
-    selectedId: selection.selectedId,
-    onSelectEquipment: handleHvacSelectDetail,
-    focusToken: floatingPanels.hvacPanelZIndex,
-    zIndex: floatingPanels.hvacPanelZIndex,
-    spaceOverlayLoading: spaceOverlay.spaceOverlayStatus.loading
-  }
-
-  const idsValidationPanelProps = {
-    isOpen: floatingPanels.idsValidationPanelOpen,
-    onClose: floatingPanels.handleCloseIdsValidationPanel,
-    jobId,
-    focusToken: floatingPanels.idsValidationPanelZIndex,
-    zIndex: floatingPanels.idsValidationPanelZIndex
-  }
-
-  const graphQueryPanelProps = {
-    isOpen: floatingPanels.graphPanelOpen,
-    onClose: floatingPanels.handleCloseGraphPanel,
-    jobId,
-    selectedId: selection.selectedId,
-    onSelectResult: handleGraphSelectResult,
-    onSelectResultBatch: handleGraphSelectBatch,
-    focusToken: floatingPanels.graphPanelZIndex,
-    zIndex: floatingPanels.graphPanelZIndex
-  }
-
-  const workOrdersPanelProps = {
-    isOpen: floatingPanels.workOrdersPanelOpen,
-    onClose: floatingPanels.handleCloseWorkOrdersPanel,
-    jobId,
-    selectedId: selection.selectedId,
-    metadataUrl: modelUrls?.metadataUrl || '',
-    onSelectWorkOrder: handleTreeSelect,
-    focusToken: floatingPanels.workOrdersPanelZIndex,
-    zIndex: floatingPanels.workOrdersPanelZIndex
-  }
-
   const spaceNavigatorProps = spaceOverlay.spaceNavigatorProps
   const { visible: showSpaceNavigator, ...navigatorProps } = spaceNavigatorProps || {}
 
@@ -199,30 +107,8 @@ export default function ViewerShell({ containerStyle }) {
     timestamp: occupancy.timestamp
   }
 
-  const occupancyPanelProps = {
-    isOpen: occupancyPanelOpen,
-    onClose: () => setOccupancyPanelOpen(false),
-    occupancyData: occupancy.occupancyMap,
-    totals: occupancy.totals,
-    timestamp: occupancy.timestamp,
-    onReset: occupancy.reset,
-    onSpaceSelect: spaceOverlay.handleSpaceSelect,
-    zIndex: 210
-  }
-
-  const llmChatPanelProps = {
-    isOpen: floatingPanels.llmChatPanelOpen,
-    onClose: floatingPanels.handleCloseLlmChatPanel,
-    jobId,
-    onSelectResult: handleGraphSelectResult,
-    focusToken: floatingPanels.llmChatPanelZIndex,
-    zIndex: floatingPanels.llmChatPanelZIndex
-  }
-
   return (
     <div style={containerStyle}>
-      <ViewerToolbar {...viewerToolbarProps} />
-
       <SectionPlanePanel {...sectionPanelProps} />
 
       <Viewer {...viewerProps}>
@@ -236,6 +122,13 @@ export default function ViewerShell({ containerStyle }) {
           </mesh>
         )}
         <SpaceBboxOverlay {...spaceOverlayProps} />
+        {workOrderMarkers.markerData.length > 0 && (
+          <WorkOrderMarkersInner
+            markerData={workOrderMarkers.markerData}
+            onMarkerClick={(globalId) => setWoScrollTarget(globalId)}
+            sceneIndex={sceneIndex}
+          />
+        )}
       </Viewer>
 
       {!hasGeometry && (
@@ -264,14 +157,6 @@ export default function ViewerShell({ containerStyle }) {
       )}
 
       <UploadPanel {...uploadPanelProps} />
-
-      <EcPanel {...ecPanelProps} />
-      <HvacFmPanel {...hvacPanelProps} />
-      <GraphQueryPanel {...graphQueryPanelProps} />
-      <IdsValidationPanel {...idsValidationPanelProps} />
-      <WorkOrdersPanel {...workOrdersPanelProps} />
-      <OccupancyPanel {...occupancyPanelProps} />
-      <LlmChatPanel {...llmChatPanelProps} />
 
       {showSpaceNavigator && <SpaceNavigator {...navigatorProps} />}
 

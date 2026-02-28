@@ -107,7 +107,9 @@ export default function useViewerSelection({
     const ids = [payload.equipmentId, ...(payload.terminalIds || [])].filter(Boolean)
     if (ids.length === 0) return
 
-    showAll()
+    // enableXRay handles ALL meshes: ghosts non-selected (including previously
+    // highlighted ones now that the highlight guard is removed) and restores
+    // selected ones to original.  selectById then applies highlight on top.
     enableXRay(ids, { mode: 'ghost' })
     selectById(ids)
 
@@ -118,15 +120,38 @@ export default function useViewerSelection({
     if (!result.found) {
       showToast('No geometry found for selected equipment', 'warning')
     }
-  }, [showAll, enableXRay, selectById, focusOnElements, showToast, enableSpaceOverlayForSpaces])
+  }, [enableXRay, selectById, focusOnElements, showToast, enableSpaceOverlayForSpaces])
+
+  // Track the last set of IDs we passed to updateXRaySelection / enableXRay
+  // so the effect below can skip truly-redundant calls.
+  const lastXRayIdsRef = useRef(null)
 
   useEffect(() => {
     if (!xRayEnabled) return
-    const solidIds = [...(isolatedIds || []), ...normalizeIds(selectedId)]
+
+    // Build the full set of IDs that should remain solid.
+    // lastSelectedIdsRef holds the multi-element set from handleHvacSelectDetail /
+    // handleTreeSelect — this is essential because selectedId only contains the
+    // *first* selected mesh's GlobalId, not all of them.
+    const explicitIds = lastSelectedIdsRef.current || []
+    const currentSelectedIds = normalizeIds(selectedId)
+    const isolatedList = isolatedIds || []
+
+    // Merge all sources, deduplicate
+    const merged = new Set([...isolatedList, ...explicitIds, ...currentSelectedIds])
+    const solidIds = Array.from(merged)
+
     if (solidIds.length === 0) {
       disableXRay()
       return
     }
+
+    // Skip if identical IDs were already applied (e.g. by handleHvacSelectDetail)
+    const prev = lastXRayIdsRef.current
+    if (prev && prev.length === solidIds.length && prev.every((id, i) => id === solidIds[i])) {
+      return
+    }
+    lastXRayIdsRef.current = solidIds
     updateXRaySelection(solidIds)
   }, [xRayEnabled, isolatedIds, selectedId, updateXRaySelection, disableXRay])
 

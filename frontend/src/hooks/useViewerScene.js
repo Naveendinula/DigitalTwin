@@ -4,7 +4,7 @@ import { debugLog } from '../utils/logger'
 export default function useViewerScene({
   setScene,
   setSectionScene,
-  setSelectionScene,
+  setSceneIndex,
   setXRayScene,
   setFocusScene,
   setViewModeScene,
@@ -38,7 +38,7 @@ export default function useViewerScene({
   const handleSceneReady = useCallback((scene, camera, gl) => {
     setScene(scene)
     setSectionScene(scene)
-    setSelectionScene(scene)
+    setSceneIndex(scene)
     setXRayScene(scene)
     setFocusScene(scene)
     setViewModeScene(scene)
@@ -52,8 +52,8 @@ export default function useViewerScene({
       setSectionRenderer(gl)
     }
     maybeFitToModel()
-    debugLog('Scene registered with visibility, section, selection, X-ray, focus, and view mode controllers')
-  }, [setScene, setSectionScene, setSelectionScene, setXRayScene, setFocusScene, setViewModeScene, setSectionCamera, setFocusCamera, setViewModeCamera, setSectionRenderer, maybeFitToModel])
+    debugLog('Scene registered with visibility, section, scene-index, X-ray, focus, and view mode controllers')
+  }, [setScene, setSectionScene, setSceneIndex, setXRayScene, setFocusScene, setViewModeScene, setSectionCamera, setFocusCamera, setViewModeCamera, setSectionRenderer, maybeFitToModel])
 
   const handleRendererReady = useCallback((gl, camera) => {
     if (gl) {

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import DraggablePanel from './DraggablePanel'
 import { apiFetch, parseJsonSafe } from '../utils/api'
 
@@ -131,6 +131,9 @@ function WorkOrdersPanel({
   onSelectWorkOrder,
   focusToken,
   zIndex,
+  scrollToGlobalId,
+  onScrollToConsumed,
+  onWorkOrdersChanged,
 }) {
   const [position, setPosition] = useState({ x: 820, y: 80 })
   const [size, setSize] = useState({ width: 460, height: 620 })
@@ -161,6 +164,8 @@ function WorkOrdersPanel({
   const [syncSettingsSaving, setSyncSettingsSaving] = useState(false)
   const [syncAction, setSyncAction] = useState(null)
   const [syncMessage, setSyncMessage] = useState('')
+
+  const cardRefs = useRef(new Map())
 
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [createPending, setCreatePending] = useState(false)
@@ -335,6 +340,26 @@ function WorkOrdersPanel({
     }
   }, [items, selectedGlobalId])
 
+  // Scroll to a specific element's work order when requested via 3D marker click
+  useEffect(() => {
+    if (!scrollToGlobalId || !items.length) return
+    // Reset filters to show active work orders so the target card is visible
+    setStatusFilter('active')
+    setSelectedOnly(false)
+    const match = items.find(
+      (item) => item.global_id === scrollToGlobalId && ACTIVE_STATUSES.has(item.status)
+    )
+    if (match) {
+      setSelectedWorkOrderId(match.id)
+      // Scroll after React commits the DOM update
+      requestAnimationFrame(() => {
+        const el = cardRefs.current.get(match.id)
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      })
+    }
+    onScrollToConsumed?.()
+  }, [scrollToGlobalId, items, onScrollToConsumed])
+
   const selectedWorkOrder = useMemo(
     () => items.find((item) => item.id === selectedWorkOrderId) || null,
     [items, selectedWorkOrderId]
@@ -388,6 +413,7 @@ function WorkOrdersPanel({
       })
       setShowCreateForm(false)
       await fetchWorkOrders()
+      onWorkOrdersChanged?.()
       if (payload?.id) {
         setSelectedWorkOrderId(payload.id)
       }
@@ -422,6 +448,7 @@ function WorkOrdersPanel({
         setEditorState(toEditorState(payload))
       }
       await fetchWorkOrders()
+      onWorkOrdersChanged?.()
     } catch (err) {
       setRawItems((prev) => prev.map((row) => (
         row.id === item.id ? { ...row, status: previous } : row
@@ -468,6 +495,7 @@ function WorkOrdersPanel({
       setRawItems((prev) => prev.map((row) => (row.id === payload.id ? payload : row)))
       setEditorState(toEditorState(payload))
       await fetchWorkOrders()
+      onWorkOrdersChanged?.()
     } catch (err) {
       setError(err.message || 'Failed to save work order')
     } finally {
@@ -492,6 +520,7 @@ function WorkOrdersPanel({
       setSelectedWorkOrderId(null)
       setEditorState(null)
       await fetchWorkOrders()
+      onWorkOrdersChanged?.()
     } catch (err) {
       setError(err.message || 'Failed to delete work order')
     } finally {
@@ -595,6 +624,7 @@ function WorkOrdersPanel({
       setEditorState(toEditorState(payload))
       setSyncMessage(direction === 'push' ? 'Work order pushed to CMMS.' : 'Work order pulled from CMMS.')
       await fetchWorkOrders()
+      onWorkOrdersChanged?.()
     } catch (err) {
       setError(err.message || `Failed to ${direction} work order`)
     } finally {
@@ -746,6 +776,7 @@ function WorkOrdersPanel({
                 {items.map((item) => (
                   <div
                     key={item.id}
+                    ref={(el) => { if (el) cardRefs.current.set(item.id, el); else cardRefs.current.delete(item.id) }}
                     style={{
                       ...styles.card,
                       ...(item.id === selectedWorkOrderId ? styles.cardSelected : {}),

@@ -1,11 +1,11 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import AppHeader from './components/AppHeader'
 import UploadPanel from './components/UploadPanel'
 import ViewerWorkspace from './components/ViewerWorkspace'
 import { useToast } from './components/Toast'
 import useKeyboardShortcuts from './hooks/useKeyboardShortcuts'
-import useFloatingPanels from './hooks/useFloatingPanels'
+import useDockedPanels from './hooks/useDockedPanels'
 import useSelection from './hooks/useSelection'
 import useVisibility from './hooks/useVisibility'
 import useSectionMode from './hooks/useSectionMode'
@@ -18,6 +18,8 @@ import useSpaceOverlay from './hooks/useSpaceOverlay'
 import useOccupancy from './hooks/useOccupancy'
 import useViewerScene from './hooks/useViewerScene'
 import usePanelResize from './hooks/usePanelResize'
+import useSceneIndex from './hooks/useSceneIndex'
+import useWorkOrderMarkers from './hooks/useWorkOrderMarkers'
 import { useAuth } from './hooks/useAuth'
 import { ViewerProvider } from './hooks/useViewerContext'
 import LoginPage from './pages/LoginPage'
@@ -39,35 +41,40 @@ function ViewerApp() {
   const [jobId, setJobId] = useState(null)
 
   // Panel visibility state
-  const [structureTreeVisible, setStructureTreeVisible] = useState(true)
-  const [propertiesPanelVisible, setPropertiesPanelVisible] = useState(true)
+  const [structureTreeVisible, setStructureTreeVisible] = useState(false)
   const {
     leftPanelWidth: structurePanelWidth,
-    rightPanelWidth: propertiesPanelWidth,
     handleStartResize,
   } = usePanelResize({
     initialLeftWidth: 280,
     initialRightWidth: 320,
   })
 
-  const selection = useSelection()
+  // Shared mesh index – built once, consumed by selection, X-ray, and camera focus
+  const sceneIndex = useSceneIndex()
+
+  const selection = useSelection({ sceneIndex })
   const visibility = useVisibility()
   const sectionMode = useSectionMode()
-  const xRayMode = useXRayMode()
-  const cameraFocus = useCameraFocus()
+  const xRayMode = useXRayMode({ sceneIndex })
+  const cameraFocus = useCameraFocus({ sceneIndex })
   const viewModeState = useViewMode()
   
   // Toast notifications
   const { showToast, ToastContainer } = useToast()
 
-  const floatingPanels = useFloatingPanels(xRayMode.disableXRay)
+  const dockedPanels = useDockedPanels(xRayMode.disableXRay)
   const spaceOverlay = useSpaceOverlay({ jobId, showToast })
   const occupancy = useOccupancy({ jobId, pollInterval: 2000, showToast })
 
-  // Occupancy panel state
-  const [occupancyPanelOpen, setOccupancyPanelOpen] = useState(false)
+  // Geometry / logout state
   const [geometryHidden, setGeometryHidden] = useState(false)
   const [logoutPending, setLogoutPending] = useState(false)
+  const [woScrollTarget, setWoScrollTarget] = useState(null)
+
+  // Work-order 3D markers — active when the work-orders panel is open
+  const woMarkersActive = dockedPanels.openPanels.includes('work-orders')
+  const workOrderMarkers = useWorkOrderMarkers(jobId, woMarkersActive)
 
   const {
     focusLock,
@@ -102,7 +109,7 @@ function ViewerApp() {
   } = useViewerScene({
     setScene: visibility.setScene,
     setSectionScene: sectionMode.setScene,
-    setSelectionScene: selection.setScene,
+    setSceneIndex: sceneIndex.setScene,
     setXRayScene: xRayMode.setScene,
     setFocusScene: cameraFocus.setScene,
     setViewModeScene: viewModeState.setScene,
@@ -139,7 +146,6 @@ function ViewerApp() {
     sectionMode.setSectionMode(false)
     spaceOverlay.disableSpaceOverlay()
     occupancy.disable()
-    setOccupancyPanelOpen(false)
     setGeometryHidden(false)
     // Invalidate bounds cache for new model
     viewModeState.invalidateBoundsCache()
@@ -150,20 +156,13 @@ function ViewerApp() {
   const handleResetModel = useCallback(() => {
     setModelUrls(null)
     setJobId(null)
-    floatingPanels.handleCloseEcPanel()
-    floatingPanels.handleCloseHvacPanel()
-    floatingPanels.handleCloseGraphPanel()
-    floatingPanels.handleCloseWorkOrdersPanel()
+    dockedPanels.closeAllPanels()
     spaceOverlay.disableSpaceOverlay()
     occupancy.disable()
-    setOccupancyPanelOpen(false)
     setGeometryHidden(false)
     handleClearAll()
   }, [
-    floatingPanels.handleCloseEcPanel,
-    floatingPanels.handleCloseHvacPanel,
-    floatingPanels.handleCloseGraphPanel,
-    floatingPanels.handleCloseWorkOrdersPanel,
+    dockedPanels.closeAllPanels,
     spaceOverlay.disableSpaceOverlay,
     occupancy.disable,
     handleClearAll
@@ -181,8 +180,8 @@ function ViewerApp() {
   }, [occupancy.enabled, occupancy.toggle, spaceOverlay.spaceOverlayEnabled, spaceOverlay.toggleSpaceOverlay])
 
   const handleToggleOccupancyPanel = useCallback(() => {
-    setOccupancyPanelOpen(prev => !prev)
-  }, [])
+    dockedPanels.togglePanel('occupancy')
+  }, [dockedPanels.togglePanel])
 
   const handleToggleGeometry = useCallback(() => {
     setGeometryHidden(prev => !prev)
@@ -197,26 +196,32 @@ function ViewerApp() {
     }
   }, [logout])
 
+  // Auto-open properties panel when an element is selected
+  const handleTreeSelectAndShowProps = useCallback((globalId) => {
+    handleTreeSelect(globalId)
+    if (globalId) dockedPanels.openPanel('properties')
+  }, [handleTreeSelect, dockedPanels.openPanel])
+
   const handleGlobalSearchSelect = useCallback((result) => {
     if (!result?.globalId) return
 
-    handleTreeSelect(result.globalId)
+    handleTreeSelectAndShowProps(result.globalId)
 
     if (result.type === 'IfcSpace') {
       spaceOverlay.enableSpaceOverlayForSpaces([result.globalId])
     }
-  }, [handleTreeSelect, spaceOverlay.enableSpaceOverlayForSpaces])
+  }, [handleTreeSelectAndShowProps, spaceOverlay.enableSpaceOverlayForSpaces])
 
   const handleGraphSelectResult = useCallback((globalId) => {
     if (!globalId) return
-    handleTreeSelect(globalId)
-  }, [handleTreeSelect])
+    handleTreeSelectAndShowProps(globalId)
+  }, [handleTreeSelectAndShowProps])
 
   const handleGraphSelectBatch = useCallback((globalIds) => {
     const ids = Array.isArray(globalIds) ? globalIds.filter(Boolean) : []
     if (ids.length === 0) return
 
-    visibility.showAll()
+    // enableXRay already resets all meshes — no need for showAll()
     xRayMode.enableXRay(ids, { mode: 'wireframe' })
     selection.selectById(ids)
 
@@ -227,7 +232,6 @@ function ViewerApp() {
       showToast(`Highlighted ${focusResult.count} elements`, 'info', 2000)
     }
   }, [
-    visibility.showAll,
     xRayMode.enableXRay,
     selection.selectById,
     cameraFocus.focusOnElements,
@@ -235,21 +239,26 @@ function ViewerApp() {
   ])
 
   // Show upload panel if no model loaded
-  if (!modelUrls) {
-    return <UploadPanel onModelReady={handleModelReady} hasModel={false} />
-  }
+  // Stable wrapper for handleSelect that also opens the properties panel
+  const handleSelectAndShowProps = useCallback((mesh) => {
+    selection.handleSelect(mesh)
+    if (mesh) dockedPanels.openPanel('properties')
+  }, [selection.handleSelect, dockedPanels.openPanel])
 
-  const viewerContextValue = {
+  // Memoize the context value to prevent cascading re-renders of all consumers
+  // when unrelated state changes in ViewerApp.
+  const viewerContextValue = useMemo(() => ({
     modelUrls,
     jobId,
-    selection,
+    selection: {
+      ...selection,
+      handleSelect: handleSelectAndShowProps,
+    },
     sectionMode,
     viewModeState,
-    floatingPanels,
+    dockedPanels,
     spaceOverlay,
     occupancy,
-    occupancyPanelOpen,
-    setOccupancyPanelOpen,
     geometryHidden,
     handleModelReady,
     handleResetModel,
@@ -260,13 +269,30 @@ function ViewerApp() {
     handleGraphSelectResult,
     handleGraphSelectBatch,
     handleHvacSelectDetail,
-    handleTreeSelect,
+    handleTreeSelect: handleTreeSelectAndShowProps,
     handleIsolate,
     focusLock,
     setFocusLock,
     handleSceneReady,
     handleRendererReady,
-    handleControlsReady
+    handleControlsReady,
+    sceneIndex,
+    workOrderMarkers,
+    woScrollTarget,
+    setWoScrollTarget,
+  }), [
+    modelUrls, jobId, selection, handleSelectAndShowProps,
+    sectionMode, viewModeState, dockedPanels, spaceOverlay, occupancy,
+    geometryHidden, handleModelReady, handleResetModel, handleSectionPick,
+    handleToggleOccupancy, handleToggleOccupancyPanel, handleToggleGeometry,
+    handleGraphSelectResult, handleGraphSelectBatch, handleHvacSelectDetail,
+    handleTreeSelectAndShowProps, handleIsolate, focusLock, setFocusLock,
+    handleSceneReady, handleRendererReady, handleControlsReady,
+    sceneIndex, workOrderMarkers, woScrollTarget, setWoScrollTarget,
+  ])
+
+  if (!modelUrls) {
+    return <UploadPanel onModelReady={handleModelReady} hasModel={false} />
   }
 
   return (
@@ -284,11 +310,8 @@ function ViewerApp() {
       <ViewerProvider value={viewerContextValue}>
         <ViewerWorkspace
           structureTreeVisible={structureTreeVisible}
-          propertiesPanelVisible={propertiesPanelVisible}
           onToggleStructureTree={() => setStructureTreeVisible(prev => !prev)}
-          onTogglePropertiesPanel={() => setPropertiesPanelVisible(prev => !prev)}
           structurePanelWidth={structurePanelWidth}
-          propertiesPanelWidth={propertiesPanelWidth}
           onStartResize={handleStartResize}
         />
       </ViewerProvider>

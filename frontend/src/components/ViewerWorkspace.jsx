@@ -1,67 +1,66 @@
 import appStyles from '../constants/appStyles'
-import PropertyPanel from './PropertyPanel'
+import DockedPanelContainer from './DockedPanelContainer'
+import FloatingPanelLayer from './FloatingPanelLayer'
+import LeftSidebar from './LeftSidebar'
+import RightSidebar from './RightSidebar'
 import StructureTree from './StructureTree'
 import ViewerShell from './ViewerShell'
 import { useViewerContext } from '../hooks/useViewerContext'
 
 export default function ViewerWorkspace({
   structureTreeVisible,
-  propertiesPanelVisible,
   onToggleStructureTree,
-  onTogglePropertiesPanel,
   structurePanelWidth,
-  propertiesPanelWidth,
   onStartResize,
 }) {
   const {
     modelUrls,
     jobId,
     selection,
-    floatingPanels,
+    dockedPanels,
     focusLock,
     setFocusLock,
     handleIsolate,
     handleTreeSelect,
+    sectionMode,
+    viewModeState,
+    spaceOverlay,
+    occupancy,
+    geometryHidden,
+    handleToggleOccupancy,
+    handleToggleOccupancyPanel,
+    handleToggleGeometry,
   } = useViewerContext()
 
+  const sidebarProps = {
+    structureTreeVisible,
+    onToggleStructureTree,
+    sectionModeEnabled: sectionMode.sectionModeEnabled,
+    onToggleSectionMode: sectionMode.toggleSectionMode,
+    hasSectionPlane: !!sectionMode.activeSectionPlane,
+    onClearSectionPlane: sectionMode.clearSectionPlane,
+    viewMode: viewModeState.viewMode,
+    onSetViewMode: viewModeState.setViewMode,
+    availableViews: viewModeState.getAvailableViews(),
+    onResetView: viewModeState.resetView,
+    onFitToModel: viewModeState.fitToModel,
+    onTogglePanel: dockedPanels.togglePanel,
+    activePanel: dockedPanels.activePanel,
+    floatingPanels: dockedPanels.floatingPanels,
+    onToggleSpaceOverlay: spaceOverlay.toggleSpaceOverlay,
+    spaceOverlayEnabled: spaceOverlay.spaceOverlayEnabled,
+    spaceOverlayLoading: spaceOverlay.spaceOverlayStatus.loading,
+    onToggleOccupancy: handleToggleOccupancy,
+    occupancyEnabled: occupancy.enabled,
+    onOpenOccupancyPanel: () => dockedPanels.togglePanel('occupancy'),
+    geometryHidden,
+    onToggleGeometry: handleToggleGeometry,
+    hasModel: !!modelUrls,
+  }
+
   return (
-    <div style={appStyles.mainContent}>
-      <button
-        data-panel-toggle
-        onClick={onToggleStructureTree}
-        title={structureTreeVisible ? 'Hide Structure Tree' : 'Show Structure Tree'}
-        style={{
-          ...appStyles.panelToggle,
-          ...appStyles.panelToggleLeft,
-          ...(structureTreeVisible ? {} : appStyles.panelToggleHidden),
-        }}
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          {structureTreeVisible ? (
-            <polyline points="15 18 9 12 15 6" />
-          ) : (
-            <polyline points="9 18 15 12 9 6" />
-          )}
-        </svg>
-      </button>
-      <button
-        data-panel-toggle
-        onClick={onTogglePropertiesPanel}
-        title={propertiesPanelVisible ? 'Hide Properties Panel' : 'Show Properties Panel'}
-        style={{
-          ...appStyles.panelToggle,
-          ...appStyles.panelToggleRight,
-          ...(propertiesPanelVisible ? {} : appStyles.panelToggleHidden),
-        }}
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          {propertiesPanelVisible ? (
-            <polyline points="9 18 15 12 9 6" />
-          ) : (
-            <polyline points="15 18 9 12 15 6" />
-          )}
-        </svg>
-      </button>
+    <div style={{ ...appStyles.mainContent, position: 'relative' }}>
+      <LeftSidebar {...sidebarProps} />
 
       {structureTreeVisible && (
         <div style={{ width: structurePanelWidth, position: 'relative', display: 'flex', flexShrink: 0 }}>
@@ -92,30 +91,50 @@ export default function ViewerWorkspace({
 
       <ViewerShell containerStyle={appStyles.viewerContainer} />
 
-      {propertiesPanelVisible && (
-        <div style={{ width: propertiesPanelWidth, position: 'relative', display: 'flex', flexShrink: 0 }}>
-          <div
-            onMouseDown={(event) => onStartResize('right', event)}
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '6px',
-              height: '100%',
-              cursor: 'col-resize',
-              background: 'rgba(0, 0, 0, 0.03)',
-              zIndex: 5,
-            }}
-            title="Drag to resize"
-          />
-          <PropertyPanel
-            selectedId={selection.selectedId}
-            metadataUrl={modelUrls.metadataUrl}
-            jobId={jobId}
-            onOpenWorkOrdersPanel={floatingPanels.handleOpenWorkOrdersPanel}
-          />
-        </div>
+      <DockedPanelContainer
+        activePanel={dockedPanels.activePanel}
+        openPanels={dockedPanels.openPanels}
+        onClose={dockedPanels.closePanel}
+        onUndock={dockedPanels.undockPanel}
+        floatingPanels={dockedPanels.floatingPanels}
+      />
+
+      <RightSidebar
+        openPanels={dockedPanels.openPanels}
+        activePanel={dockedPanels.activePanel}
+        floatingPanels={dockedPanels.floatingPanels}
+        dockZoneActive={dockedPanels.dockZoneActive}
+        onToggle={dockedPanels.togglePanel}
+        onClose={dockedPanels.closePanel}
+      />
+
+      {/* Dock-zone drop indicator — visible when dragging a floating panel near right edge */}
+      {dockedPanels.dockZoneActive && (
+        <div style={dockZoneStyles.indicator} />
       )}
+
+      {/* Floating panels render as an absolute overlay */}
+      <FloatingPanelLayer
+        floatingPanels={dockedPanels.floatingPanels}
+        onDock={dockedPanels.dockPanel}
+        onClose={dockedPanels.closePanel}
+        setDockZoneActive={dockedPanels.setDockZoneActive}
+      />
     </div>
   )
+}
+
+const dockZoneStyles = {
+  indicator: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    width: '100px',
+    background: 'linear-gradient(to right, transparent, rgba(59, 130, 246, 0.08))',
+    borderRight: '3px solid rgba(59, 130, 246, 0.4)',
+    pointerEvents: 'none',
+    zIndex: 800,
+    borderRadius: '0 12px 12px 0',
+  },
 }
