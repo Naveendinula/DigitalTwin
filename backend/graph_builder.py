@@ -20,6 +20,7 @@ from ifc_metadata_extractor import get_containing_storey, get_element_materials,
 from utils import clean_text as _clean_text
 
 logger = logging.getLogger(__name__)
+_MARK_PROPERTY_NAMES = ("mark", "tag", "assettag", "reference")
 
 
 def _global_id(entity: Any) -> str | None:
@@ -52,7 +53,54 @@ def _normalize_materials(values: list[Any] | None) -> list[str]:
     return sorted({_clean_text(value) for value in values if _clean_text(value)})
 
 
-def _ensure_element_node(graph: nx.MultiDiGraph, element: Any) -> str | None:
+def _extract_mark(element: Any) -> str | None:
+    direct_tag = _clean_text(getattr(element, "Tag", None))
+    if direct_tag:
+        return direct_tag
+
+    try:
+        psets = get_property_sets(element)
+    except Exception:
+        psets = {}
+
+    for properties in psets.values():
+        if not isinstance(properties, dict):
+            continue
+        for prop_name, prop_value in properties.items():
+            if _clean_text(prop_name).lower() not in _MARK_PROPERTY_NAMES:
+                continue
+            mark = _clean_text(convert_value(prop_value))
+            if mark:
+                return mark
+    return None
+
+
+def _classify_graph_role(
+    node_id: str,
+    ifc_type: str,
+    equipment_ids: set[str],
+    terminal_ids: set[str],
+) -> str:
+    if node_id in equipment_ids:
+        return "equipment"
+    if node_id in terminal_ids or ifc_type in {"IfcAirTerminal", "IfcFlowTerminal"}:
+        return "terminal"
+    if ifc_type == "IfcSpace":
+        return "space"
+    if ifc_type == "IfcBuildingStorey":
+        return "storey"
+    if ifc_type == "IfcSystem":
+        return "system"
+    return "element"
+
+
+def _ensure_element_node(
+    graph: nx.MultiDiGraph,
+    element: Any,
+    *,
+    equipment_ids: set[str] | None = None,
+    terminal_ids: set[str] | None = None,
+) -> str | None:
     node_id = _global_id(element)
     if not node_id:
         return None
@@ -61,8 +109,15 @@ def _ensure_element_node(graph: nx.MultiDiGraph, element: Any) -> str | None:
 
     ifc_type = _clean_text(element.is_a()) or "IfcObject"
     name = _clean_text(getattr(element, "Name", None)) or None
+    description = _clean_text(getattr(element, "Description", None)) or None
     storey = get_containing_storey(element)
     materials = _normalize_materials(get_element_materials(element))
+    graph_role = _classify_graph_role(
+        node_id,
+        ifc_type,
+        equipment_ids or set(),
+        terminal_ids or set(),
+    )
 
     graph.add_node(
         node_id,
@@ -70,6 +125,9 @@ def _ensure_element_node(graph: nx.MultiDiGraph, element: Any) -> str | None:
         label=_label_for_type(ifc_type),
         ifcType=ifc_type,
         name=name,
+        description=description,
+        mark=_extract_mark(element),
+        graphRole=graph_role,
         storey=storey,
         materials=materials,
     )
@@ -100,6 +158,9 @@ def _ensure_system_node(graph: nx.MultiDiGraph, system_name: str) -> str:
             label="System",
             ifcType="IfcSystem",
             name=system_name,
+            description=None,
+            mark=None,
+            graphRole="system",
             storey=None,
             materials=[],
         )
@@ -172,6 +233,7 @@ def _ensure_min_node(
     ifc_type: str = "IfcObject",
     name: str | None = None,
     storey: str | None = None,
+    graph_role: str = "element",
 ) -> str:
     if node_id not in graph:
         graph.add_node(
@@ -180,6 +242,9 @@ def _ensure_min_node(
             label=_label_for_type(ifc_type),
             ifcType=ifc_type,
             name=name,
+            description=None,
+            mark=None,
+            graphRole=graph_role,
             storey=storey,
             materials=[],
         )
@@ -218,6 +283,7 @@ def _ensure_node_from_global_id(
     fallback_ifc_type: str = "IfcObject",
     fallback_name: str | None = None,
     fallback_storey: str | None = None,
+    graph_role: str = "element",
 ) -> str | None:
     node_id = _clean_text(global_id)
     if not node_id:
@@ -235,6 +301,7 @@ def _ensure_node_from_global_id(
         ifc_type=fallback_ifc_type,
         name=fallback_name,
         storey=fallback_storey,
+        graph_role=graph_role,
     )
 
 
@@ -245,50 +312,56 @@ def build_graph_from_ifc_model(ifc_file: ifcopenshell.file) -> nx.MultiDiGraph:
     graph = nx.MultiDiGraph()
     seen_edges: set[tuple[str, str, str]] = set()
 
-    entities_by_global_id = _index_root_entities(ifc_file)
+    hvac_result = analyze_hvac_fm(ifc_file)
+    equipment_ids = {
+        text
+        for item in hvac_result.get("equipment", [])
+        if (text := _clean_text(item.get("globalId")))
+    }
+    terminal_ids = {
+        text
+        for equipment in hvac_result.get("equipment", [])
+        for collection_name in ("servedTerminals", "systemAssociatedTerminals")
+        for terminal in equipment.get(collection_name, [])
+        if (text := _clean_text(terminal.get("globalId")))
+    }
     products = list(ifc_file.by_type("IfcProduct"))
 
     for product in products:
-        _ensure_element_node(graph, product)
+        _ensure_element_node(
+            graph,
+            product,
+            equipment_ids=equipment_ids,
+            terminal_ids=terminal_ids,
+        )
 
     # IfcRelContainedInSpatialStructure: Element -> Spatial container
     for relation in ifc_file.by_type("IfcRelContainedInSpatialStructure"):
-        target_id = _ensure_element_node(graph, relation.RelatingStructure)
+        target_id = _ensure_element_node(
+            graph,
+            relation.RelatingStructure,
+            equipment_ids=equipment_ids,
+            terminal_ids=terminal_ids,
+        )
         for element in relation.RelatedElements or []:
-            source_id = _ensure_element_node(graph, element)
+            source_id = _ensure_element_node(
+                graph,
+                element,
+                equipment_ids=equipment_ids,
+                terminal_ids=terminal_ids,
+            )
             _add_typed_edge_once(graph, seen_edges, source_id, target_id, "CONTAINED_IN")
 
-    # IfcRelAggregates (spatial only): Child spatial -> Parent spatial
-    for relation in ifc_file.by_type("IfcRelAggregates"):
-        parent = relation.RelatingObject
-        if not _is_spatial(parent):
-            continue
-        parent_id = _ensure_element_node(graph, parent)
-        for child in relation.RelatedObjects or []:
-            if not _is_spatial(child):
-                continue
-            child_id = _ensure_element_node(graph, child)
-            _add_typed_edge_once(graph, seen_edges, child_id, parent_id, "DECOMPOSES")
-
-    # IfcRelSpaceBoundary: Space -> related building element
-    for relation in ifc_file.by_type("IfcRelSpaceBoundary"):
-        space = getattr(relation, "RelatingSpace", None)
-        element = getattr(relation, "RelatedBuildingElement", None)
-        if not space or not element:
-            continue
-        source_id = _ensure_element_node(graph, space)
-        target_id = _ensure_element_node(graph, element)
-        _add_typed_edge_once(graph, seen_edges, source_id, target_id, "BOUNDED_BY")
-
-    # Materials, properties, and system associations from products
+    # Properties and system associations from products
     for product in products:
-        product_id = _ensure_element_node(graph, product)
+        product_id = _ensure_element_node(
+            graph,
+            product,
+            equipment_ids=equipment_ids,
+            terminal_ids=terminal_ids,
+        )
         if not product_id:
             continue
-
-        for material_name in _normalize_materials(get_element_materials(product)):
-            material_id = _ensure_material_node(graph, material_name)
-            _add_typed_edge_once(graph, seen_edges, product_id, material_id, "HAS_MATERIAL")
 
         # Property sets / quantity sets
         try:
@@ -312,42 +385,6 @@ def build_graph_from_ifc_model(ifc_file: ifcopenshell.file) -> nx.MultiDiGraph:
                 system_name = _global_id(system) or f"system-{system.id()}"
             system_id = _ensure_system_node(graph, system_name)
             _add_typed_edge_once(graph, seen_edges, product_id, system_id, "IN_SYSTEM")
-
-    # FEEDS and SERVES from existing HVAC/FM traversal
-    hvac_result = analyze_hvac_fm(ifc_file)
-    for equipment in hvac_result.get("equipment", []):
-        equipment_id = _ensure_node_from_global_id(
-            graph,
-            entities_by_global_id,
-            equipment.get("globalId"),
-            fallback_ifc_type="IfcDistributionElement",
-            fallback_name=equipment.get("name"),
-            fallback_storey=equipment.get("storey"),
-        )
-        if not equipment_id:
-            continue
-
-        for terminal in equipment.get("servedTerminals", []):
-            terminal_id = _ensure_node_from_global_id(
-                graph,
-                entities_by_global_id,
-                terminal.get("globalId"),
-                fallback_ifc_type=terminal.get("type") or "IfcFlowTerminal",
-                fallback_name=terminal.get("name"),
-                fallback_storey=terminal.get("storey"),
-            )
-            _add_typed_edge_once(graph, seen_edges, equipment_id, terminal_id, "FEEDS")
-
-            space = terminal.get("space") or {}
-            space_id = _ensure_node_from_global_id(
-                graph,
-                entities_by_global_id,
-                space.get("globalId"),
-                fallback_ifc_type="IfcSpace",
-                fallback_name=space.get("name"),
-                fallback_storey=terminal.get("storey"),
-            )
-            _add_typed_edge_once(graph, seen_edges, terminal_id, space_id, "SERVES")
 
     return graph
 

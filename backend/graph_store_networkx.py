@@ -26,6 +26,9 @@ def _node_payload(node_id: str, attrs: dict[str, Any]) -> dict[str, Any]:
         "label": attrs.get("label"),
         "ifcType": attrs.get("ifcType"),
         "name": attrs.get("name"),
+        "description": attrs.get("description"),
+        "mark": attrs.get("mark"),
+        "graphRole": attrs.get("graphRole"),
         "storey": attrs.get("storey"),
         "materials": attrs.get("materials") or [],
     }

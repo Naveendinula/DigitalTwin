@@ -19,6 +19,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from utils import clean_text as _clean_text
+
 # Current metadata schema version
 METADATA_SCHEMA_VERSION = 2
 logger = logging.getLogger(__name__)
@@ -235,14 +237,33 @@ def get_element_materials(element) -> list[str]:
 
 def get_containing_storey(element) -> str | None:
     """
-    Get the building storey that contains this element.
-    
+    Get the best available level/storey label for this element.
+
     Args:
         element: An IFC element
         
     Returns:
-        Name of the containing storey or None
+        Constraints.Level when present, else containing storey name, else None
     """
+    try:
+        psets = get_property_sets(element)
+    except Exception:
+        psets = {}
+
+    for pset_name, properties in psets.items():
+        if _clean_text(pset_name).lower() != 'constraints' or not isinstance(properties, dict):
+            continue
+        level = _clean_text(properties.get('Level'))
+        if level:
+            return level
+
+    for properties in psets.values():
+        if not isinstance(properties, dict):
+            continue
+        level = _clean_text(properties.get('Level'))
+        if level:
+            return level
+
     try:
         # Check spatial containment
         if hasattr(element, 'ContainedInStructure'):

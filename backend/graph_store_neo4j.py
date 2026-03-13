@@ -9,7 +9,7 @@ Phase 3:
 - Neo4j-backed graph query store implementation
 
 Phase 5:
-- Neo4j-first cutover for graph API + LLM query paths
+- Neo4j-first cutover for graph API query paths
 """
 
 from __future__ import annotations
@@ -54,6 +54,16 @@ _SCHEMA_QUERIES = (
     ON (n.job_id, n.storey)
     """,
     """
+    CREATE INDEX bim_node_job_graph_role IF NOT EXISTS
+    FOR (n:BIMNode)
+    ON (n.job_id, n.graphRole)
+    """,
+    """
+    CREATE INDEX bim_node_job_mark IF NOT EXISTS
+    FOR (n:BIMNode)
+    ON (n.job_id, n.mark)
+    """,
+    """
     CREATE INDEX bim_rel_job_type IF NOT EXISTS
     FOR ()-[r:BIM_REL]-()
     ON (r.job_id, r.type)
@@ -93,6 +103,9 @@ SET n.globalId = row.globalId,
     n.label = row.label,
     n.ifcType = row.ifcType,
     n.name = row.name,
+    n.description = row.description,
+    n.mark = row.mark,
+    n.graphRole = row.graphRole,
     n.storey = row.storey,
     n.materials = row.materials
 """
@@ -174,6 +187,9 @@ def _normalize_node(raw_node: dict[str, Any]) -> dict[str, Any] | None:
         "label": _clean_text(raw_node.get("label")) or None,
         "ifcType": _clean_text(raw_node.get("ifcType")) or None,
         "name": _clean_text(raw_node.get("name")) or None,
+        "description": _clean_text(raw_node.get("description")) or None,
+        "mark": _clean_text(raw_node.get("mark")) or None,
+        "graphRole": _clean_text(raw_node.get("graphRole")) or None,
         "storey": _clean_text(raw_node.get("storey")) or None,
         "materials": materials,
     }
@@ -327,6 +343,9 @@ def _node_payload(row: dict[str, Any]) -> dict[str, Any]:
         "label": row.get("label"),
         "ifcType": row.get("ifcType"),
         "name": row.get("name"),
+        "description": row.get("description"),
+        "mark": row.get("mark"),
+        "graphRole": row.get("graphRole"),
         "storey": row.get("storey"),
         "materials": materials,
     }
@@ -392,6 +411,9 @@ class Neo4jGraphStore:
                    n.label AS label,
                    n.ifcType AS ifcType,
                    n.name AS name,
+                   n.description AS description,
+                   n.mark AS mark,
+                   n.graphRole AS graphRole,
                    n.storey AS storey,
                    n.materials AS materials
             LIMIT 1
@@ -518,6 +540,9 @@ class Neo4jGraphStore:
                    n.label AS label,
                    n.ifcType AS ifcType,
                    n.name AS name,
+                   n.description AS description,
+                   n.mark AS mark,
+                   n.graphRole AS graphRole,
                    n.storey AS storey,
                    n.materials AS materials
             """,
@@ -579,6 +604,9 @@ class Neo4jGraphStore:
                    n.label AS label,
                    n.ifcType AS ifcType,
                    n.name AS name,
+                   n.description AS description,
+                   n.mark AS mark,
+                   n.graphRole AS graphRole,
                    n.storey AS storey,
                    n.materials AS materials
             """,
@@ -702,6 +730,9 @@ class Neo4jGraphStore:
                    n.label AS label,
                    n.ifcType AS ifcType,
                    n.name AS name,
+                   n.description AS description,
+                   n.mark AS mark,
+                   n.graphRole AS graphRole,
                    n.storey AS storey,
                    n.materials AS materials
             """,

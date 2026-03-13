@@ -1,44 +1,30 @@
 # Architecture Documentation
 
 > **Status**: Living Document  
-> **Last Updated**: February 27, 2026  
+> **Last Updated**: March 12, 2026  
 > **Owner**: Naveen Panditharatne
 
 ## Recent additions / changes
+
+- **Date:** 2026-03-12
+- **Graph Traversal Explorer:** Added a second mode inside `frontend/src/components/GraphQueryPanel.jsx` for step-by-step graph traversal.
+- **Frontend updates:** Traversal mode reuses existing graph endpoints (`stats`, `neighbors`, `path`) to expand one hop at a time, record hop batches in UI state, and compare shortest-path results against the expanded traversal.
+- **Visualization updates:** `frontend/src/components/GraphView.jsx` now accepts hop/path highlighting props so traversal graphs can distinguish the start node, current hop, and shortest-path overlay without changing backend payloads.
+
+- **Date:** 2026-03-09
+- **Phase 1 Neo4j validation profile:** Trimmed the graph builder to a narrower validation graph for manual Cypher verification.
+- **Backend updates:** `backend/graph_builder.py` now emits only `CONTAINED_IN`, `IN_SYSTEM`, and property-link relationships while adding `graphRole`, `mark`, and `description` node fields; `backend/graph_store_neo4j.py` now persists those fields and indexes `graphRole` and `mark`.
+- **Level preference fix:** Graph/metadata `storey` now prefers `Constraints.Level` from element properties before falling back to spatial containment, which better matches Revit-authored level data in current assets.
+- **Validation assets:** Added `backend/tests/fixtures/graph_phase1.ifc`, `backend/tests/test_graph_phase1.py`, and documented the manual Cypher validation queries below.
 
 - **Date:** 2026-02-27
 - **Landing loader progress UI:** Updated the `UploadPanel` landing preload overlay to show real frame-loading progress with a percentage (`0-100%`) and a thin progress bar while scrollytelling frames load.
 - **Landing loader race fix:** Hardened landing frame preload state updates against React `StrictMode` double-effect races by scoping callbacks to the active preload run; loader now reliably reaches `100%` and holds briefly before dismissing.
 
-- **Date:** 2026-02-26
-- **Deterministic COBie HRU query path:** Added a targeted non-LLM answer path for questions about HRUs with COBie parameters to prevent overcounting from prompt inference.
-- **Backend (`llm_chat.py`):** Before Cypher/keyword LLM flows, COBie+HRU questions now run a strict property check over HRU elements and only count elements with at least one non-empty `COBie.*` property value. Responses include exact matched `globalId`s.
-- **HRU level count hardening:** Added a deterministic non-LLM path for count questions like "how many HRUs are on level 2", using `Constraints.Level` first and `storey` as fallback so counts are not under-reported when spatial containment storey is sparse.
-- **Air terminal by space hardening:** Added a deterministic non-LLM path for questions like "how many air terminals are connected to the residential lobby". Space matching now includes key `IfcSpace` property values (`Identity Data.Name`, `Room Name`, `Number`, `Room Number`, `Pset_SpaceCommon.Reference`) instead of relying only on `IfcSpace.name`.
-- **LLM chat timeout hardening (frontend):** Increased LLM panel request timeout from 60s to a configurable `VITE_LLM_CHAT_TIMEOUT_MS` (default 300s) and updated timeout wording to reflect that backend processing may still be in progress.
-
 - **Date:** 2026-02-25
-- **Self-correcting Cypher loop (LLM Phase 3):** Hardened the text-to-Cypher pipeline with pre-execution auto-correction, schema validation, and enriched repair context.
-- **Backend (`cypher_agent.py`):**
-  - `_sanitize_cypher()` — auto-fixes common LLM mistakes without an LLM round-trip: relationship-type-as-label (`[:CONTAINED_IN]` → `[:BIM_REL {type: 'CONTAINED_IN'}]`), missing `job_id` on `:BIM_REL`, stripping LIMIT from pure count queries.
-  - `_validate_cypher_labels()` — checks node labels and parameter usage against the schema before execution; warnings are included in reasoning output.
-  - Enhanced repair prompt — `_build_repair_hints()` detects specific mistakes in failed Cypher and injects targeted hints (valid labels, correct relationship patterns) so the repair LLM call is more likely to succeed.
-  - Repaired queries also run through `_sanitize_cypher()` before re-execution.
-  - Structured attempt tracking — `_build_reasoning()` formats the full retry chain (attempt number, status, Cypher) into the `reasoning` field for transparency.
-
-- **Date:** 2026-02-25
-- **Text-to-Cypher agent (LLM Phase 2):** Added a two-step text-to-Cypher pipeline that translates natural-language questions into Neo4j Cypher queries, executes them, and synthesises answers — with automatic repair/retry on query failures. The keyword-search context path remains as a fallback.
-- **Backend:** Added `backend/cypher_agent.py` (schema-aware Cypher generation, few-shot examples, self-correcting repair loop, read-only execution, answer synthesis). Updated `backend/llm_chat.py` to route through the Cypher agent first when `GRAPH_BACKEND=neo4j`, falling back to the existing keyword-search path on failure.
-- **Flow:** User question → `generate_cypher()` (LLM + schema + few-shot) → `_execute_cypher()` (Neo4j read-only) → repair loop (up to 2 retries) → `_synthesise_answer()` (LLM) → response with `answer`, `referenced_ids`, `reasoning` (contains the Cypher query).
-
-- **Date:** 2026-02-25
-- **Neo4j-first graph cutover (phase 5):** Graph query/LLM paths now default to Neo4j (`GRAPH_BACKEND=neo4j`) with no silent read fallback path.
+- **Neo4j-first graph cutover (phase 5):** Graph query paths now default to Neo4j (`GRAPH_BACKEND=neo4j`) with no silent read fallback path.
 - **Backend updates:** `backend/config.py` now defaults `GRAPH_BACKEND` to `neo4j`; `backend/graph_store.py` selects a single active backend without auto-fallback; `backend/graph_api.py` uses only the graph-store router path; `backend/tasks.py` now treats graph build + Neo4j sync as required when `GRAPH_BACKEND=neo4j`; `backend/neo4j_client.py` now fails fast during startup when required Neo4j connectivity/config is missing.
 - **Operational note:** `backend/.env.example` now defaults to Neo4j and includes ingest batch tuning.
-
-- **Date:** 2026-02-25
-- **LLM graph-store migration (phase 4):** LLM context generation no longer depends on directly loading a NetworkX graph in `llm_chat.py`; it now uses graph-store queries (`stats`, targeted node queries, neighbor edges) so the same path works with Neo4j-backed graph reads.
-- **Backend updates:** Updated `backend/llm_chat.py` to query via `get_graph_store()` and validate referenced IDs through store lookups; updated `backend/llm_api.py` to pass `job_id` directly into the LLM context pipeline.
 
 - **Date:** 2026-02-25
 - **Neo4j read backend (phase 3):** Added Neo4j-backed read implementations for stats, neighbors, shortest path, structured query, and subgraph responses.
@@ -55,11 +41,6 @@
 - **Neo4j readiness:** Added `neo4j` dependency, environment config (`GRAPH_BACKEND`, `NEO4J_*`), and driver lifecycle helpers in `backend/neo4j_client.py` wired into FastAPI lifespan.
 
 - **Date:** 2026-02-22
-- **LLM BIM Assistant:** Added an AI chat panel that lets users ask natural language questions about their building model. The LLM (OpenRouter, `stepfun/step-3.5-flash:free`) receives graph context (stats, keyword-matched nodes, relationships) extracted through the graph-store layer and returns human-readable answers with clickable `globalId` references for 3D highlighting.
-- **Backend:** Added `backend/llm_chat.py` (context-stuffing engine: graph summary + keyword search + edge context), `backend/llm_api.py` (`POST /api/llm/{job_id}/chat`), OpenRouter config in `backend/config.py`.
-- **Frontend:** Added `LlmChatPanel.jsx` (draggable floating chat), `ChatIcon` in `ViewerIcons.jsx`, wired into `useFloatingPanels`/`usePanelStacking`/`ViewerToolbar`/`ViewerShell`.
-
-- **Date:** 2026-02-21
 - **Tooling & safety baseline (phase 6):** Pinned backend dependencies (plus `numpy`) and added `backend/requirements-dev.txt`; added frontend `tsconfig.json`, ESLint/Prettier configs, Vitest setup/config, and first hook tests (`usePanelStacking`, `useFloatingPanels`, `usePanelResize`); tightened backend CORS methods/headers; added in-memory rate limiting middleware and centralized 5xx response sanitization handlers in `backend/main.py`.
 
 - **Date:** 2026-02-21
@@ -242,7 +223,7 @@ The system bridges the gap between complex BIM files and accessible web visualiz
 *   `ifc_spatial_hierarchy.py`: Extracts the building tree (Site -> Building -> Storey -> Space -> Element).
 *   `graph_api.py`: Graph-query API endpoints for per-job graph stats, neighbors, paths, and filtered traversals.
 *   `graph_builder.py`: Builds a lightweight IFC relationship graph and writes `graph.json` artifact.
-*   `graph_store.py`: Graph backend selector for API/LLM query paths (`neo4j` or `networkx`).
+*   `graph_store.py`: Graph backend selector for API query paths (`neo4j` or `networkx`).
 *   `graph_store_neo4j.py`: Neo4j ingest + query store implementation (stats, traversal, path, subgraph).
 *   `graph_store_networkx.py`: NetworkX graph artifact query store implementation (optional backend).
 *   `neo4j_client.py`: Shared Neo4j driver lifecycle and connectivity checks.
@@ -385,10 +366,31 @@ graph TB
 
 ### Data Flow: Graph Build (Phase 1)
 1.  **Process stage**: During background IFC processing, after metadata extraction, backend calls `graph_builder.py`.
-2.  **Build graph**: The module opens IFC and builds a directed multigraph of key BIM relationships (containment, decomposition, boundaries, materials, systems, HVAC feed/serve links).
-3.  **Persist**: Graph is serialized as node-link JSON to `output/{jobId}/graph.json`.
-4.  **Sync**: Backend syncs `graph.json` into Neo4j in batches.
-5.  **Failure behavior**: If `GRAPH_BACKEND=neo4j`, graph build/sync failure fails the processing job; otherwise graph generation remains non-fatal.
+2.  **Build graph**: The module opens IFC and builds a directed multigraph of key BIM relationships.
+3.  **Phase 1 validation profile**: The current validation cut emits only `CONTAINED_IN`, `IN_SYSTEM`, and property links while preserving node-level `storey`, `materials`, `graphRole`, `mark`, and `description` fields.
+4.  **Level preference**: `storey` now prefers `Constraints.Level` from element properties before falling back to the containing `IfcBuildingStorey` name.
+5.  **Role mapping**: `graphRole` is derived as `equipment`, `terminal`, `space`, `storey`, `system`, or fallback `element`; `mark` uses `Tag` first, then `Mark` / `Tag` / `AssetTag` / `Reference` property fallbacks.
+6.  **Persist**: Graph is serialized as node-link JSON to `output/{jobId}/graph.json`.
+7.  **Sync**: Backend syncs `graph.json` into Neo4j in batches.
+8.  **Failure behavior**: If `GRAPH_BACKEND=neo4j`, graph build/sync failure fails the processing job; otherwise graph generation remains non-fatal.
+
+### Neo4j Validation Profile (Phase 1)
+- **Node storage:** Neo4j continues to use generic `BIMNode` rows keyed by `(job_id, id)` instead of dedicated labels like `Equipment` or `Storey`.
+- **Node fields:** Phase 1 validation depends on `ifcType`, `name`, `storey`, `materials`, `graphRole`, `mark`, and `description` on `BIMNode`, plus `psetName`, `propName`, `value`, and `valueType` on `BIMProp`.
+- **Indexes:** Neo4j maintains composite indexes on `(job_id, ifcType)`, `(job_id, storey)`, `(job_id, graphRole)`, and `(job_id, mark)` for `BIMNode`, plus existing property-node indexes.
+- **Relationship storage:** Non-property relationships remain under `BIM_REL` with the semantic type stored in `r.type`; property links are stored as `HAS_PROP`.
+
+### Manual Cypher Validation Queries (Phase 1)
+1.  **Find equipment by mark**
+    `MATCH (n:BIMNode {job_id:$job_id}) WHERE n.graphRole = 'equipment' AND toLower(coalesce(n.mark,'')) CONTAINS toLower($mark) RETURN n.id, n.name, n.mark, n.storey ORDER BY n.mark`
+2.  **List equipment on a storey**
+    `MATCH (n:BIMNode {job_id:$job_id}) WHERE n.graphRole = 'equipment' AND toLower(coalesce(n.storey,'')) = toLower($storey) RETURN n.id, n.name, n.mark ORDER BY n.name`
+3.  **List equipment in a system**
+    `MATCH (eq:BIMNode {job_id:$job_id})-[r:BIM_REL {job_id:$job_id, type:'IN_SYSTEM'}]->(sys:BIMNode {job_id:$job_id}) WHERE eq.graphRole = 'equipment' AND toLower(coalesce(sys.name,'')) CONTAINS toLower($system) RETURN eq.id, eq.name, eq.mark, sys.name ORDER BY eq.name`
+4.  **Get one asset's properties**
+    `MATCH (n:BIMNode {job_id:$job_id, id:$global_id})-[:HAS_PROP {job_id:$job_id}]->(p:BIMProp {job_id:$job_id}) RETURN p.psetName, p.propName, p.value, p.valueType ORDER BY p.psetName, p.propName`
+5.  **Find missing marks/descriptions**
+    `MATCH (n:BIMNode {job_id:$job_id}) WHERE n.graphRole = 'equipment' AND ((n.mark IS NULL OR trim(n.mark) = '') OR (n.description IS NULL OR trim(n.description) = '')) RETURN n.id, n.name, n.mark, n.description, n.storey ORDER BY n.name`
 
 ### Data Flow: Graph Query API (Phase 2-5)
 1.  **Authorize**: Frontend calls `/api/graph/{jobId}/*`; backend enforces per-job ownership with `require_job_access_user`.
@@ -401,6 +403,13 @@ graph TB
 2.  **Load filter options**: Frontend calls `GET /api/graph/{jobId}/stats` to populate type/storey/material filter dropdowns.
 3.  **Run query**: Frontend posts filter/traversal criteria to `POST /api/graph/{jobId}/query` and renders returned nodes/edges in a result list.
 4.  **Model linking**: Clicking a result reuses existing selection/focus flow; "Highlight Results" reuses batch X-ray selection to emphasize all returned elements in 3D.
+
+### Data Flow: Graph Traversal Explorer
+1.  **Switch modes**: User toggles `GraphQueryPanel` into Traversal Explorer mode.
+2.  **Seed traversal**: Frontend uses the current model selection as the default start node when available, then calls `GET /api/graph/{jobId}/neighbors/{global_id}` for the first hop.
+3.  **Expand hop-by-hop**: For each additional hop, frontend calls the same neighbors endpoint for the current frontier, filters by the chosen relationship type, deduplicates visited nodes/edges in UI state, and records a hop batch for inspection.
+4.  **Compare shortest path**: When the user supplies a target node, frontend calls `GET /api/graph/{jobId}/path/{source_id}/{target_id}` and overlays that path onto the accumulated traversal graph.
+5.  **Explain traversal**: `GraphView.jsx` colors nodes by hop, highlights the newest hop edges, and separately marks shortest-path nodes/edges while the hop breakdown list remains the authoritative textual explanation.
 
 ### Data Flow: Graph Visualization (Phase 4)
 1.  **Toggle visual mode**: User clicks "Show Graph View" in `GraphQueryPanel`.
@@ -475,7 +484,7 @@ graph TB
 *   **FastAPI**: Web framework.
 *   **IfcOpenShell**: Parsing and manipulating IFC files.
 *   **NetworkX**: Directed multigraph representation and node-link JSON serialization for `graph.json` build artifact (also optional query backend).
-*   **Neo4j + neo4j Python driver**: Default graph query backend for API and LLM paths.
+*   **Neo4j + neo4j Python driver**: Default graph query backend for API paths.
 *   **SQLite + aiosqlite**: Lightweight async persistence for maintenance logs, work orders, auth, and job ownership.
 *   **Pandas**: Data manipulation for the EC database and material merging.
 *   **IfcConvert**: External executable (must be present in `backend/`) for geometry conversion.
